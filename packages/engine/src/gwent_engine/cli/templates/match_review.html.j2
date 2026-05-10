@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --p1: #2563eb;
+      --p2: #dc2626;
+      --value: #c2410c;
+      --unit-bg: #dbeafe;
+      --unit-border: #60a5fa;
+      --special-bg: #fde68a;
+      --special-border: #f59e0b;
+      --hero-bg: #ffedd5;
+      --hero-border: #f97316;
+      --panel-bg: #eef2f7;
+      --selected-bg: #fff7d6;
+    }
+    body {
+      margin: 0;
+      padding: 32px;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-family: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+    }
+    h1, h2 {
+      margin: 0 0 12px;
+      letter-spacing: 0.01em;
+    }
+    h1 { font-size: 2rem; }
+    h2 { margin-top: 32px; font-size: 1.15rem; }
+    p { margin: 0 0 10px; }
+    .tag {
+      color: var(--muted);
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .muted { color: var(--muted); }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 8px 24px;
+      margin: 20px 0 24px;
+    }
+    .label {
+      display: inline-block;
+      min-width: 150px;
+      color: var(--muted);
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+    .step {
+      margin: 0 0 22px;
+      position: relative;
+      scroll-margin-top: 24px;
+    }
+    .action-line {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .step-number {
+      color: var(--muted);
+      margin-right: 8px;
+    }
+    .actor-link {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+    .detail {
+      margin-left: 28px;
+    }
+    .detail-grid {
+      display: block;
+    }
+    .detail-main {
+      min-width: 0;
+    }
+    .detail-aside {
+      position: absolute;
+      top: 5px;
+      right: -396px;
+      width: 360px;
+    }
+    .detail-aside summary {
+      cursor: pointer;
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .detail-aside summary::-webkit-details-marker {
+      display: none;
+    }
+    .detail-aside summary::before {
+      content: "▸";
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+    .detail-aside[open] summary::before {
+      content: "▾";
+    }
+    .expand-hint {
+      color: var(--muted);
+      font-size: 0.68rem;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .detail-aside[open] summary {
+      margin-bottom: 6px;
+    }
+    .events, .facts, .alternatives {
+      margin: 8px 0 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    .events li, .facts li, .alternatives li {
+      margin: 4px 0;
+    }
+    .log-block {
+      margin-top: 8px;
+    }
+    .surface {
+      background: var(--panel-bg);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .toc {
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      width: 220px;
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      padding: 0;
+    }
+    .toc-title {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-weight: 700;
+    }
+    .toc-list,
+    .toc-sublist {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .toc-sublist {
+      margin-top: 6px;
+      padding-left: 12px;
+      gap: 4px;
+    }
+    .toc a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .toc-list > li > a {
+      font-weight: 700;
+    }
+    .toc a:hover {
+      text-decoration: underline;
+    }
+    .action-badge {
+      display: inline-block;
+      padding: 1px 8px;
+      border-radius: 999px;
+      background: #e2e8f0;
+      color: #0f172a;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    .debug-grid {
+      font-size: 0.8em;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 2px 20px;
+    }
+    .mulligan-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      gap: 8px 20px;
+    }
+    .mulligan-item {
+      display: grid;
+      gap: 4px;
+      font-size: 0.84rem;
+    }
+    .debug-item-key,
+    .term-key,
+    .summary-key,
+    .zone-label {
+      font-weight: 700;
+    }
+    .score-term-header .term-key {
+      color: #000;
+    }
+    .zone-label-horn {
+      color: var(--value);
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 3px;
+    }
+    .ranked-list {
+      display: grid;
+      gap: 8px;
+      font-size: 0.8rem;
+    }
+    .ranked-item {
+      display: grid;
+      gap: 2px;
+    }
+    .ranked-item-candidate-selected {
+      background: var(--selected-bg);
+      border-radius: 6px;
+      padding: 6px 8px;
+    }
+    .ranked-item-selected {
+      color: #166534;
+      font-weight: 700;
+    }
+    .ranked-header {
+      display: flex;
+      gap: 10px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .ranked-score {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .ranked-terms {
+      margin-left: 18px;
+      display: grid;
+      gap: 1px;
+    }
+    .search-trace-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(280px, 1fr));
+      align-items: start;
+    }
+    .search-trace-panel {
+      display: grid;
+      gap: 8px;
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.45);
+    }
+    .search-trace-panel-selected {
+      background: var(--selected-bg);
+      border: 1px solid rgba(194, 65, 12, 0.65);
+    }
+    .search-trace-header {
+      display: flex;
+      gap: 8px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .search-trace-sections {
+      display: grid;
+      gap: 10px;
+      align-content: start;
+    }
+    .trace-section {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(203, 213, 225, 0.65);
+      background: rgba(255, 255, 255, 0.68);
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+    .trace-section-label {
+      color: var(--muted);
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(203, 213, 225, 0.6);
+    }
+    .trace-diff-marker {
+      width: 7px;
+      height: 7px;
+      display: inline-block;
+      border: 1px solid rgba(194, 65, 12, 0.75);
+      background: rgba(194, 65, 12, 0.16);
+      border-radius: 999px;
+      flex: 0 0 auto;
+    }
+    .trace-action-list,
+    .trace-facts,
+    .trace-terms {
+      display: grid;
+      gap: 4px;
+      font-size: 0.76rem;
+      padding: 6px 8px;
+      border-radius: 6px;
+    }
+    .trace-term {
+      display: grid;
+      gap: 3px;
+    }
+    .trace-term-header {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .trace-term-formula,
+    .trace-term-details {
+      color: var(--muted);
+      font-size: 0.68rem;
+    }
+    .trace-term-details {
+      display: grid;
+      gap: 2px;
+      margin-left: 12px;
+    }
+    .trace-input-suffix {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--muted);
+    }
+    .trace-fact {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 1px 0;
+    }
+    .trace-fact-changed {
+      color: #7c2d12;
+    }
+    .candidate-trace-toggle {
+      margin-top: 6px;
+      font-size: 0.78rem;
+    }
+    .candidate-trace-toggle summary {
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .diagnosis-terms {
+      display: grid;
+      gap: 3px;
+      margin-top: 8px;
+      font-size: 0.84rem;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(260px, 1fr));
+      gap: 6px 20px;
+      font-size: 0.84rem;
+      margin-bottom: 10px;
+    }
+    .timeline {
+      display: grid;
+      gap: 6px;
+      font-size: 0.8rem;
+    }
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 52px 72px minmax(0, 1.8fr) 70px 70px 90px;
+      gap: 10px;
+      align-items: start;
+    }
+    .timeline-head {
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+    .timeline-marker {
+      color: var(--value);
+      font-weight: 700;
+    }
+    .timeline-subnote {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .round-board {
+      display: grid;
+      gap: 8px;
+      font-size: 0.84rem;
+    }
+    .round-board-row,
+    .zone-row {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 2px 0;
+    }
+    .zone-grid {
+      display: grid;
+      gap: 8px;
+      font-size: 0.84rem;
+    }
+    .board-mini {
+      font-size: 0.72rem;
+      margin-top: 0;
+    }
+    .board-mini-summary {
+      display: grid;
+      gap: 2px;
+      font-size: 0.72rem;
+      margin-bottom: 6px;
+    }
+    .board-mini .round-board {
+      gap: 5px;
+      font-size: 0.72rem;
+    }
+    .board-mini .round-board-row {
+      grid-template-columns: 100px minmax(0, 1fr);
+      gap: 6px;
+      padding: 1px 0;
+    }
+    .round-summary-panel {
+      border: 1px solid #eadf9e;
+      background: #fffceb;
+    }
+    .round-start-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0 14px;
+      color: var(--muted);
+    }
+    .round-start-divider::before,
+    .round-start-divider::after {
+      content: "";
+      flex: 1 1 auto;
+      height: 1px;
+      background: #cbd5e1;
+    }
+    .round-start-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 999px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      color: var(--text);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 0.86rem;
+    }
+    .data-table th,
+    .data-table td {
+      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #dbe3ef;
+      vertical-align: top;
+    }
+    .data-table thead th {
+      color: var(--muted);
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .additional-stats {
+      margin-top: 12px;
+    }
+    .summary-overview th {
+      width: 180px;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .p1 { color: var(--p1); font-weight: 700; }
+    .p2 { color: var(--p2); font-weight: 700; }
+    .value { color: var(--value); font-weight: 700; }
+    .actor-slot {
+      position: relative;
+      display: inline-flex;
+      align-items: baseline;
+    }
+    .popup-slot {
+      position: relative;
+      display: inline-flex;
+      align-items: baseline;
+    }
+    .popup-trigger {
+      border: 0;
+      background: transparent;
+      padding: 0;
+      font: inherit;
+      color: inherit;
+    }
+    .popup-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .popup-title {
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+    .card {
+      display: inline-block;
+      margin: 0 1px;
+      padding: 0 2px;
+      border-radius: 1px;
+      border: 1px solid transparent;
+      font-weight: 700;
+    }
+    .card-unit {
+      background: var(--unit-bg);
+      border-color: var(--unit-border);
+    }
+    .card-special {
+      background: var(--special-bg);
+      border-color: var(--special-border);
+    }
+    .card-hero {
+      background: var(--hero-bg);
+      border-color: var(--hero-border);
+      text-decoration: underline;
+    }
+    .popup-panel {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      z-index: 20;
+      display: none;
+      width: min(420px, calc(100vw - 72px));
+      background: white;
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+      padding: 10px 12px;
+    }
+    .popup-panel.is-visible {
+      display: block;
+    }
+    .score-trigger {
+      cursor: pointer;
+      color: inherit;
+      font-weight: 700;
+      text-decoration-line: underline;
+      text-decoration-style: dotted;
+      text-underline-offset: 2px;
+    }
+    .score-popover {
+      width: min(520px, calc(100vw - 72px));
+    }
+    .score-derivation-summary {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 10px;
+      font-size: 0.76rem;
+    }
+    .score-derivation-terms {
+      display: grid;
+      gap: 8px;
+    }
+    .score-term {
+      display: grid;
+      gap: 3px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: #f8fafc;
+    }
+    .score-term-zero {
+      opacity: 0.5;
+    }
+    .score-term-dominant {
+      background: var(--selected-bg);
+      border: 1px solid rgba(194, 65, 12, 0.65);
+    }
+    .score-term-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      flex-wrap: wrap;
+    }
+    .score-term-formula,
+    .score-term-detail-list {
+      color: var(--muted);
+      font-size: 0.72rem;
+    }
+    .score-term-detail-list {
+      display: grid;
+      gap: 2px;
+      margin-left: 12px;
+    }
+    .dominant-badge {
+      color: var(--value);
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .popup-close,
+    .hand-popover-close {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font: inherit;
+      font-size: 1rem;
+      padding: 0;
+    }
+    .hand-popover-body {
+      font-size: 0.76rem;
+      line-height: 1.6;
+    }
+    @media (max-width: 1440px) {
+      .toc {
+        position: static;
+        width: auto;
+        max-height: none;
+        margin-bottom: 24px;
+      }
+      .detail-aside {
+        position: static;
+        width: auto;
+        margin-top: 10px;
+      }
+      .board-mini {
+        margin-top: 6px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="toc">
+    <div class="toc-title">Contents</div>
+    <ul class="toc-list">
+      <li><a href="#match-information">Match Information</a></li>
+      <li><a href="#match-summary">Match Summary</a></li>
+      <li>
+        <a href="#match-trace">Match Trace</a>
+        {% if match.toc_rounds %}
+          <ul class="toc-sublist">
+            {% for item in match.toc_rounds %}
+              <li><a href="#{{ item.anchor }}">{{ item.label|safe }}</a></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </li>
+      <li><a href="#match-timeline">Timeline</a></li>
+    </ul>
+  </aside>
+  <main>
+    <header id="match-information">
+      <p class="tag">AI Match Review</p>
+      <h1>{{ title|safe }}</h1>
+      <p class="muted">Generated automatically after bot-match execution at {{ generated_at }}.</p>
+      <section class="meta">
+        {% for label, value in match.metadata %}
+          <div><span class="label">{{ label }}</span> {{ value|safe }}</div>
+        {% endfor %}
+      </section>
+    </header>
+
+    <section id="match-trace">
+      <h2>Match Trace</h2>
+      {% for step in match.steps %}
+        {% if step.round_start %}
+          <div class="round-start-divider" aria-label="{{ step.round_start.label|striptags }}">
+            <span class="round-start-badge">{{ step.round_start.label|safe }}</span>
+          </div>
+        {% endif %}
+        <article class="step" id="step-{{ step.index }}">
+          <div class="action-line">
+            <span class="step-number">{{ step.index }}.</span>
+            <span class="action-badge">{{ step.action_type }}</span>
+            {% if step.actor %}
+              <span class="actor-slot popup-slot">
+                <button
+                  type="button"
+                  class="actor-link {{ step.actor.css_class }} hand-trigger popup-trigger"
+                  aria-expanded="false"
+                >
+                  {{ step.actor.label|safe }}
+                </button>
+                <div class="hand-popover popup-panel" id="{{ step.actor.popover_id }}">
+                  <div class="popup-header">
+                    <div class="popup-title">{{ step.actor.title|safe }}</div>
+                    <button type="button" class="hand-popover-close popup-close" aria-label="Close">✕</button>
+                  </div>
+                  <div class="hand-popover-body">{{ step.actor.cards|safe }}</div>
+                </div>
+              </span>
+            {% endif %}
+            <span>{{ step.action|safe }}</span>
+          </div>
+          <div class="detail">
+            <div class="detail-grid">
+              <div class="detail-main">
+                {% if step.events %}
+                  <ul class="events">
+                    {% for event in step.events %}
+                      <li><span class="muted">{{ event.type }}:</span> {{ event.summary|safe }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+
+                {% if step.debug_entries %}
+                  <div class="log-block surface">
+                    <p class="tag">Bot Debug</p>
+                    <div class="debug-grid">
+                      {% for entry in step.debug_entries %}
+                        <div>
+                          <span class="debug-item-key">{{ entry.key|safe }}</span>:
+                          <span>{{ entry.value|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+                {% if step.mulligan_review %}
+                  <div class="log-block surface">
+                    <p class="tag">Mulligan Review</p>
+                    <div class="mulligan-grid">
+                      {% for player in step.mulligan_review.players %}
+                        <div class="mulligan-item">
+                          <div class="summary-key">{{ player.title|safe }}</div>
+                          <div><span class="summary-key">Hand Before</span>: <span>{{ player.before_hand|safe }}</span></div>
+                          <div><span class="summary-key">Selected</span>: <span>{{ player.selected|safe }}</span></div>
+                          <div><span class="summary-key">Replacement</span>: <span>{{ player.replacement|safe }}</span></div>
+                          <div><span class="summary-key">Hand After</span>: <span>{{ player.after_hand|safe }}</span></div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+                {% if step.baseline_ranked_actions %}
+                  <div class="log-block surface">
+                    <p class="tag">{{ step.ranked_actions_title|safe }}</p>
+                    <div class="ranked-list">
+                      {% for item in step.baseline_ranked_actions %}
+                        <div class="ranked-item">
+                          <div class="ranked-header">
+                            <span class="muted">{{ item.kind }}</span>
+                            <span>{{ item.action|safe }}</span>
+                            <span class="ranked-score popup-slot">
+                              <button type="button" class="score-trigger popup-trigger" aria-expanded="false">
+                                {{ item.score_derivation.button_label|safe }}
+                              </button>
+                              <div class="score-popover popup-panel" id="{{ item.score_derivation.popover_id }}">
+                                <div class="popup-header">
+                                  <div class="popup-title">{{ item.score_derivation.title|safe }}</div>
+                                  <button type="button" class="popup-close" aria-label="Close">✕</button>
+                                </div>
+                                <div class="score-derivation-summary">
+                                  <div><span class="summary-key">Total</span>: <span>{{ item.score_derivation.total }}</span></div>
+                                  <div><span class="summary-key">Additions</span>: <span>{{ item.score_derivation.additions|safe }}</span></div>
+                                  {% if item.score_derivation.dominant_term %}
+                                    <div>
+                                      <span class="summary-key">Most Influential</span>:
+                                      <span>{{ item.score_derivation.dominant_term.name|safe }}</span>
+                                      <span>({{ item.score_derivation.dominant_term.value }})</span>
+                                    </div>
+                                  {% endif %}
+                                </div>
+                                <div class="score-derivation-terms">
+                                  {% for term in item.score_derivation.terms %}
+                                    <div class="score-term{% if term.dominant %} score-term-dominant{% endif %}{% if term.is_zero %} score-term-zero{% endif %}">
+                                      <div class="score-term-header">
+                                        <span class="term-key">{{ term.name|safe }}</span>
+                                        <span>
+                                          {% if term.dominant %}
+                                            <span class="dominant-badge">most influential</span>
+                                          {% endif %}
+                                          <span>{{ term.value }}</span>
+                                        </span>
+                                      </div>
+                                      <div class="score-term-formula">{{ term.formula|safe }}</div>
+                                      {% if term.details %}
+                                        <div class="score-term-detail-list">
+                                          {% for detail in term.details %}
+                                            <div>
+                                              <span class="term-key">{{ detail.key|safe }}</span>:
+                                              <span>{{ detail.value|safe }}</span>
+                                            </div>
+                                          {% endfor %}
+                                        </div>
+                                      {% endif %}
+                                    </div>
+                                  {% endfor %}
+                                </div>
+                              </div>
+                            </span>
+                          </div>
+                          {% if item.terms %}
+                            <div class="ranked-terms">
+                              {% for term in item.terms %}
+                                <div>
+                                  <span class="term-key">{{ term.key|safe }}</span>:
+                                  <span>{{ term.value }}</span>
+                                </div>
+                              {% endfor %}
+                            </div>
+                          {% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+                {% if step.decision_comparison %}
+                  <div class="log-block surface">
+                    <p class="tag">{{ step.decision_comparison_title|safe }}</p>
+                    <div class="summary-grid">
+                      {% for fact in step.decision_comparison.summary %}
+                        <div>
+                          <span class="summary-key">{{ fact.key|safe }}</span>:
+                          <span>{{ fact.value|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    {% if step.decision_comparison.terms %}
+                      <p class="tag">Decisive Terms</p>
+                      <div class="diagnosis-terms">
+                        {% for term in step.decision_comparison.terms %}
+                          <div>
+                            <span class="term-key">{{ term.key|safe }}</span>:
+                            <span>{{ term.value|safe }}</span>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+                {% if step.search_line_traces %}
+                  <div class="log-block surface">
+                    <p class="tag">Search Line Traces</p>
+                    <div class="search-trace-grid">
+                      {% for trace in step.search_line_traces %}
+                        <div class="search-trace-panel{% if trace.selected %} search-trace-panel-selected{% endif %}">
+                          <div class="search-trace-header">
+                            <span class="tag">{{ trace.label|safe }}</span>
+                            <span>{{ trace.action|safe }}</span>
+                            <span class="ranked-score">value={{ trace.value }}</span>
+                            {% if trace.selected %}
+                              <span class="ranked-item-selected">selected</span>
+                            {% endif %}
+                          </div>
+                          <div class="search-trace-sections">
+                            {% for section in trace.sections %}
+                              <div class="trace-section">
+                                <div class="trace-section-label">{{ section.label|safe }}</div>
+                                {% if section.actions %}
+                                  <div class="trace-action-list">
+                                    {% for action in section.actions %}
+                                      <div>{{ action|safe }}</div>
+                                    {% endfor %}
+                                  </div>
+                                {% endif %}
+                                {% if section.facts %}
+                                  <div class="trace-facts">
+                                    {% for fact in section.facts %}
+                                      <div class="trace-fact{% if fact.changed %} trace-fact-changed{% endif %}">
+                                        {% if fact.changed %}
+                                          <span class="trace-diff-marker" aria-hidden="true"></span>
+                                        {% endif %}
+                                        <span class="term-key">{{ fact.key|replace(' (input)', ' <span class=\"trace-input-suffix\">(input)</span>')|safe }}</span>:
+                                        <span>{{ fact.value|safe }}</span>
+                                      </div>
+                                    {% endfor %}
+                                  </div>
+                                {% endif %}
+                                {% if section.terms %}
+                                  <div class="trace-terms">
+                                    {% for term in section.terms %}
+                                      <div class="trace-term">
+                                        <div class="trace-term-header">
+                                          <span class="term-key">{{ term.name|safe }}</span>:
+                                          <span>{{ term.value }}</span>
+                                        </div>
+                                        {% if term.formula %}
+                                          <div class="trace-term-formula">{{ term.formula|replace('*', '×')|safe }}</div>
+                                        {% endif %}
+                                        {% if term.details %}
+                                          <div class="trace-term-details">
+                                            {% for detail in term.details %}
+                                              <div>
+                                                <span class="term-key">{{ detail.key|safe }}</span>:
+                                                <span>{{ detail.value|safe }}</span>
+                                              </div>
+                                            {% endfor %}
+                                          </div>
+                                        {% endif %}
+                                      </div>
+                                    {% endfor %}
+                                  </div>
+                                {% endif %}
+                              </div>
+                            {% endfor %}
+                          </div>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+                {% if step.candidate_diagnosis %}
+                  <div class="log-block surface">
+                    <p class="tag">{{ step.candidate_diagnosis_title|safe }}</p>
+                    <div class="ranked-list">
+                      {% for item in step.candidate_diagnosis %}
+                        <div class="ranked-item{% if item.selected %} ranked-item-candidate-selected{% endif %}">
+                          <div class="ranked-header">
+                            <span class="muted">rank={{ item.coarse_rank }}</span>
+                            <span>{{ item.action|safe }}</span>
+                            <span class="ranked-score">coarse={{ item.coarse_score }}</span>
+                            {% if item.selected %}
+                              <span class="ranked-item-selected">selected</span>
+                            {% else %}
+                              <span class="muted">{{ item.status }}</span>
+                            {% endif %}
+                          </div>
+                          <div class="ranked-terms">
+                            <div>
+                              <span class="term-key">coarse_reason</span>:
+                              <span>{{ item.reason|safe }}</span>
+                            </div>
+                            {% if item.prune_reason %}
+                              <div>
+                                <span class="term-key">prune_reason</span>:
+                                <span>{{ item.prune_reason|safe }}</span>
+                              </div>
+                            {% endif %}
+                          </div>
+                          {% if item.trace %}
+                            <details class="candidate-trace-toggle">
+                              <summary>show trace</summary>
+                              <div class="search-trace-sections">
+                                {% for section in item.trace.sections %}
+                                  <div class="trace-section">
+                                    <div class="trace-section-label">{{ section.label|safe }}</div>
+                                    {% if section.actions %}
+                                      <div class="trace-action-list">
+                                        {% for action in section.actions %}
+                                          <div>{{ action|safe }}</div>
+                                        {% endfor %}
+                                      </div>
+                                    {% endif %}
+                                    {% if section.facts %}
+                                      <div class="trace-facts">
+                                        {% for fact in section.facts %}
+                                          <div class="trace-fact{% if fact.changed %} trace-fact-changed{% endif %}">
+                                            {% if fact.changed %}
+                                              <span class="trace-diff-marker" aria-hidden="true"></span>
+                                            {% endif %}
+                                            <span class="term-key">{{ fact.key|replace(' (input)', ' <span class=\"trace-input-suffix\">(input)</span>')|safe }}</span>:
+                                            <span>{{ fact.value|safe }}</span>
+                                          </div>
+                                        {% endfor %}
+                                      </div>
+                                    {% endif %}
+                                    {% if section.terms %}
+                                      <div class="trace-terms">
+                                        {% for term in section.terms %}
+                                          <div class="trace-term">
+                                            <div class="trace-term-header">
+                                              <span class="term-key">{{ term.name|safe }}</span>:
+                                              <span>{{ term.value }}</span>
+                                            </div>
+                                            {% if term.formula %}
+                                              <div class="trace-term-formula">{{ term.formula|replace('*', '×')|safe }}</div>
+                                            {% endif %}
+                                            {% if term.details %}
+                                              <div class="trace-term-details">
+                                                {% for detail in term.details %}
+                                                  <div>
+                                                    <span class="term-key">{{ detail.key|safe }}</span>:
+                                                    <span>{{ detail.value|safe }}</span>
+                                                  </div>
+                                                {% endfor %}
+                                              </div>
+                                            {% endif %}
+                                          </div>
+                                        {% endfor %}
+                                      </div>
+                                    {% endif %}
+                                  </div>
+                                {% endfor %}
+                              </div>
+                            </details>
+                          {% endif %}
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endif %}
+                {% if step.round_summary %}
+                  <div class="log-block surface round-summary-panel" id="{{ step.round_summary.anchor_id }}">
+                    <p class="tag">Round Summary</p>
+                    <div class="summary-grid">
+                      {% for fact in step.round_summary.facts %}
+                        <div>
+                          <span class="summary-key">{{ fact.key|safe }}</span>:
+                          <span>{{ fact.value|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    <div class="log-block">
+                      <p class="tag">Board</p>
+                      <div class="round-board">
+                        {% for row in step.round_summary.board_rows %}
+                          <div class="round-board-row">
+                            <span class="zone-label{% if row.horn_active %} zone-label-horn{% endif %}">{{ row.label|safe }}</span>
+                            <span>{{ row.cards|safe }}</span>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    <div class="log-block">
+                      <p class="tag">Hands</p>
+                      <div class="zone-grid">
+                        {% for zone in step.round_summary.hands %}
+                          <div class="zone-row">
+                            <span class="zone-label">{{ zone.label|safe }}</span>
+                            <span>{{ zone.cards|safe }}</span>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    <div class="log-block">
+                      <p class="tag">Decks</p>
+                      <div class="zone-grid">
+                        {% for zone in step.round_summary.decks %}
+                          <div class="zone-row">
+                            <span class="zone-label">{{ zone.label|safe }}</span>
+                            <span>{{ zone.cards|safe }}</span>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                    <div class="log-block">
+                      <p class="tag">Discards</p>
+                      <div class="zone-grid">
+                        {% for zone in step.round_summary.discards %}
+                          <div class="zone-row">
+                            <span class="zone-label">{{ zone.label|safe }}</span>
+                            <span>{{ zone.cards|safe }}</span>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+              {% if step.board_state %}
+                <details class="detail-aside">
+                  <summary class="tag">
+                    <span>{{ step.board_state.title }}</span>
+                    <span class="expand-hint">click to expand</span>
+                  </summary>
+                  <div class="log-block board-mini">
+                    <div class="board-mini-summary">
+                      {% for score in step.board_state.scores %}
+                        <div>
+                          <span class="summary-key">{{ score.key|safe }}</span>:
+                          <span>{{ score.value|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                    <div class="round-board">
+                      {% for row in step.board_state.board_rows %}
+                        <div class="round-board-row">
+                          <span class="zone-label{% if row.horn_active %} zone-label-horn{% endif %}">{{ row.label|safe }}</span>
+                          <span>{{ row.cards|safe }}</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </details>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    </section>
+
+    <section id="match-summary">
+      <h2>Summary</h2>
+      <p class="tag">Overview</p>
+      <table class="data-table summary-overview">
+        <tbody>
+          {% for item in match.summary_overview %}
+            <tr>
+              <th>{{ item.key|safe }}</th>
+              <td>{{ item.value|safe }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="tag">Player Stats</p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="p1">Player 1</th>
+            <th class="p2">Player 2</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in match.summary_player_rows %}
+            <tr>
+              <th>{{ row.metric|safe }}</th>
+              <td>{{ row.p1|safe }}</td>
+              <td>{{ row.p2|safe }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="additional-stats">
+        <p class="tag">Additional Stats</p>
+        <table class="data-table">
+          <tbody>
+            {% for item in match.additional_stats %}
+              <tr>
+                <th>{{ item.key|safe }}</th>
+                <td>{{ item.value|safe }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <h2 id="match-timeline">Timeline</h2>
+      <div class="log-block">
+        <p class="tag">Timeline</p>
+        <div class="timeline">
+          <div class="timeline-row timeline-head">
+            <span>Step</span>
+            <span>Actor</span>
+            <span>Action</span>
+            <span>P1</span>
+            <span>P2</span>
+            <span>Lead</span>
+          </div>
+          {% for item in match.timeline %}
+            <div class="timeline-row">
+              <span><a href="#step-{{ item.index }}">{{ item.index }}</a></span>
+              <span>{{ item.actor|safe }}</span>
+              <span>
+                {{ item.action|safe }}
+                {% if item.round_ended %}
+                  <span class="timeline-marker">[RoundEndedEvent]</span>
+                  {% if item.round_end_summary %}
+                    <span class="timeline-subnote">{{ item.round_end_summary|safe }}</span>
+                  {% endif %}
+                {% endif %}
+              </span>
+              <span>{{ item.p1_score }}</span>
+              <span>{{ item.p2_score }}</span>
+              <span>{{ item.lead|safe }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const closeAllPopovers = () => {
+        document.querySelectorAll(".popup-panel.is-visible").forEach((popover) => {
+          popover.classList.remove("is-visible");
+        });
+        document.querySelectorAll(".popup-trigger[aria-expanded='true']").forEach((trigger) => {
+          trigger.setAttribute("aria-expanded", "false");
+        });
+      };
+
+      document.querySelectorAll(".popup-trigger").forEach((trigger) => {
+        trigger.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const slot = trigger.closest(".popup-slot");
+          const popover = slot?.querySelector(".popup-panel");
+          if (!popover) return;
+          const wasVisible = popover.classList.contains("is-visible");
+          closeAllPopovers();
+          if (!wasVisible) {
+            popover.classList.add("is-visible");
+            trigger.setAttribute("aria-expanded", "true");
+          }
+        });
+      });
+
+      document.querySelectorAll(".popup-close").forEach((button) => {
+        button.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          closeAllPopovers();
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".popup-slot")) {
+          closeAllPopovers();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          closeAllPopovers();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

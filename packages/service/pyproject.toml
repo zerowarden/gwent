@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gwent-service"
+version = "0.1.0"
+description = "Stateful HTTP service layer for the Witcher 3 Gwent engine"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.11.0",
+    "uvicorn>=0.30.0",
+    "gwent-engine",
+    "gwent-shared",
+]
+
+[tool.uv.sources]
+gwent-engine = { workspace = true }
+gwent-shared = { workspace = true }
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gwent_service*"]
+
+[tool.setuptools.package-data]
+gwent_service = ["py.typed"]

@@ -1,0 +1,13 @@
+{
+  "include": ["packages", "tests"],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "packages/engine/src",
+        "packages/service/src",
+        "packages/shared/src"
+      ]
+    }
+  ]
+}

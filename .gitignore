@@ -1,0 +1,11 @@
+build/
+.cache/
+dist/
+*.egg-info
+.output/
+__pycache__/
+*.py[oc]
+tests/coverage.xml
+.venv
+wheels/
+docs/

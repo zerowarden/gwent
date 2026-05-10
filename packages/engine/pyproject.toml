@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gwent-engine"
+version = "0.1.0"
+description = "Witcher 3 Gwent game engine"
+requires-python = ">=3.12"
+dependencies = [
+    "Jinja2>=3.1.6",
+    "PyYAML>=6.0.2",
+    "questionary>=2.1.0",
+    "rich>=13.9.4",
+    "gwent-shared",
+]
+
+[project.scripts]
+gwent-engine-demo = "gwent_engine.cli.main:main"
+
+[tool.uv.sources]
+gwent-shared = { workspace = true }
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gwent_engine*"]
+
+[tool.setuptools.package-data]
+gwent_engine = ["py.typed", "data/*.yaml", "cli/templates/*.j2"]

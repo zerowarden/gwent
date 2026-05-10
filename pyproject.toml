@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gwent"
+version = "0.1.0"
+description = "Workspace for the Witcher 3 Gwent engine and service"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = ["gwent-engine", "gwent-service", "gwent-shared"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "mypy>=1.11.2",
+    "pytest>=8.3.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.11.0",
+    "vulture>=2.16",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.uv.workspace]
+members = ["packages/engine", "packages/service", "packages/shared"]
+
+[tool.uv.sources]
+gwent-engine = { workspace = true }
+gwent-service = { workspace = true }
+gwent-shared = { workspace = true }
+
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+cache_dir = ".cache/pytest"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["gwent_engine", "gwent_service", "gwent_shared"]
+data_file = ".cache/coverage/.coverage"
+
+[tool.coverage.xml]
+output = "tests/coverage.xml"
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 70
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+cache-dir = ".cache/ruff"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "N", "RUF", "UP"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["gwent_engine", "gwent_service", "gwent_shared"]
+cache_dir = ".cache/mypy"
+
+[[tool.mypy.overrides]]
+module = ["questionary", "yaml"]
+ignore_missing_imports = true

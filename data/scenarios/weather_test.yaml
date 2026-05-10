@@ -1,0 +1,155 @@
+id: weather_test
+game_id: weather_test
+starting_player: p1
+rng:
+  shuffle: identity
+  choice: first
+
+players:
+  p1:
+    deck_id: northern_realms
+    leader_id: northern_realms_foltest_the_siegemaster
+    deck:
+      - alias: thaler
+        card_id: northern_realms_thaler
+      - alias: p1_biting_frost_01
+        card_id: neutral_biting_frost
+      - alias: blue_stripes_commando_01
+        card_id: northern_realms_blue_stripes_commando
+      - alias: blue_stripes_commando_02
+        card_id: northern_realms_blue_stripes_commando
+      - alias: blue_stripes_commando_03
+        card_id: northern_realms_blue_stripes_commando
+      - alias: prince_stennis
+        card_id: northern_realms_prince_stennis
+      - alias: dethmold
+        card_id: northern_realms_dethmold
+      - alias: trebuchet_01
+        card_id: northern_realms_trebuchet 
+      - alias: trebuchet_02
+        card_id: northern_realms_trebuchet 
+      - alias: ballista_01
+        card_id: northern_realms_ballista 
+      - alias: ballista_02
+        card_id: northern_realms_ballista 
+      - alias: p1_decoy_01
+        card_id: neutral_decoy
+      - alias: p1_mysterious_elf
+        card_id: neutral_mysterious_elf
+      - alias: p1_commanders_horn_01
+        card_id: neutral_commanders_horn
+      - alias: sigismund_dijkstra
+        card_id: northern_realms_sigismund_dijkstra
+      - alias: crinfrid_reavers_dragon_hunter_01
+        card_id: northern_realms_crinfrid_reaver
+      - alias: p1_decoy_02
+        card_id: neutral_decoy
+      - alias: p1_decoy_03
+        card_id: neutral_decoy
+      - alias: dun_banner_medic
+        card_id: northern_realms_dun_banner_medic
+
+  p2:
+    deck_id: nilfgaardian_empire
+    leader_id: nilfgaard_emhyr_the_relentless
+    deck:
+      - alias: p2_decoy_01
+        card_id: neutral_decoy
+      - alias: p2_decoy_02
+        card_id: neutral_decoy
+      - alias: p2_biting_frost_01
+        card_id: neutral_biting_frost
+      - alias: geralt_of_rivia
+        card_id: neutral_geralt
+      - alias: cirilla_fiona_elen_riannon
+        card_id: neutral_ciri
+      - alias: yennefer_of_vengerberg
+        card_id: neutral_yennefer
+      - alias: villentretenmerth
+        card_id: neutral_villentretenmerth
+      - alias: dandelion
+        card_id: neutral_dandelion
+      - alias: mysterious_elf
+        card_id: neutral_mysterious_elf
+      - alias: cow
+        card_id: neutral_avenger_cow
+      - alias: menno_coehoorn
+        card_id: nilfgaard_menno_coehoorn
+      - alias: black_infantry_archer_01
+        card_id: nilfgaard_black_infantry_archer
+      - alias: black_infantry_archer_02
+        card_id: nilfgaard_black_infantry_archer
+      - alias: heavy_zerrikanian_fire_scorpion
+        card_id: nilfgaard_heavy_zerrikanian_fire_scorpion
+      - alias: stefan_skellen
+        card_id: nilfgaard_stefan_skellen
+      - alias: shilard_fitz_oesterlen
+        card_id: nilfgaard_shilard_fitz_oesterlen
+      - alias: vattier_de_rideux
+        card_id: nilfgaard_vattier_de_rideaux
+      - alias: etolian_auxilary_archer_01
+        card_id: nilfgaard_etolian_auxilary_archer
+      - alias: etolian_auxilary_archer_02
+        card_id: nilfgaard_etolian_auxilary_archer
+      - alias: young_emissary_01
+        card_id: nilfgaard_young_emissary
+      - alias: young_emissary_02
+        card_id: nilfgaard_young_emissary
+      - alias: impera_brigade_guard_01
+        card_id: nilfgaard_impera_brigade_guard
+      - alias: impera_brigade_guard_02
+        card_id: nilfgaard_impera_brigade_guard
+      - alias: impera_brigade_guard_03
+        card_id: nilfgaard_impera_brigade_guard
+      - alias: impera_brigade_guard_04
+        card_id: nilfgaard_impera_brigade_guard
+
+steps:
+  - type: start_game
+
+  - type: mulligan
+    selections:
+      p1: []
+      p2: []
+
+  - type: play_card
+    player: p1
+    card: blue_stripes_commando_01
+    row: close
+
+  - type: play_card
+    player: p2
+    card: geralt_of_rivia
+    row: close
+
+  - type: play_card
+    player: p1
+    card: blue_stripes_commando_02
+    row: close
+
+  - type: play_card
+    player: p2
+    card: cirilla_fiona_elen_riannon
+    row: close
+
+  - type: play_card
+    player: p1
+    card: blue_stripes_commando_03
+    row: close
+
+  - type: play_card
+    player: p2
+    card: p2_biting_frost_01
+
+  - type: play_card
+    player: p1
+    card: trebuchet_01
+    row: siege
+
+  - type: pass
+    player: p2
+
+  - type: play_card
+    player: p1
+    card: trebuchet_02
+    row: siege

@@ -1,0 +1,1202 @@
+cards:
+  # Monsters
+  - definition_id: monsters_arachas
+    name: Arachas
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: arachas
+    max_copies_per_deck: 3
+  - definition_id: monsters_arachas_behemoth
+    name: Arachas Behemoth
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: [muster]
+    muster_group: arachas
+  - definition_id: monsters_botchling
+    name: Botchling
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_celaeno_harpy
+    name: Celaeno Harpy
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close, ranged]
+    ability_kinds: []
+  - definition_id: monsters_cockatrice
+    name: Cockatrice 
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: monsters_crone_brewess
+    name: Crone Brewess
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: crone
+  - definition_id: monsters_crone_weavess
+    name: Crone Weavess
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: crone
+  - definition_id: monsters_crone_whispess
+    name: Crone Whispess
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: crone
+  - definition_id: monsters_draug
+    name: Draug
+    faction: monsters
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_earth_elemental
+    name: Earth Elemental
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: monsters_endrega
+    name: Endrega
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: monsters_fiend
+    name: Fiend
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_fire_elemental
+    name: Fire Elemental
+    faction: monsters
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: monsters_foglet
+    name: Foglet
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_forktail
+    name: Forktail
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_gargoyle
+    name: Gargoyle
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: monsters_ghoul
+    name: Ghoul
+    faction: monsters
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: ghoul
+    max_copies_per_deck: 3
+  - definition_id: monsters_grave_hag
+    name: Ghoul
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [ranged]
+  - definition_id: monsters_griffin
+    name: Griffin
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_harpy
+    name: Harpy
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: monsters_imlerith
+    name: Imlerith
+    faction: monsters
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: monsters_kayran
+    name: Kayran
+    faction: monsters
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile, morale_boost]
+    is_hero: true
+  - definition_id: monsters_leshen
+    name: Leshen
+    faction: monsters
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: monsters_nekkar
+    name: Nekkar
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: nekkar
+  - definition_id: monsters_plague_maiden
+    name: Plague Maiden
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_toad
+    name: Toad
+    faction: monsters
+    card_type: unit
+    base_strength: 7
+    allowed_rows: [ranged]
+    ability_kinds: [unit_scorch_row]
+  - definition_id: monsters_vampire_bruxa
+    name: "Vampire: Bruxa"
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: vampire
+  - definition_id: monsters_vampire_ekimmara
+    name: "Vampire: Ekimmara"
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: vampire
+  - definition_id: monsters_vampire_fleder
+    name: "Vampire: Fleder"
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: vampire
+  - definition_id: monsters_vampire_garkain
+    name: "Vampire: Garkain"
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: vampire
+  - definition_id: monsters_vampire_katakan
+    name: "Vampire: Katakan"
+    faction: monsters
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: vampire
+  - definition_id: monsters_werewolf
+    name: Werewolf
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: monsters_wyvern
+    name: Werewolf
+    faction: monsters
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+
+  # Nilfgaardian Empire
+  - definition_id: nilfgaard_albrich
+    name: Albrich
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_assire_var_anahid
+    name: Assire var Anahid
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_black_infantry_archer
+    name: Black Infantry Archer
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_cahir
+    name: Cahir Mawr Dyffryn aep Caellach
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: nilfgaard_etolian_auxilary_archer
+    name: Etolian Auxilary Archer
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [ranged]
+    ability_kinds: [medic]
+  - definition_id: nilfgard_fringilla_vigo
+    name: Fringilla Vigo 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_heavy_zerrikanian_fire_scorpion
+    name: Heavy Zerrikanian Fire Scorpion
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: nilfgaard_impera_brigade_guard
+    name: Impera Brigade Guard
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: brigade_guard
+    max_copies_per_deck: 4
+  - definition_id: nilfgaard_letho
+    name: Letho of Gulet
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: nilfgaard_menno_coehoorn
+    name: Menno Coehoorn
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: [medic]
+    is_hero: true
+  - definition_id: nilfgaard_morteisen
+    name: Morteisen
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: nilfgaard_morvan_voorhis
+    name: Morvan Voorhis 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [siege]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: nilfgaard_nausicaa_cavalry_rider
+    name: Nausicaa Cavalry Rider 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: nausicaa_cavalry
+  - definition_id: nilfgaard_puttkammer
+    name: Puttkammer
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_rainfarn
+    name: Rainfarn
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: nilfgaard_renuald_aep_matsen
+    name: Renuald aep Matsen
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_rotten_mangonel
+    name: Rotten Mangonel
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: nilfgaard_shilard_fitz_oesterlen
+    name: Shilard Fitz-Oesterlen
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 7
+    allowed_rows: [close]
+    ability_kinds: [spy]
+  - definition_id: nilfgaard_siege_engineer
+    name: Siege Engineer
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: nilfgaard_siege_technician
+    name: Siege Technician
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 0
+    allowed_rows: [siege]
+    ability_kinds: [medic]
+  - definition_id: nilfgaard_stefan_skellen
+    name: Stefan Skellen 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 9
+    allowed_rows: [close]
+    ability_kinds: [spy]
+  - definition_id: nilfgaard_sweers
+    name: Sweers
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_tibor_eggebracht
+    name: Tibor Eggebracht 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: nilfgaard_vanhemar
+    name: Vanhemar
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_vattier_de_rideaux
+    name: Vattier de Rideaux
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [spy]
+  - definition_id: nilfgaard_vreemde
+    name: Vreemde
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: nilfgaard_young_emissary
+    name: Young Emissary 
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: young_emissary
+  - definition_id: nilfgaard_zerrikanian_fire_scorpion
+    name: Zerrikanian Fire Scorpion
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [siege]
+    ability_kinds: []
+
+  # Northern Realms
+  - definition_id: northern_realms_ballista
+    name: Ballista
+    faction: northern_realms
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+    max_copies_per_deck: 2 
+  - definition_id: northern_realms_blue_stripes_commando
+    name: Blue Stripes Commando
+    faction: northern_realms
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [tight_bond]
+    bond_group: blue_stripes_commando
+    max_copies_per_deck: 3
+  - definition_id: northern_realms_catapult
+    name: Catapult
+    faction: northern_realms
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [siege]
+    ability_kinds: [tight_bond]
+    bond_group: catapult
+  - definition_id: northern_realms_crinfrid_reaver
+    name: Crinfrid Reaver Dragon Hunters
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [ranged]
+    ability_kinds: [tight_bond]
+    bond_group: crinfrid_reaver
+    max_copies_per_deck: 3
+  - definition_id: northern_realms_dethmold
+    name: Dethmold
+    faction: northern_realms
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: northern_realms_dun_banner_medic
+    name: Dun Banner Medic
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [siege]
+    ability_kinds: [medic]
+  - definition_id: northern_realms_esterad_thyssen
+    name: Esterad Thyssen
+    faction: northern_realms
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: northern_realms_john_natalis
+    name: John Natalis 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: northern_realms_kaedweni_siege_expert
+    name: Kaedweni Siege Expert 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [siege]
+    ability_kinds: [morale_boost]
+    max_copies_per_deck: 3 
+  - definition_id: northern_realms_keira_metz
+    name: Keira Metz 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: northern_realms_philippa_eilhart
+    name: Philippa Eilhart
+    faction: northern_realms
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: northern_realms_poor_fucking_infantry
+    name: Poor Fucking Infantry
+    faction: northern_realms
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [close]
+    ability_kinds: [tight_bond]
+    bond_group: poor_fucking_infantry
+    max_copies_per_deck: 4
+  - definition_id: northern_realms_prince_stennis
+    name: Prince Stennis 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: [spy]
+  - definition_id: northern_realms_redanian_foot_solider
+    name: Redanian Foot Soldier 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [close]
+    ability_kinds: []
+    max_copies_per_deck: 2
+  - definition_id: northern_realms_sabrina_glevissig
+    name: Sabrina Glevissig 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: northern_realms_sheldon_skaggs
+    name: Sheldon Skaggs 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: northern_realms_siege_tower
+    name: Siege Tower
+    faction: northern_realms
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: northern_realms_siegfried_of_denesle
+    name: Siegfried of Denesle 
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: northern_realms_sigismund_dijkstra
+    name: Sigismund Dijkstra
+    faction: northern_realms
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [spy]
+  - definition_id: northern_realms_sile_de_tansarville
+    name: Sile de Tansarville
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: northern_realms_thaler
+    name: Thaler
+    faction: northern_realms
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [siege]
+    ability_kinds: [spy]
+  - definition_id: northern_realms_trebuchet
+    name: Trebuchet
+    faction: northern_realms
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: []
+    max_copies_per_deck: 2
+  - definition_id: northern_realms_vernon_roche
+    name: Vernon Roche
+    faction: northern_realms
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: northern_realms_ves
+    name: Ves
+    faction: northern_realms
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: northern_realms_yarpen_zigrin
+    name: Yarpen Zigrin
+    faction: northern_realms
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: []
+
+  # Scoia'tael
+  - definition_id: scoiatael_barclay_els
+    name: Barclay Els
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: scoiatael_ciaran_aep_easnillien
+    name: Ciaran aep Easnillien
+    faction: scoiatael
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: scoiatael_dennis_cranmer
+    name: Dnnis Cranmer
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: scoiatael_dol_blathanna_archer
+    name: Dol Blathanna Archer
+    faction: scoiatael
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: scoiatael_dol_blathanna_scout
+    name: Dol Blathanna Scout 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+    max_copies_per_deck: 3
+  - definition_id: scoiatael_dwarven_skirmisher
+    name: Dwarven Skirmisher
+    faction: scoiatael
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: dwarven_skirmisher
+  - definition_id: scoiatael_eithne
+    name: Eithne 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: scoiatael_elven_skirmisher
+    name: Elven Skirmisher 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: [muster]
+    muster_group: elven_skirmisher
+  - definition_id: scoiatael_filavandrel_aen_fidhail
+    name: Filavandrel aen Fidhail 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: scoiatael_havekar_healer
+    name: Havekar Healer 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 0
+    allowed_rows: [ranged]
+    ability_kinds: [medic]
+  - definition_id: scoiatael_havekar_smuggler
+    name: Havekar Smuggler 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    muster_group: havekar_smuggler
+    max_copies_per_deck: 3
+  - definition_id: scoiatael_ida_emean_aep_sivney
+    name: Ida Emean aep Sivney 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+  - definition_id: scoiatael_isengrim_faoiltiarna
+    name: Isengrim Faoiltiarna 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: [morale_boost]
+    is_hero: true
+  - definition_id: scoiatael_mahakaman_defender
+    name: Mahakaman Defender 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: scoiatael_hero_milva
+    name: Milva
+    faction: scoiatael
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: [morale_boost]
+  - definition_id: scoiatael_riordain
+    name: Riordain 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 1
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: scoiatael_schirru
+    name: Schirru
+    faction: scoiatael
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [siege]
+    ability_kinds: [unit_scorch_row]
+  - definition_id: scoiatael_toruviel
+    name: Toruviel 
+    faction: scoiatael
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: scoiatael_vrihedd_brigade_recruit
+    name: Vrihedd Brigade Recruit
+    faction: scoiatael
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: scoiatael_vrihedd_brigade_veteran
+    name: Vrihedd Brigade Veteran
+    faction: scoiatael
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: scoiatael_yaevinn
+    name: Yaevinn
+    faction: scoiatael
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close, ranged]
+    ability_kinds: [agile]
+  - definition_id: scoiatael_saesenthessis
+    name: Saesenthessis
+    faction: scoiatael
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
+
+  # Skellige cards (Blood and Wine expansion)
+  - definition_id: skellige_berserker
+    name: Berserker
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [berserker]
+    transforms_into_definition_id: skellige_transformed_vildkaarl
+  - definition_id: skellige_birna_bran
+    name: Birna Bran
+    faction: skellige
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: [medic]
+  - definition_id: skellige_blueboy_lugos
+    name: Blueboy Lugos
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_cerys
+    name: Cerys
+    faction: skellige
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    musters_group: drummond_shieldmaiden
+    is_hero: true
+  - definition_id: skellige_clan_an_craie_warrior
+    name: Clan an Craie Warrior
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: [tight_bond]
+    bond_group: clan_an_craie_warrior
+  - definition_id: skellige_clan_brokvar_archer
+    name: Clan Brokvar Archer 
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: skellige_clan_dimun_pirate
+    name: Clan Dimun Pirate 
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: [scorch]
+  - definition_id: skellige_clan_drummond_shield_maiden
+    name: Clan Drummond Shield Maiden
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [tight_bond]
+    muster_group: drummond_shieldmaiden
+    bond_group: clan_drummond_shield_maiden
+    max_copies_per_deck: 3
+  - definition_id: skellige_clan_heymaey_skald
+    name: Clan Heymaey Skald
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_clan_donar_an_hindar
+    name: Donar an Hindar 
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_clan_tordarroch_armorsmith
+    name: Clan Tordarroch Armorsmith 
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_clan_draig_bon_dhu
+    name: Draig Bon-Dhu
+    faction: skellige
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [siege]
+    ability_kinds: [commanders_horn]
+  - definition_id: skellige_ermion
+    name: Ermion
+    faction: skellige
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [ranged]
+    ability_kinds: [mardroeme]
+    is_hero: true
+  - definition_id: skellige_hjalmar
+    name: Hjalmar
+    faction: skellige
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: skellige_holger_blackhand
+    name: Holger Blackhand
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [siege]
+    ability_kinds: []
+  - definition_id: skellige_kambi
+    name: Kambi
+    faction: skellige
+    card_type: unit
+    base_strength: 0
+    allowed_rows: [close]
+    ability_kinds: [avenger]
+    avenger_summon_definition_id: skellige_hemdall
+  - definition_id: skellige_hemdall
+    name: Hemdall
+    faction: skellige
+    card_type: unit
+    base_strength: 11
+    allowed_rows: [close]
+    ability_kinds: []
+    generated_only: true
+    is_hero: true
+  - definition_id: skellige_light_longship
+    name: Light Longship
+    faction: skellige
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [siege]
+    ability_kinds: [muster]
+    muster_group: light_longship
+  - definition_id: skellige_madman_lugos
+    name: Madman Lugos 
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_mardroeme
+    name: Mardroeme
+    faction: skellige
+    card_type: special
+    base_strength: 0
+    allowed_rows: [close, ranged, siege]
+    ability_kinds: [mardroeme]
+  - definition_id: skellige_olaf
+    name: Olaf
+    faction: skellige
+    card_type: unit
+    base_strength: 12
+    allowed_rows: [close, ranged]
+    ability_kinds: [morale_boost]
+  - definition_id: skellige_svanrige
+    name: Svanrige
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_udalryk
+    name: Udalryk
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: skellige_war_longship
+    name: War Longship
+    faction: skellige
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [siege]
+    ability_kinds: [tight_bond]
+    bond_group: war_longship
+    max_copies_per_deck: 3
+  - definition_id: skellige_young_berserker
+    name: Young Berserker
+    faction: skellige
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [close]
+    ability_kinds: [berserker]
+    transforms_into_definition_id: skellige_transformed_young_vildkaarl
+    max_copies_per_deck: 3
+  - definition_id: skellige_transformed_vildkaarl
+    name: Transformed Vildkaarl
+    faction: skellige
+    card_type: unit
+    base_strength: 14
+    allowed_rows: [close]
+    ability_kinds: [morale_boost]
+    generated_only: true
+  - definition_id: skellige_transformed_young_vildkaarl
+    name: Transformed Young Vildkaarl
+    faction: skellige
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [ranged]
+    ability_kinds: [tight_bond]
+    bond_group: young_vildkaarl
+    generated_only: true
+
+  # Neutral and heroes
+  - definition_id: neutral_biting_frost
+    name: Biting Frost
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [biting_frost]
+    max_copies_per_deck: 3
+  - definition_id: neutral_ciri
+    name: Cirilla Fiona Elen Riannon
+    faction: neutral
+    card_type: unit
+    base_strength: 15
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: neutral_clear_weather
+    name: Clear Weather
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [clear_weather]
+    max_copies_per_deck: 3
+  - definition_id: neutral_commanders_horn
+    name: Commander's Horn
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: [close, ranged, siege]
+    ability_kinds: [commanders_horn]
+    max_copies_per_deck: 3
+  - definition_id: neutral_avenger_cow
+    name: Cow
+    faction: neutral
+    card_type: unit
+    base_strength: 0
+    allowed_rows: [ranged]
+    ability_kinds: [avenger]
+    avenger_summon_definition_id: neutral_bovine_defense_force
+  - definition_id: neutral_dandelion
+    name: Dandelion
+    faction: neutral
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [close]
+    ability_kinds: [unit_commanders_horn]
+  - definition_id: neutral_decoy
+    name: Decoy
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [decoy]
+    max_copies_per_deck: 3
+  - definition_id: neutral_emiel
+    name: Emiel Regis Rohellec Terzieff
+    faction: neutral
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: neutral_gaunter_o_dimm
+    name: "Gaunter O'Dimm"
+    faction: neutral
+    card_type: unit
+    base_strength: 2
+    allowed_rows: [siege]
+    ability_kinds: [muster]
+    muster_group: darkness
+  - definition_id: neutral_gaunter_darkness
+    name: "Gaunter O'Dimm: Darkness"
+    faction: neutral
+    card_type: unit
+    base_strength: 4
+    allowed_rows: [ranged]
+    ability_kinds: [muster]
+    muster_group: darkness
+    max_copies_per_deck: 3
+  - definition_id: neutral_geralt
+    name: Geralt of Rivia
+    faction: neutral
+    card_type: unit
+    base_strength: 15
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: neutral_impenetrable_fog
+    name: Impenetrable Fog
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [impenetrable_fog]
+    max_copies_per_deck: 3
+  - definition_id: neutral_mysterious_elf
+    name: Mysterious Elf
+    faction: neutral
+    card_type: unit
+    base_strength: 0
+    allowed_rows: [close]
+    ability_kinds: [spy]
+    is_hero: true
+  - definition_id: neutral_olgierd_von_everec
+    name: Olgierd von Everec 
+    faction: neutral
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close, ranged]
+    ability_kinds: [morale_boost]
+  - definition_id: neutral_scorch
+    name: Scorch
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [scorch]
+    max_copies_per_deck: 3
+  - definition_id: neutral_skellige_storm
+    name: Skellige Storm
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [skellige_storm]
+    max_copies_per_deck: 3
+  - definition_id: neutral_torrential_rain
+    name: Torrential Rain
+    faction: neutral
+    card_type: special
+    base_strength: 0
+    allowed_rows: []
+    ability_kinds: [torrential_rain]
+    max_copies_per_deck: 3
+  - definition_id: neutral_triss_merigold
+    name: Triss Merigold
+    faction: neutral
+    card_type: unit
+    base_strength: 7
+    allowed_rows: [close]
+    ability_kinds: []
+    is_hero: true
+  - definition_id: neutral_vesemir
+    name: Vesemir
+    faction: neutral
+    card_type: unit
+    base_strength: 6
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: neutral_villentretenmerth
+    name: Villentretenmerth 
+    faction: neutral
+    card_type: unit
+    base_strength: 7
+    allowed_rows: [close]
+    ability_kinds: [unit_scorch_row]
+  - definition_id: neutral_yennefer
+    name: Yennefer of Vengerberg
+    faction: neutral
+    card_type: unit
+    base_strength: 7
+    allowed_rows: [ranged]
+    ability_kinds: [medic]
+    is_hero: true
+  - definition_id: neutral_zoltan
+    name: Zoltan Chivay
+    faction: neutral
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
+  - definition_id: neutral_bovine_defense_force
+    name: Bovine Defense Force
+    faction: neutral
+    card_type: unit
+    base_strength: 8
+    allowed_rows: [close]
+    ability_kinds: []
+    generated_only: true

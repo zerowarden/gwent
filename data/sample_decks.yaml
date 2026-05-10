@@ -1,0 +1,595 @@
+decks:
+  # =========================================================
+  # MONSTERS
+  # =========================================================
+
+  - deck_id: monsters_muster_swarm_strict
+    faction: monsters
+    leader_id: monsters_eredin_commander_of_the_red_riders
+    cards:
+      # Core neutral hero/value package
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+      - neutral_villentretenmerth
+
+      # Monsters hero / premium package
+      - monsters_imlerith
+      - monsters_leshen
+      - monsters_kayran
+      - monsters_draug
+      - monsters_toad
+
+      # Arachas package
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_arachas_behemoth
+
+      # Crone package
+      - monsters_crone_brewess
+      - monsters_crone_weavess
+      - monsters_crone_whispess
+
+      # Vampire package
+      - monsters_vampire_bruxa
+      - monsters_vampire_ekimmara
+      - monsters_vampire_fleder
+      - monsters_vampire_garkain
+      - monsters_vampire_katakan
+
+      # Light support
+      - neutral_clear_weather
+      - neutral_decoy
+
+  - deck_id: monsters_vampire_crone_control_strict
+    faction: monsters
+    leader_id: monsters_eredin_king_of_the_wild_hunt
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+      - neutral_villentretenmerth
+      - neutral_olgierd_von_everec
+      - neutral_dandelion
+      - neutral_emiel
+
+      - monsters_imlerith
+      - monsters_leshen
+      - monsters_kayran
+      - monsters_draug
+      - monsters_toad
+      - monsters_werewolf
+
+      - monsters_crone_brewess
+      - monsters_crone_weavess
+      - monsters_crone_whispess
+
+      - monsters_vampire_bruxa
+      - monsters_vampire_ekimmara
+      - monsters_vampire_fleder
+      - monsters_vampire_garkain
+      - monsters_vampire_katakan
+
+      - neutral_scorch
+      - neutral_skellige_storm
+      - neutral_clear_weather
+      - neutral_decoy
+
+  - deck_id: monsters_hs_373
+    faction: monsters
+    leader_id: monsters_eredin_commander_of_the_red_riders
+    cards:
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_mysterious_elf
+      - neutral_avenger_cow
+      - monsters_kayran
+      - monsters_leshen
+      - neutral_yennefer
+      - neutral_dandelion
+      - neutral_villentretenmerth
+      - monsters_nekkar
+      - monsters_nekkar
+      - monsters_nekkar
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_vampire_ekimmara
+      - monsters_arachas_behemoth
+      - monsters_vampire_bruxa
+      - monsters_vampire_fleder
+      - monsters_vampire_garkain
+      - monsters_vampire_katakan
+      - monsters_crone_brewess
+      - monsters_crone_weavess
+      - monsters_crone_whispess
+      - neutral_ciri
+      - neutral_olgierd_von_everec
+      - monsters_werewolf
+
+
+  - deck_id: monsters_hero_midrange_strict
+    faction: monsters
+    leader_id: monsters_eredin_commander_of_the_red_riders
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+      - neutral_villentretenmerth
+
+      - monsters_imlerith
+      - monsters_leshen
+      - monsters_kayran
+      - monsters_draug
+      - monsters_toad
+
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_arachas
+      - monsters_arachas_behemoth
+
+      - monsters_crone_brewess
+      - monsters_crone_weavess
+      - monsters_crone_whispess
+
+      - monsters_fiend
+      - monsters_griffin
+      - monsters_earth_elemental
+      - monsters_werewolf
+
+      - neutral_scorch
+      - neutral_commanders_horn
+      - neutral_clear_weather
+
+  # =========================================================
+  # NILFGAARD
+  # =========================================================
+
+  - deck_id: nilfgaard_spy_medic_control_strict
+    faction: nilfgaard
+    leader_id: nilfgaard_emhyr_his_imperial_majesty
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+      - neutral_villentretenmerth
+
+      - nilfgaard_letho
+      - nilfgaard_menno_coehoorn
+      - nilfgaard_tibor_eggebracht
+      - nilfgaard_morvan_voorhis
+
+      # Spy engine
+      - nilfgaard_shilard_fitz_oesterlen
+      - nilfgaard_stefan_skellen
+      - nilfgaard_vattier_de_rideaux
+
+      # Medic package
+      - nilfgaard_etolian_auxilary_archer
+      - nilfgaard_siege_technician
+
+      # Strong standalone bodies
+      - nilfgaard_black_infantry_archer
+      - nilfgaard_heavy_zerrikanian_fire_scorpion
+      - nilfgaard_cahir
+      - nilfgaard_assire_var_anahid
+      - nilfgard_fringilla_vigo
+      - nilfgaard_renuald_aep_matsen
+      - nilfgaard_siege_engineer
+      - nilfgaard_puttkammer
+      - nilfgaard_albrich
+
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_scorch
+      - neutral_clear_weather
+
+  - deck_id: nilfgaard_frost_control_strict
+    faction: nilfgaard
+    leader_id: nilfgaard_emhyr_his_imperial_majesty
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+
+      - nilfgaard_letho
+      - nilfgaard_menno_coehoorn
+      - nilfgaard_tibor_eggebracht
+      - nilfgaard_morvan_voorhis
+
+      - nilfgaard_shilard_fitz_oesterlen
+      - nilfgaard_stefan_skellen
+      - nilfgaard_vattier_de_rideaux
+      - nilfgaard_etolian_auxilary_archer
+      - nilfgaard_siege_technician
+
+      - nilfgaard_black_infantry_archer
+      - nilfgaard_heavy_zerrikanian_fire_scorpion
+      - nilfgaard_zerrikanian_fire_scorpion
+      - nilfgaard_cahir
+      - nilfgaard_assire_var_anahid
+      - nilfgard_fringilla_vigo
+      - nilfgaard_renuald_aep_matsen
+      - nilfgaard_siege_engineer
+      - nilfgaard_puttkammer
+
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_biting_frost
+      - neutral_biting_frost
+      - neutral_scorch
+
+  - deck_id: nilfgaard_siege_midrange_strict
+    faction: nilfgaard
+    leader_id: nilfgaard_emhyr_his_imperial_majesty
+    cards:
+      - neutral_ciri
+      - neutral_clear_weather
+      - neutral_commanders_horn
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_geralt
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+      - neutral_yennefer
+      - nilfgaard_assire_var_anahid
+      - nilfgaard_black_infantry_archer
+      - nilfgaard_cahir
+      - nilfgaard_heavy_zerrikanian_fire_scorpion
+      - nilfgaard_letho
+      - nilfgaard_menno_coehoorn
+      - nilfgaard_morvan_voorhis
+      - nilfgaard_puttkammer
+      - nilfgaard_rotten_mangonel
+      - nilfgaard_shilard_fitz_oesterlen
+      - nilfgaard_siege_engineer
+      - nilfgaard_stefan_skellen
+      - nilfgaard_tibor_eggebracht
+      - nilfgaard_vanhemar
+      - nilfgaard_vattier_de_rideaux
+      - nilfgaard_zerrikanian_fire_scorpion
+      - nilfgard_fringilla_vigo
+
+  - deck_id: nilfgaard_optimised
+    faction: nilfgaard
+    leader_id: nilfgaard_emhyr_the_relentless
+    cards:
+      - neutral_decoy
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_villentretenmerth
+      - neutral_dandelion
+      - neutral_mysterious_elf
+      - neutral_avenger_cow
+      - nilfgaard_menno_coehoorn
+      - nilfgaard_black_infantry_archer
+      - nilfgaard_black_infantry_archer
+      - nilfgaard_stefan_skellen
+      - nilfgaard_heavy_zerrikanian_fire_scorpion
+      - nilfgaard_shilard_fitz_oesterlen
+      - nilfgaard_vattier_de_rideaux
+      - nilfgaard_etolian_auxilary_archer
+      - nilfgaard_etolian_auxilary_archer
+      - nilfgaard_young_emissary
+      - nilfgaard_young_emissary
+      - nilfgaard_impera_brigade_guard
+      - nilfgaard_impera_brigade_guard
+      - nilfgaard_impera_brigade_guard
+      - nilfgaard_impera_brigade_guard
+
+  # =========================================================
+  # NORTHERN REALMS
+  # =========================================================
+
+  - deck_id: northern_realms_spy_siege_bond_strict
+    faction: northern_realms
+    leader_id: northern_realms_foltest_the_steel_forged
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+
+      - northern_realms_john_natalis
+      - northern_realms_esterad_thyssen
+      - northern_realms_philippa_eilhart
+      - northern_realms_vernon_roche
+      - northern_realms_ves
+
+      # Spy engine
+      - northern_realms_prince_stennis
+      - northern_realms_sigismund_dijkstra
+      - northern_realms_thaler
+
+      # Medic
+      - northern_realms_dun_banner_medic
+
+      # Bond core
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_crinfrid_reaver
+      - northern_realms_crinfrid_reaver
+      - northern_realms_crinfrid_reaver
+
+      # Siege finishers
+      - northern_realms_catapult
+      - northern_realms_siege_tower
+
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_commanders_horn
+      - neutral_clear_weather
+
+  - deck_id: northern_realms_siege_overload_strict
+    faction: northern_realms
+    leader_id: northern_realms_foltest_the_steel_forged
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+
+      - northern_realms_john_natalis
+      - northern_realms_esterad_thyssen
+      - northern_realms_philippa_eilhart
+
+      - northern_realms_prince_stennis
+      - northern_realms_sigismund_dijkstra
+      - northern_realms_thaler
+      - northern_realms_dun_banner_medic
+
+      - northern_realms_catapult
+      - northern_realms_ballista
+      - northern_realms_ballista
+      - northern_realms_trebuchet
+      - northern_realms_trebuchet
+      - northern_realms_siege_tower
+      - northern_realms_kaedweni_siege_expert
+      - northern_realms_kaedweni_siege_expert
+      - northern_realms_kaedweni_siege_expert
+      - northern_realms_dethmold
+      - northern_realms_keira_metz
+
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_commanders_horn
+      - neutral_clear_weather
+
+  - deck_id: northern_realms_close_bond_burst_strict
+    faction: northern_realms
+    leader_id: northern_realms_foltest_the_steel_forged
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+
+      - northern_realms_john_natalis
+      - northern_realms_esterad_thyssen
+      - northern_realms_philippa_eilhart
+      - northern_realms_vernon_roche
+      - northern_realms_ves
+
+      - northern_realms_prince_stennis
+      - northern_realms_sigismund_dijkstra
+      - northern_realms_thaler
+      - northern_realms_dun_banner_medic
+
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_poor_fucking_infantry
+      - northern_realms_poor_fucking_infantry
+      - northern_realms_poor_fucking_infantry
+      - northern_realms_poor_fucking_infantry
+
+      - neutral_dandelion
+      - neutral_olgierd_von_everec
+      - neutral_villentretenmerth
+
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_scorch
+      - neutral_clear_weather
+
+  - deck_id: northern_realms_hs_dominate
+    faction: northern_realms
+    leader_id: northern_realms_foltest_the_siegemaster
+    cards:
+      - neutral_commanders_horn
+      - neutral_dandelion
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_gaunter_darkness
+      - neutral_gaunter_darkness
+      - neutral_gaunter_darkness
+      - neutral_gaunter_o_dimm
+      - neutral_mysterious_elf
+      - neutral_olgierd_von_everec
+      - neutral_villentretenmerth
+      - neutral_yennefer
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_blue_stripes_commando
+      - northern_realms_catapult
+      - northern_realms_catapult
+      - northern_realms_crinfrid_reaver
+      - northern_realms_crinfrid_reaver
+      - northern_realms_dun_banner_medic
+      - northern_realms_kaedweni_siege_expert
+      - northern_realms_kaedweni_siege_expert
+      - northern_realms_prince_stennis
+      - northern_realms_sigismund_dijkstra
+      - northern_realms_thaler
+
+  # =========================================================
+  # SCOIA'TAEL
+  # =========================================================
+
+  - deck_id: scoiatael_high_stakes
+    faction: scoiatael
+    leader_id: scoiatael_francesca_the_beautiful
+    cards:
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_commanders_horn
+      - neutral_commanders_horn
+      - neutral_commanders_horn
+      - neutral_scorch
+      - neutral_scorch
+      - neutral_biting_frost
+      - neutral_skellige_storm
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_villentretenmerth
+      - neutral_dandelion
+      - neutral_mysterious_elf
+      - scoiatael_isengrim_faoiltiarna
+      - scoiatael_filavandrel_aen_fidhail
+      - scoiatael_yaevinn
+      - scoiatael_barclay_els
+      - scoiatael_dol_blathanna_scout
+      - scoiatael_dol_blathanna_scout
+      - scoiatael_dol_blathanna_scout
+      - scoiatael_havekar_smuggler
+      - scoiatael_havekar_smuggler
+      - scoiatael_havekar_smuggler
+      - neutral_yennefer
+      - scoiatael_eithne
+      - scoiatael_schirru
+      - scoiatael_saesenthessis
+
+  # =========================================================
+  # SKELLIGE
+  # =========================================================
+  - deck_id: skellige_hs_645
+    faction: skellige
+    leader_id: skellige_king_bran
+    cards:
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_decoy
+      - neutral_mysterious_elf
+      - neutral_gaunter_o_dimm
+      - neutral_yennefer 
+      - neutral_villentretenmerth
+      - neutral_gaunter_darkness
+      - neutral_gaunter_darkness
+      - neutral_gaunter_darkness
+      - skellige_birna_bran
+      - skellige_clan_an_craie_warrior
+      - skellige_clan_an_craie_warrior
+      - neutral_olgierd_von_everec
+      - skellige_berserker
+      - skellige_cerys
+      - skellige_clan_drummond_shield_maiden
+      - skellige_clan_drummond_shield_maiden
+      - skellige_clan_drummond_shield_maiden
+      - skellige_young_berserker
+      - skellige_young_berserker
+      - skellige_young_berserker
+      - skellige_war_longship
+      - skellige_war_longship
+      - skellige_war_longship
+      - neutral_dandelion
+      - neutral_commanders_horn
+      - skellige_olaf
+      - skellige_mardroeme
+      - skellige_ermion
+      - skellige_clan_draig_bon_dhu
+      
+
+  - deck_id: skellige_slim_cerys_midrange_strict
+    faction: skellige
+    leader_id: skellige_king_bran
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+      - neutral_triss_merigold
+
+      - skellige_cerys
+      - skellige_hjalmar
+      - skellige_ermion
+
+      - skellige_olaf
+      - skellige_kambi
+      - skellige_birna_bran
+      - skellige_blueboy_lugos
+      - skellige_madman_lugos
+      - skellige_udalryk
+      - skellige_svanrige
+      - skellige_clan_dimun_pirate
+      - skellige_clan_brokvar_archer
+      - skellige_clan_an_craie_warrior
+      - skellige_clan_drummond_shield_maiden
+      - skellige_clan_heymaey_skald
+      - skellige_clan_donar_an_hindar
+      - skellige_clan_tordarroch_armorsmith
+      - skellige_holger_blackhand
+      - skellige_light_longship
+      - skellige_war_longship
+
+      - neutral_decoy
+      - neutral_scorch
+      - neutral_skellige_storm
+      - neutral_clear_weather
+
+  - deck_id: skellige_cerys_berserker_combo_strict
+    faction: skellige
+    leader_id: skellige_king_bran
+    cards:
+      - neutral_geralt
+      - neutral_ciri
+      - neutral_yennefer
+      - neutral_mysterious_elf
+
+      - skellige_cerys
+      - skellige_hjalmar
+      - skellige_ermion
+
+      - skellige_olaf
+      - skellige_kambi
+      - skellige_birna_bran
+      - skellige_berserker
+      - skellige_young_berserker
+      - skellige_blueboy_lugos
+      - skellige_madman_lugos
+      - skellige_clan_dimun_pirate
+      - skellige_clan_brokvar_archer
+      - skellige_clan_an_craie_warrior
+      - skellige_clan_drummond_shield_maiden
+      - skellige_light_longship
+      - skellige_war_longship
+      - skellige_holger_blackhand
+      - skellige_udalryk
+      - skellige_svanrige
+
+      - skellige_mardroeme
+      - skellige_mardroeme
+      - neutral_decoy
+      - neutral_scorch
+      - neutral_skellige_storm

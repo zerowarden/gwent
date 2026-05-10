@@ -1,0 +1,21 @@
+factions:
+  - faction_id: monsters
+    name: Monsters
+    passive_kind: monsters_keep_one_unit
+    passive_description: Keeps random Unit Card out after each round.
+  - faction_id: nilfgaard
+    name: Nilfgaard
+    passive_kind: nilfgaard_wins_ties
+    passive_description: Wins any round that ends in a draw. 
+  - faction_id: northern_realms
+    name: Northern Realms
+    passive_kind: northern_realms_draw_on_round_win
+    passive_description: Grants an extra card upon winning a round. 
+  - faction_id: scoiatael
+    name: "Scoia'tael"
+    passive_kind: scoiatael_chooses_starting_player
+    passive_description: Decides who takes first turn.
+  - faction_id: skellige
+    name: "Skellige"
+    passive_kind: skellige_summon_two_from_discard_on_round_three
+    passive_description: "2 random Unit cards from the graveyard are placed on the battlefield at the start of the third round."

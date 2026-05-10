@@ -1,0 +1,33 @@
+profiles:
+  baseline:
+    policies:
+      scorch_policy: opportunistic_scorch
+      leader_policy: aggressive
+
+  conservative:
+    policies:
+      scorch_policy: reserve_scorch
+      leader_policy: conservative
+    weights:
+      card_advantage: 2.2
+      remaining_hand_value: 0.3
+      leader_value: 4.5
+      overcommit_penalty: -1.1
+      exact_finish_bonus: 3.8
+    pass:
+      safe_lead_margin: 5
+
+  aggro:
+    policies:
+      scorch_policy: opportunistic_scorch
+      leader_policy: aggressive
+    weights:
+      immediate_points: 1.15
+      card_advantage: 1.8
+      remaining_hand_value: 0.2
+      leader_value: 3.5
+      overcommit_penalty: -0.85
+      exact_finish_bonus: 4.3
+    pass:
+      safe_lead_margin: 8
+      estimated_opponent_tempo_per_card: 3
