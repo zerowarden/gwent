@@ -1,6 +1,8 @@
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+from gwent_service.application.errors import MatchNotFoundError, MatchVersionConflictError
 from gwent_service.domain.models import StagedMulliganSubmission, StoredMatch
 from gwent_service.infrastructure.sqlite import SQLiteMatchRepository
 
@@ -51,7 +53,8 @@ def test_sqlite_repository_update_persists_event_logs_and_staged_mulligans(
 ) -> None:
     database_path = tmp_path / "matches.sqlite3"
     repository = SQLiteMatchRepository(database_path)
-    repository.create(_sqlite_match())
+    created_match = _sqlite_match()
+    repository.create(created_match)
 
     base_match = _sqlite_match(version=1)
     updated_match = replace(
@@ -77,9 +80,43 @@ def test_sqlite_repository_update_persists_event_logs_and_staged_mulligans(
         ),
     )
 
-    repository.update(updated_match)
+    repository.update(updated_match, expected_version=created_match.version)
 
     reloaded_repository = SQLiteMatchRepository(database_path)
     loaded_match = reloaded_repository.get("sqlite_match")
 
     assert loaded_match == updated_match
+
+
+def test_sqlite_repository_rejects_update_from_stale_version(tmp_path: Path) -> None:
+    database_path = tmp_path / "matches.sqlite3"
+    repository = SQLiteMatchRepository(database_path)
+    created_match = _sqlite_match()
+    repository.create(created_match)
+
+    first_writer_match = _sqlite_match(version=1)
+    second_writer_match = replace(
+        _sqlite_match(version=1),
+        staged_mulligans=(
+            StagedMulliganSubmission(
+                engine_player_id="p2",
+                card_instance_ids=("p2_replacement_card",),
+            ),
+        ),
+    )
+
+    repository.update(first_writer_match, expected_version=created_match.version)
+
+    with pytest.raises(MatchVersionConflictError) as conflict:
+        repository.update(second_writer_match, expected_version=created_match.version)
+
+    assert conflict.value.expected_version == created_match.version
+    assert conflict.value.actual_version == first_writer_match.version
+    assert repository.get("sqlite_match") == first_writer_match
+
+
+def test_sqlite_repository_update_of_missing_match_raises_not_found(tmp_path: Path) -> None:
+    repository = SQLiteMatchRepository(tmp_path / "matches.sqlite3")
+
+    with pytest.raises(MatchNotFoundError):
+        repository.update(_sqlite_match(version=1), expected_version=0)

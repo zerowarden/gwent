@@ -1,6 +1,13 @@
+import pytest
 from gwent_service.application.commands import SubmitMulliganCommand
+from gwent_service.application.errors import MatchVersionConflictError
 
-from tests.service.support import build_create_match_command, build_service
+from tests.service.support import (
+    StaleSnapshotRepository,
+    build_create_match_command,
+    build_service,
+    build_service_with_repository,
+)
 
 
 def test_match_service_stages_one_mulligan_then_resolves_on_second_submission() -> None:
@@ -39,3 +46,41 @@ def test_match_service_stages_one_mulligan_then_resolves_on_second_submission() 
     assert len(resolved_match.event_log_payloads) == 6
     assert "p1_card_1" not in {card.instance_id for card in alice_resolved_view.viewer_hand}
     assert "p1_card_11" in {card.instance_id for card in alice_resolved_view.viewer_hand}
+
+
+def test_submit_mulligan_from_stale_snapshot_does_not_overwrite_committed_state() -> None:
+    service, repository = build_service()
+    _ = service.create_match(
+        build_create_match_command(match_id="mulligan_match"),
+        viewer_service_player_id="alice",
+    )
+    stale_snapshot = repository.get("mulligan_match")
+    assert stale_snapshot is not None
+
+    _ = service.submit_mulligan(
+        SubmitMulliganCommand(
+            match_id="mulligan_match",
+            service_player_id="alice",
+            card_instance_ids=("p1_card_1",),
+        )
+    )
+
+    stale_service = build_service_with_repository(
+        StaleSnapshotRepository(repository, stale_snapshot)
+    )
+    with pytest.raises(MatchVersionConflictError):
+        _ = stale_service.submit_mulligan(
+            SubmitMulliganCommand(
+                match_id="mulligan_match",
+                service_player_id="bob",
+                card_instance_ids=(),
+            )
+        )
+
+    committed_match = repository.get("mulligan_match")
+    assert committed_match is not None
+    staged_engine_player_ids = [
+        submission.engine_player_id for submission in committed_match.staged_mulligans
+    ]
+    assert committed_match.version == stale_snapshot.version + 1
+    assert staged_engine_player_ids == ["p1"]

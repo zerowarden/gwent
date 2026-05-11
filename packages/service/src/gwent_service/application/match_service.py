@@ -151,7 +151,7 @@ class MatchService:
                 staged_mulligans=next_staged_mulligans,
                 version=stored_match.version + 1,
             )
-            self._repository.update(updated_match)
+            self._repository.update(updated_match, expected_version=stored_match.version)
             return project_match_for_player(
                 updated_match,
                 command.service_player_id,
@@ -320,7 +320,7 @@ class MatchService:
             ),
             version=stored_match.version + 1,
         )
-        self._repository.update(updated_match)
+        self._repository.update(updated_match, expected_version=stored_match.version)
         return updated_match
 
     def _replace_match(

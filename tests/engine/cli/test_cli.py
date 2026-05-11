@@ -126,37 +126,39 @@ def test_bot_match_cli_accepts_leader_overrides() -> None:
     assert run.steps
 
 
-def test_main_defaults_to_interactive_bot_match_and_prints_report(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    report_path = Path("/tmp/interactive-bot-match/report.html")
-    exit_code, output = _run_main_with_report(
-        monkeypatch,
-        capsys,
-        argv=[],
-        report_path=report_path,
-    )
-
-    assert exit_code == 0
-    assert str(report_path.parent) in output
-    assert str(report_path) in output
-
-
+@pytest.mark.parametrize(
+    ("argv", "report_path", "expected_output_parts"),
+    (
+        (
+            [],
+            Path("/tmp/interactive-bot-match/report.html"),
+            ("/tmp/interactive-bot-match", "/tmp/interactive-bot-match/report.html"),
+        ),
+        (
+            ["--mode", "bot-match"],
+            Path("/tmp/greedy-random_3_20260419-000000.html"),
+            ("/tmp/greedy-random_3_20260419-000000.html",),
+        ),
+    ),
+)
 def test_main_bot_match_prints_html_review_report(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    argv: list[str],
+    report_path: Path,
+    expected_output_parts: tuple[str, ...],
 ) -> None:
-    report_path = Path("/tmp/greedy-random_3_20260419-000000.html")
     exit_code, output = _run_main_with_report(
         monkeypatch,
         capsys,
-        argv=["--mode", "bot-match"],
+        argv=argv,
         report_path=report_path,
     )
+    single_line_output = output.replace("\n", "")
 
     assert exit_code == 0
-    assert str(report_path).replace("_\n", "_") in output.replace("\n", "")
+    for expected_output_part in expected_output_parts:
+        assert expected_output_part in single_line_output
 
 
 def _run_main_with_report(

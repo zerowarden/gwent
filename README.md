@@ -1,5 +1,7 @@
 # Gwent
 
+![Happy geralt](./assets/image.jpg)
+
 _Fancy a game of card?_
 
 ## Description

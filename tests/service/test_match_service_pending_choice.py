@@ -67,7 +67,8 @@ def test_match_service_pending_choice_can_be_retrieved_and_resolved() -> None:
             version=stored_match.version + 1,
             created_at=stored_match.created_at,
             updated_at=stored_match.updated_at,
-        )
+        ),
+        expected_version=stored_match.version,
     )
 
     pending_choice_view = service.get_match(

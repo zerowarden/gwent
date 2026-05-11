@@ -64,7 +64,8 @@ def test_pending_choice_can_be_resolved_over_http() -> None:
                 version=stored_match.version + 1,
                 created_at=stored_match.created_at,
                 updated_at=stored_match.updated_at,
-            )
+            ),
+            expected_version=stored_match.version,
         )
         pending_response = client.get(
             "/matches/api_pending_choice",

@@ -3,11 +3,16 @@ from __future__ import annotations
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from typing import cast
+from typing import NoReturn, cast
 
+from gwent_shared import expect_int
 from gwent_shared.error_translation import translate_exception
 
-from gwent_service.application.errors import MatchAlreadyExistsError, MatchNotFoundError
+from gwent_service.application.errors import (
+    MatchAlreadyExistsError,
+    MatchNotFoundError,
+    MatchVersionConflictError,
+)
 from gwent_service.domain.models import StoredMatch
 from gwent_service.infrastructure.sqlite.payloads import (
     deserialize_stored_match,
@@ -69,7 +74,7 @@ class SQLiteMatchRepository:
             return None
         return deserialize_stored_match(row)
 
-    def update(self, stored_match: StoredMatch) -> None:
+    def update(self, stored_match: StoredMatch, *, expected_version: int) -> None:
         payload = serialize_stored_match(stored_match)
         with closing(self._connect()) as connection, connection:
             cursor = connection.execute(
@@ -83,7 +88,7 @@ class SQLiteMatchRepository:
                     version = ?,
                     created_at = ?,
                     updated_at = ?
-                WHERE match_id = ?
+                WHERE match_id = ? AND version = ?
                 """,
                 (
                     payload[1],
@@ -94,10 +99,32 @@ class SQLiteMatchRepository:
                     payload[6],
                     payload[7],
                     payload[0],
+                    expected_version,
                 ),
             )
             if cursor.rowcount == 0:
-                raise MatchNotFoundError(stored_match.match_id)
+                self._raise_update_failure(connection, stored_match.match_id, expected_version)
+
+    @staticmethod
+    def _raise_update_failure(
+        connection: sqlite3.Connection,
+        match_id: str,
+        expected_version: int,
+    ) -> NoReturn:
+        existing = cast(
+            sqlite3.Row | None,
+            connection.execute(
+                "SELECT version FROM matches WHERE match_id = ?",
+                (match_id,),
+            ).fetchone(),
+        )
+        if existing is None:
+            raise MatchNotFoundError(match_id)
+        raise MatchVersionConflictError(
+            match_id,
+            expected_version=expected_version,
+            actual_version=expect_int(existing["version"], context="sqlite.version"),
+        )
 
     def _initialize_schema(self) -> None:
         with closing(self._connect()) as connection, connection:

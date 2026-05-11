@@ -13,6 +13,7 @@ from gwent_service.domain.models import (
     StoredMatch,
     StoredPlayerSlot,
 )
+from gwent_service.domain.repositories import MatchRepository
 from gwent_service.engine.adapter import GwentEngineAdapter
 from gwent_service.infrastructure.memory_repo import InMemoryMatchRepository
 
@@ -26,12 +27,34 @@ def identity_rng_factory(seed: int | None, event_counter: int) -> IdentityShuffl
 
 def build_service() -> tuple[MatchService, InMemoryMatchRepository]:
     repository = InMemoryMatchRepository()
-    service = MatchService(
+    return build_service_with_repository(repository), repository
+
+
+def build_service_with_repository(repository: MatchRepository) -> MatchService:
+    return MatchService(
         repository,
         GwentEngineAdapter(),
         rng_factory=identity_rng_factory,
     )
-    return service, repository
+
+
+class StaleSnapshotRepository:
+    def __init__(self, delegate: MatchRepository, stale_match: StoredMatch) -> None:
+        self._delegate: MatchRepository = delegate
+        self._stale_match: StoredMatch | None = stale_match
+
+    def create(self, stored_match: StoredMatch) -> None:
+        self._delegate.create(stored_match)
+
+    def get(self, match_id: str) -> StoredMatch | None:
+        stale_match = self._stale_match
+        if stale_match is not None and stale_match.match_id == match_id:
+            self._stale_match = None
+            return stale_match
+        return self._delegate.get(match_id)
+
+    def update(self, stored_match: StoredMatch, *, expected_version: int) -> None:
+        self._delegate.update(stored_match, expected_version=expected_version)
 
 
 def build_stored_match(

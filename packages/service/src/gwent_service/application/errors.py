@@ -20,6 +20,26 @@ class MatchNotFoundError(_SingleValueMatchServiceError):
     message_template: ClassVar[str] = "Match {value!r} was not found."
 
 
+class MatchVersionConflictError(MatchServiceError):
+    match_id: str
+    expected_version: int
+    actual_version: int
+
+    def __init__(
+        self,
+        match_id: str,
+        *,
+        expected_version: int,
+        actual_version: int,
+    ) -> None:
+        super().__init__(
+            f"Stale match {match_id!r}: expected version {expected_version}, got {actual_version}."
+        )
+        self.match_id = match_id
+        self.expected_version = expected_version
+        self.actual_version = actual_version
+
+
 class UnknownMatchPlayerError(MatchServiceError):
     def __init__(self, service_player_id: str, match_id: str) -> None:
         super().__init__(f"Player {service_player_id!r} does not belong to match {match_id!r}.")

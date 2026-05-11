@@ -9,6 +9,7 @@ from gwent_service.application.errors import (
     MatchNotFoundError,
     MatchPhaseError,
     MatchServiceError,
+    MatchVersionConflictError,
     MulliganAlreadySubmittedError,
     MulliganSelectionError,
     UnknownMatchPlayerError,
@@ -17,9 +18,10 @@ from gwent_service.application.errors import (
 
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(MatchAlreadyExistsError)
-    async def _handle_match_already_exists(
+    @app.exception_handler(MatchVersionConflictError)
+    async def _handle_conflict_errors(
         request: Request,
-        exc: MatchAlreadyExistsError,
+        exc: MatchAlreadyExistsError | MatchVersionConflictError,
     ) -> JSONResponse:
         del request
         return JSONResponse(status_code=409, content={"detail": str(exc)})
