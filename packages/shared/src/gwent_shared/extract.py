@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from typing import cast
 
 ErrorFactory = Callable[[str], Exception]
 
@@ -173,7 +174,7 @@ def expect_mapping(
     error_factory: ErrorFactory = TypeError,
 ) -> Mapping[str, object]:
     if isinstance(value, Mapping):
-        return value
+        return cast(Mapping[str, object], value)
     raise error_factory(f"{context} must be a mapping.")
 
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
@@ -76,6 +78,21 @@ class RowState:
 
     def all_cards(self) -> tuple[CardInstanceId, ...]:
         return self.close + self.ranged + self.siege
+
+    def without(self, removed_card_ids: tuple[CardInstanceId, ...]) -> RowState:
+        removed = set(removed_card_ids)
+        return RowState(
+            close=tuple(card_id for card_id in self.close if card_id not in removed),
+            ranged=tuple(card_id for card_id in self.ranged if card_id not in removed),
+            siege=tuple(card_id for card_id in self.siege if card_id not in removed),
+        )
+
+    def retained(self, kept_card_ids: frozenset[CardInstanceId]) -> RowState:
+        return RowState(
+            close=tuple(card_id for card_id in self.close if card_id in kept_card_ids),
+            ranged=tuple(card_id for card_id in self.ranged if card_id in kept_card_ids),
+            siege=tuple(card_id for card_id in self.siege if card_id in kept_card_ids),
+        )
 
 
 @dataclass(frozen=True, slots=True)

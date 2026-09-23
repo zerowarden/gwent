@@ -12,7 +12,10 @@ from gwent_engine.ai.baseline import (
 from gwent_engine.ai.baseline.projection import projected_future_card_value
 from gwent_engine.ai.observations import PlayerObservation, build_player_observation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
-from gwent_engine.ai.search.public_info import redact_private_information
+from gwent_engine.ai.search.public_info import (
+    provision_search_registry,
+    redact_private_information,
+)
 from gwent_engine.ai.search.types import SearchTraceFact, SearchValueTerm
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import AbilityKind, CardType, GameStatus
@@ -38,10 +41,10 @@ def evaluate_search_state(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None = None,
 ) -> SearchStateEvaluation:
+    card_registry = provision_search_registry(card_registry)
     state = redact_private_information(
         state,
         viewer_player_id=viewer_player_id,
-        card_registry=card_registry,
     )
     observation = build_player_observation(state, viewer_player_id, leader_registry)
     assessment = build_assessment(observation, card_registry)

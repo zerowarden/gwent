@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import cast
 
-from gwent_shared.error_translation import recover_exception
 from rich.console import Console
 
 from gwent_engine.cli.args import parse_args
@@ -21,11 +20,10 @@ from gwent_engine.core.errors import IllegalActionError
 def main(argv: Sequence[str] | None = None) -> int:
     args = parse_args(argv)
     mode = cast(str, args.mode)
-    return recover_exception(
-        lambda: _run_report_mode(mode=mode),
-        (IllegalActionError, RuntimeError, ValueError),
-        _cli_failure,
-    )
+    try:
+        return _run_report_mode(mode=mode)
+    except (IllegalActionError, RuntimeError, ValueError) as exc:
+        return _cli_failure(exc)
 
 
 def _run_report_mode(*, mode: str) -> int:

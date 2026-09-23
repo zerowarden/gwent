@@ -4,9 +4,10 @@ from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 
+from gwent_engine.core import Phase
 from gwent_engine.core.actions import GameAction
 from gwent_engine.core.randomness import SupportsRandom
-from gwent_shared.error_translation import translate_exception
+from gwent_engine.core.state import GameState
 
 from gwent_service.application.commands import (
     CreateMatchCommand,
@@ -24,18 +25,17 @@ from gwent_service.application.errors import (
     UnknownMatchPlayerError,
 )
 from gwent_service.application.projections import project_match_for_player
+from gwent_service.application.snapshot import (
+    MatchSnapshot,
+    snapshot_from_stored_match,
+    stored_match_from_snapshot,
+)
 from gwent_service.application.staging import (
     mulligan_submission_map,
     mulligans_are_complete,
     stage_mulligan_submission,
 )
-from gwent_service.application.state_payload import (
-    state_event_counter,
-    state_phase,
-    state_player_order,
-    state_rng_seed,
-)
-from gwent_service.domain.models import StagedMulliganSubmission, StoredMatch, StoredPlayerSlot
+from gwent_service.domain.models import StagedMulliganSubmission, StoredPlayerSlot
 from gwent_service.domain.repositories import MatchRepository
 from gwent_service.engine.contracts import (
     CreateMatchStateSpec,
@@ -46,6 +46,7 @@ from gwent_service.engine.contracts import (
 
 MatchRngFactory = Callable[[int | None, int], SupportsRandom | None]
 Clock = Callable[[], datetime]
+BuildAction = Callable[[MatchSnapshot, StoredPlayerSlot], GameAction]
 
 
 class MatchService:
@@ -85,18 +86,17 @@ class MatchService:
                 rng_seed=command.rng_seed,
             )
         )
-        initial_payload = self._adapter.serialize_state(initial_state)
         start_transition = self._adapter.apply_engine_action(
             initial_state,
             self._adapter.build_start_game_action(
-                starting_player_id=command.participants[0].engine_player_id,
+                starting_player_id=first_participant.engine_player_id,
             ),
-            rng=self._rng_for_state_payload(initial_payload),
+            rng=self._rng_for_state(initial_state),
         )
         now = self._clock()
-        stored_match = StoredMatch(
+        snapshot = MatchSnapshot(
             match_id=command.match_id,
-            state_payload=self._adapter.serialize_state(start_transition.next_state),
+            state=start_transition.next_state,
             event_log_payloads=self._adapter.serialize_events(start_transition.events),
             player_slots=(
                 StoredPlayerSlot(
@@ -110,255 +110,218 @@ class MatchService:
                     deck_id=second_participant.deck_id,
                 ),
             ),
+            staged_mulligans=(),
             version=1,
             created_at=now,
             updated_at=now,
         )
-        _ = self._require_player_slot(stored_match, viewer_service_player_id)
-        self._repository.create(stored_match)
+        _ = self._require_player_slot(snapshot, viewer_service_player_id)
+        self._repository.create(stored_match_from_snapshot(snapshot, adapter=self._adapter))
         return project_match_for_player(
-            stored_match,
+            snapshot,
             viewer_service_player_id,
             adapter=self._adapter,
         )
 
     def get_match(self, match_id: str, *, viewer_service_player_id: str) -> MatchView:
-        stored_match = self._load_match(match_id)
+        snapshot = self._load_match(match_id)
         return project_match_for_player(
-            stored_match,
+            snapshot,
             viewer_service_player_id,
             adapter=self._adapter,
         )
 
     def submit_mulligan(self, command: SubmitMulliganCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        if state_phase(stored_match.state_payload) != "mulligan":
+        snapshot = self._load_match(command.match_id)
+        viewer_slot = self._require_player_slot(snapshot, command.service_player_id)
+        if snapshot.state.phase != Phase.MULLIGAN:
             raise MatchPhaseError("Mulligan submissions are only valid during the mulligan phase.")
 
         self._adapter.validate_mulligan_selection(
-            self._adapter.deserialize_state(stored_match.state_payload),
+            snapshot.state,
             player_id=viewer_slot.engine_player_id,
             card_instance_ids=command.card_instance_ids,
         )
 
         next_staged_mulligans = stage_mulligan_submission(
-            stored_match.staged_mulligans,
+            snapshot.staged_mulligans,
             StagedMulliganSubmission(
                 engine_player_id=viewer_slot.engine_player_id,
                 card_instance_ids=command.card_instance_ids,
             ),
             valid_engine_player_ids=frozenset(
-                slot.engine_player_id for slot in stored_match.player_slots
+                slot.engine_player_id for slot in snapshot.player_slots
             ),
         )
         if not mulligans_are_complete(next_staged_mulligans):
-            updated_match = self._replace_match(
-                stored_match,
-                staged_mulligans=next_staged_mulligans,
-                version=stored_match.version + 1,
-            )
-            self._repository.update(updated_match, expected_version=stored_match.version)
+            updated_snapshot = self._record_staged_mulligans(snapshot, next_staged_mulligans)
+            self._save(snapshot, updated_snapshot)
             return project_match_for_player(
-                updated_match,
+                updated_snapshot,
                 command.service_player_id,
                 adapter=self._adapter,
             )
 
         transition = self._apply_transition(
-            stored_match,
+            snapshot,
             self._adapter.build_resolve_mulligans_action(
-                player_order=state_player_order(stored_match.state_payload),
+                player_order=tuple(str(player.player_id) for player in snapshot.state.players),
                 selections_by_player_id=mulligan_submission_map(next_staged_mulligans),
             ),
         )
-        updated_match = self._persist_transition(
-            stored_match,
+        updated_snapshot = self._persist_transition(
+            snapshot,
             transition,
             staged_mulligans=(),
         )
         return project_match_for_player(
-            updated_match,
+            updated_snapshot,
             command.service_player_id,
             adapter=self._adapter,
         )
 
     def play_card(self, command: PlayCardCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        transition = self._apply_transition(
-            stored_match,
-            self._adapter.build_play_card_action(
+        def build_action(_snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
+            return self._adapter.build_play_card_action(
                 player_id=viewer_slot.engine_player_id,
                 card_instance_id=command.card_instance_id,
                 target_row=command.target_row,
                 target_card_instance_id=command.target_card_instance_id,
                 secondary_target_card_instance_id=command.secondary_target_card_instance_id,
-            ),
-        )
-        updated_match = self._persist_transition(stored_match, transition)
-        return project_match_for_player(
-            updated_match,
-            command.service_player_id,
-            adapter=self._adapter,
-        )
+            )
+
+        return self._execute_action(command.match_id, command.service_player_id, build_action)
 
     def pass_turn(self, command: PassTurnCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        transition = self._apply_transition(
-            stored_match,
-            self._adapter.build_player_action(
+        def build_action(_snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
+            return self._adapter.build_player_action(
                 kind="pass",
                 player_id=viewer_slot.engine_player_id,
-            ),
-        )
-        updated_match = self._persist_transition(stored_match, transition)
-        return project_match_for_player(
-            updated_match,
-            command.service_player_id,
-            adapter=self._adapter,
-        )
+            )
+
+        return self._execute_action(command.match_id, command.service_player_id, build_action)
 
     def leave_match(self, command: LeaveMatchCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        transition = self._apply_transition(
-            stored_match,
-            self._adapter.build_player_action(
+        def build_action(_snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
+            return self._adapter.build_player_action(
                 kind="leave",
                 player_id=viewer_slot.engine_player_id,
-            ),
-        )
-        updated_match = self._persist_transition(stored_match, transition)
-        return project_match_for_player(
-            updated_match,
-            command.service_player_id,
-            adapter=self._adapter,
-        )
+            )
+
+        return self._execute_action(command.match_id, command.service_player_id, build_action)
 
     def use_leader(self, command: UseLeaderAbilityCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        target_player = None
-        if command.target_player is not None:
-            target_player = self._require_player_slot(
-                stored_match,
-                command.target_player,
-            ).engine_player_id
-        transition = self._apply_transition(
-            stored_match,
-            self._adapter.build_use_leader_ability_action(
+        def build_action(snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
+            target_player = None
+            if command.target_player is not None:
+                target_player = self._require_player_slot(
+                    snapshot,
+                    command.target_player,
+                ).engine_player_id
+            return self._adapter.build_use_leader_ability_action(
                 player_id=viewer_slot.engine_player_id,
                 target_row=command.target_row,
                 target_player=target_player,
                 target_card_instance_id=command.target_card_instance_id,
                 secondary_target_card_instance_id=command.secondary_target_card_instance_id,
                 selected_card_instance_ids=command.selected_card_instance_ids,
-            ),
-        )
-        updated_match = self._persist_transition(stored_match, transition)
-        return project_match_for_player(
-            updated_match,
-            command.service_player_id,
-            adapter=self._adapter,
-        )
+            )
+
+        return self._execute_action(command.match_id, command.service_player_id, build_action)
 
     def resolve_choice(self, command: ResolveChoiceCommand) -> MatchView:
-        stored_match = self._load_match(command.match_id)
-        viewer_slot = self._require_player_slot(stored_match, command.service_player_id)
-        transition = self._apply_transition(
-            stored_match,
-            self._adapter.build_resolve_choice_action(
+        def build_action(_snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
+            return self._adapter.build_resolve_choice_action(
                 player_id=viewer_slot.engine_player_id,
                 choice_id=command.choice_id,
                 selected_card_instance_ids=command.selected_card_instance_ids,
                 selected_rows=command.selected_rows,
-            ),
-        )
-        updated_match = self._persist_transition(stored_match, transition)
+            )
+
+        return self._execute_action(command.match_id, command.service_player_id, build_action)
+
+    def _execute_action(
+        self,
+        match_id: str,
+        service_player_id: str,
+        build_action: BuildAction,
+    ) -> MatchView:
+        snapshot = self._load_match(match_id)
+        viewer_slot = self._require_player_slot(snapshot, service_player_id)
+        transition = self._apply_transition(snapshot, build_action(snapshot, viewer_slot))
+        updated_snapshot = self._persist_transition(snapshot, transition)
         return project_match_for_player(
-            updated_match,
-            command.service_player_id,
+            updated_snapshot,
+            service_player_id,
             adapter=self._adapter,
         )
 
-    def _load_match(self, match_id: str) -> StoredMatch:
+    def _load_match(self, match_id: str) -> MatchSnapshot:
         stored_match = self._repository.get(match_id)
         if stored_match is None:
             raise MatchNotFoundError(match_id)
-        return stored_match
+        return snapshot_from_stored_match(stored_match, adapter=self._adapter)
 
     @staticmethod
-    def _require_player_slot(stored_match: StoredMatch, service_player_id: str) -> StoredPlayerSlot:
-        return translate_exception(
-            lambda: stored_match.slot_for_service_player(service_player_id),
-            KeyError,
-            lambda _exc: UnknownMatchPlayerError(service_player_id, stored_match.match_id),
-        )
+    def _require_player_slot(snapshot: MatchSnapshot, service_player_id: str) -> StoredPlayerSlot:
+        try:
+            return snapshot.slot_for_service_player(service_player_id)
+        except KeyError as exc:
+            raise UnknownMatchPlayerError(service_player_id, snapshot.match_id) from exc
 
     def _apply_transition(
         self,
-        stored_match: StoredMatch,
+        snapshot: MatchSnapshot,
         action: GameAction,
     ) -> EngineTransitionResult:
-        state = self._adapter.deserialize_state(stored_match.state_payload)
         return self._adapter.apply_engine_action(
-            state,
+            snapshot.state,
             action,
-            rng=self._rng_for_state_payload(stored_match.state_payload),
+            rng=self._rng_for_state(snapshot.state),
         )
 
     def _persist_transition(
         self,
-        stored_match: StoredMatch,
+        snapshot: MatchSnapshot,
         transition: EngineTransitionResult,
         *,
         staged_mulligans: tuple[StagedMulliganSubmission, ...] | None = None,
-    ) -> StoredMatch:
-        updated_match = self._replace_match(
-            stored_match,
-            state_payload=self._adapter.serialize_state(transition.next_state),
+    ) -> MatchSnapshot:
+        updated_snapshot = replace(
+            snapshot,
+            state=transition.next_state,
             event_log_payloads=(
-                stored_match.event_log_payloads + self._adapter.serialize_events(transition.events)
+                snapshot.event_log_payloads + self._adapter.serialize_events(transition.events)
             ),
             staged_mulligans=(
-                stored_match.staged_mulligans if staged_mulligans is None else staged_mulligans
+                snapshot.staged_mulligans if staged_mulligans is None else staged_mulligans
             ),
-            version=stored_match.version + 1,
+            version=snapshot.version + 1,
+            updated_at=self._clock(),
         )
-        self._repository.update(updated_match, expected_version=stored_match.version)
-        return updated_match
+        self._save(snapshot, updated_snapshot)
+        return updated_snapshot
 
-    def _replace_match(
+    def _record_staged_mulligans(
         self,
-        stored_match: StoredMatch,
-        *,
-        state_payload: dict[str, object] | None = None,
-        event_log_payloads: tuple[dict[str, object], ...] | None = None,
-        staged_mulligans: tuple[StagedMulliganSubmission, ...] | None = None,
-        version: int | None = None,
-    ) -> StoredMatch:
+        snapshot: MatchSnapshot,
+        staged_mulligans: tuple[StagedMulliganSubmission, ...],
+    ) -> MatchSnapshot:
         return replace(
-            stored_match,
-            state_payload=stored_match.state_payload if state_payload is None else state_payload,
-            event_log_payloads=(
-                stored_match.event_log_payloads
-                if event_log_payloads is None
-                else event_log_payloads
-            ),
-            staged_mulligans=(
-                stored_match.staged_mulligans if staged_mulligans is None else staged_mulligans
-            ),
-            version=stored_match.version if version is None else version,
+            snapshot,
+            staged_mulligans=staged_mulligans,
+            version=snapshot.version + 1,
             updated_at=self._clock(),
         )
 
-    def _rng_for_state_payload(self, state_payload: dict[str, object]) -> SupportsRandom | None:
-        return self._rng_factory(
-            state_rng_seed(state_payload),
-            state_event_counter(state_payload),
+    def _save(self, previous_snapshot: MatchSnapshot, updated_snapshot: MatchSnapshot) -> None:
+        self._repository.update(
+            stored_match_from_snapshot(updated_snapshot, adapter=self._adapter),
+            expected_version=previous_snapshot.version,
         )
+
+    def _rng_for_state(self, state: GameState) -> SupportsRandom | None:
+        return self._rng_factory(state.rng_seed, state.event_counter)
 
 
 def _default_rng_factory(seed: int | None, event_counter: int) -> SupportsRandom | None:

@@ -14,8 +14,13 @@ from gwent_engine.ai.search import (
 )
 from gwent_engine.ai.search.depth_policy import should_search_opponent_reply
 from gwent_engine.ai.search.opponent_model import generate_opponent_reply_candidates
-from gwent_engine.ai.search.public_info import redact_private_information
+from gwent_engine.ai.search.public_info import (
+    PUBLIC_INFO_HIDDEN_CARD_DEFINITION,
+    provision_search_registry,
+    redact_private_information,
+)
 from gwent_engine.ai.search.types import SearchResult
+from gwent_engine.cards import CardRegistry
 from gwent_engine.core import ChoiceSourceKind, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction, ResolveChoiceAction
 from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
@@ -493,7 +498,6 @@ def test_redact_private_information_replaces_only_opponent_hidden_zones() -> Non
     redacted = redact_private_information(
         state,
         viewer_player_id=PLAYER_ONE_ID,
-        card_registry=CARD_REGISTRY,
     )
 
     assert redacted.card(CardInstanceId("p1_known_archer")).definition_id == CardDefinitionId(
@@ -513,6 +517,54 @@ def test_redact_private_information_replaces_only_opponent_hidden_zones() -> Non
     assert redacted.card(CardInstanceId("p2_public_board")).definition_id == (
         CardDefinitionId("northern_realms_trebuchet")
     )
+
+
+def test_search_works_without_incidental_catalog_placeholder() -> None:
+    state = (
+        scenario("search_custom_registry")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card("p1_archer", "scoiatael_dol_blathanna_archer")],
+        )
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_hidden_unit", "neutral_geralt")],
+            deck=[card("p2_hidden_deck", "northern_realms_trebuchet")],
+        )
+        .build()
+    )
+    custom_registry = CardRegistry.from_definitions(
+        definition
+        for definition in CARD_REGISTRY
+        if definition.definition_id != CardDefinitionId("scoiatael_mahakaman_defender")
+    )
+    provisioned_registry = provision_search_registry(custom_registry)
+
+    redacted = redact_private_information(state, viewer_player_id=PLAYER_ONE_ID)
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=provisioned_registry,
+        leader_registry=LEADER_REGISTRY,
+    )
+    engine = build_search_engine(
+        config=DEFAULT_SEARCH_CONFIG,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="custom_registry_search",
+    )
+
+    result = engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=custom_registry,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert redacted.card(CardInstanceId("p2_hidden_unit")).definition_id == (
+        PUBLIC_INFO_HIDDEN_CARD_DEFINITION.definition_id
+    )
+    assert result.used_fallback_policy is False
 
 
 def test_search_engine_ignores_opponent_hidden_hand_and_deck_identities() -> None:

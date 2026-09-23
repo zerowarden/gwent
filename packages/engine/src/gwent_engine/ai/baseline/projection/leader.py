@@ -18,6 +18,7 @@ from gwent_engine.ai.baseline.projection.resolver_context import (
     ProjectionResolverContext,
 )
 from gwent_engine.ai.observations import PlayerObservation
+from gwent_engine.ai.utils import is_non_hero_unit
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, LeaderAbilityKind, Row
 from gwent_engine.core.actions import UseLeaderAbilityAction
@@ -468,4 +469,4 @@ def project_leader_action(
 
 
 def _is_leader_discard_retrieval_target(definition: CardDefinition) -> bool:
-    return definition.card_type == CardType.UNIT and not definition.is_hero
+    return is_non_hero_unit(definition)

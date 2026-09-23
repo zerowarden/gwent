@@ -4,7 +4,7 @@ from gwent_engine.core import Row, Zone
 from gwent_engine.core.config import MAX_HAND_SIZE
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
-from gwent_engine.rules.players import other_player_from_pair
+from gwent_engine.rules.players import other_player_from_pair, replace_player
 
 
 def append_to_row(rows: RowState, row: Row, card_id: CardInstanceId) -> RowState:
@@ -18,11 +18,7 @@ def append_to_row(rows: RowState, row: Row, card_id: CardInstanceId) -> RowState
 
 
 def remove_card_from_rows(rows: RowState, card_id: CardInstanceId) -> RowState:
-    return RowState(
-        close=tuple(existing_id for existing_id in rows.close if existing_id != card_id),
-        ranged=tuple(existing_id for existing_id in rows.ranged if existing_id != card_id),
-        siege=tuple(existing_id for existing_id in rows.siege if existing_id != card_id),
-    )
+    return rows.without((card_id,))
 
 
 def replace_row_card(
@@ -72,6 +68,38 @@ def drawable_card_ids(player: PlayerState, requested_count: int) -> tuple[CardIn
     available_hand_slots = max(0, MAX_HAND_SIZE - len(player.hand))
     draw_count = min(requested_count, available_hand_slots, len(player.deck))
     return player.deck[:draw_count]
+
+
+def draw_cards_into_hand(
+    state: GameState,
+    player: PlayerState,
+    requested_count: int,
+) -> tuple[GameState, tuple[CardInstanceId, ...]]:
+    drawn_card_ids = drawable_card_ids(player, requested_count)
+    if not drawn_card_ids:
+        return state, ()
+    updated_player = replace(
+        player,
+        deck=player.deck[len(drawn_card_ids) :],
+        hand=(*player.hand, *drawn_card_ids),
+    )
+    updated_cards = {
+        card_id: replace(
+            state.card(card_id),
+            zone=Zone.HAND,
+            row=None,
+            battlefield_side=None,
+        )
+        for card_id in drawn_card_ids
+    }
+    return (
+        replace(
+            state,
+            players=replace_player(state.players, updated_player),
+            card_instances=replace_card_instances(state.card_instances, updated_cards),
+        ),
+        drawn_card_ids,
+    )
 
 
 def discard_owned_weather_cards(

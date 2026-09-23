@@ -132,7 +132,7 @@ def calculate_effective_strength(
         return definition.base_strength
     if is_hero(state, card_registry, card_id):
         return definition.base_strength
-    strength = _base_battlefield_strength(
+    strength = _apply_weather(
         state,
         card_id,
         definition.base_strength,
@@ -166,21 +166,6 @@ def battlefield_effective_strengths(
     }
 
 
-def _base_battlefield_strength(
-    state: GameState,
-    card_id: CardInstanceId,
-    base_strength: int,
-    *,
-    score_context: _RowScoreContext,
-) -> int:
-    return _apply_weather(
-        state,
-        card_id,
-        base_strength,
-        score_context=score_context,
-    )
-
-
 def _apply_weather(
     state: GameState,
     card_id: CardInstanceId,
@@ -192,7 +177,7 @@ def _apply_weather(
     assert card.row is not None
     if card.row not in score_context.weathered_rows:
         return strength
-    battlefield_side = _battlefield_side_for_strength(state, card_id)
+    battlefield_side = _battlefield_side_for_card(state.card(card_id))
     if battlefield_side in score_context.halve_weather_penalty_players:
         return (strength + 1) // 2
     return 1
@@ -242,10 +227,6 @@ def _apply_horn(
     if (battlefield_side, card.row) in score_context.horn_rows:
         return strength * 2
     return strength
-
-
-def _battlefield_side_for_strength(state: GameState, card_id: CardInstanceId) -> PlayerId:
-    return _battlefield_side_for_card(state.card(card_id))
 
 
 def _battlefield_side_for_card(card: CardInstance) -> PlayerId:
@@ -344,17 +325,13 @@ def _row_signals(
     bond_groups: Counter[str] = Counter()
     has_row_horn = False
     for definition in definitions.values():
-        if _is_unit_definition(definition):
+        if definition.card_type == CardType.UNIT:
             morale_count += _unit_morale_signal(definition)
             _add_unit_bond_signal(definition, bond_groups)
             has_row_horn = has_row_horn or _unit_has_horn_signal(definition)
             continue
         has_row_horn = has_row_horn or _special_has_horn_signal(definition)
     return morale_count, has_row_horn, bond_groups
-
-
-def _is_unit_definition(definition: CardDefinition) -> bool:
-    return definition.card_type == CardType.UNIT
 
 
 def _unit_morale_signal(definition: CardDefinition) -> int:

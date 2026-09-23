@@ -7,11 +7,16 @@ from gwent_engine.ai.baseline.projection import projected_future_card_value
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
 from gwent_engine.ai.row_preference import row_preference
+from gwent_engine.ai.utils import is_non_hero_unit, visible_definitions
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.core import AbilityKind, CardType, ChoiceSourceKind, LeaderAbilityKind
+from gwent_engine.core import AbilityKind, ChoiceSourceKind, LeaderAbilityKind
 from gwent_engine.core.actions import GameAction, ResolveChoiceAction
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
+
+
+class UnsupportedPendingChoiceError(Exception):
+    """Raised when the baseline evaluator cannot score a pending choice."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -90,8 +95,12 @@ def explain_pending_choice_score_components(
 ) -> tuple[tuple[str, int], ...]:
     pending_choice = observation.visible_pending_choice
     if pending_choice is None:
-        raise ValueError("No visible pending choice to explain.")
-    target_definitions = _visible_definitions(observation, card_registry)
+        raise UnsupportedPendingChoiceError("No visible pending choice to explain.")
+    target_definitions = visible_definitions(
+        observation,
+        card_registry,
+        include_viewer_deck=True,
+    )
     if action.selected_rows:
         return (("row_preference", sum(row_preference(row) for row in action.selected_rows)),)
     if pending_choice.source_kind == ChoiceSourceKind.LEADER_ABILITY:
@@ -199,7 +208,7 @@ def _leader_target_is_eligible(
         LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND,
     }:
         return True
-    return definition.card_type == CardType.UNIT and not definition.is_hero
+    return is_non_hero_unit(definition)
 
 
 def _add_leader_selection_value(
@@ -335,25 +344,3 @@ def _medic_target_score_components(
             DEFAULT_PENDING_CHOICE_POLICY.medic_target_medic_bonus
         )
     return components
-
-
-def _visible_definitions(
-    observation: PlayerObservation,
-    card_registry: CardRegistry,
-) -> dict[CardInstanceId, CardDefinition]:
-    visible_cards = (
-        *observation.viewer_hand,
-        *observation.viewer_deck,
-        *observation.public_state.players[0].discard,
-        *observation.public_state.players[1].discard,
-        *observation.public_state.players[0].rows.close,
-        *observation.public_state.players[0].rows.ranged,
-        *observation.public_state.players[0].rows.siege,
-        *observation.public_state.players[1].rows.close,
-        *observation.public_state.players[1].rows.ranged,
-        *observation.public_state.players[1].rows.siege,
-        *observation.public_state.battlefield_weather.close,
-        *observation.public_state.battlefield_weather.ranged,
-        *observation.public_state.battlefield_weather.siege,
-    )
-    return {card.instance_id: card_registry.get(card.definition_id) for card in visible_cards}

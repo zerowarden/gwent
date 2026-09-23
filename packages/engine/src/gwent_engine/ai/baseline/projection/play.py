@@ -30,7 +30,7 @@ from gwent_engine.ai.baseline.projection.resolver_context import (
 )
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
-from gwent_engine.ai.utils import viewer_hand_definition
+from gwent_engine.ai.utils import is_non_hero_unit, viewer_hand_definition
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import PlayCardAction
@@ -390,12 +390,9 @@ def best_medic_revive(
 
     viewer = viewer_public(observation)
     candidates = [
-        card_registry.get(card.definition_id)
+        definition
         for card in viewer.discard
-        if (
-            card_registry.get(card.definition_id).card_type == CardType.UNIT
-            and not card_registry.get(card.definition_id).is_hero
-        )
+        if is_non_hero_unit(definition := card_registry.get(card.definition_id))
     ]
     if not candidates:
         return None

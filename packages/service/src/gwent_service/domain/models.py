@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -63,21 +62,7 @@ class StoredMatch:
             raise ValueError("StoredMatch version cannot be negative.")
 
     def slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
-        return self._slot_for_id(
-            service_player_id,
-            slot_id=lambda slot: slot.service_player_id,
-        )
-
-    def _slot_for_id(
-        self,
-        slot_id_value: str,
-        *,
-        slot_id: Callable[[StoredPlayerSlot], str],
-    ) -> StoredPlayerSlot:
-        for slot in self.player_slots:
-            if slot_id(slot) == slot_id_value:
-                return slot
-        raise KeyError(slot_id_value)
+        return find_service_player_slot(self.player_slots, service_player_id)
 
     def opponent_slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
         viewer_slot = self.slot_for_service_player(service_player_id)
@@ -85,3 +70,13 @@ class StoredMatch:
             if slot.service_player_id != viewer_slot.service_player_id:
                 return slot
         raise KeyError(service_player_id)
+
+
+def find_service_player_slot(
+    player_slots: tuple[StoredPlayerSlot, StoredPlayerSlot],
+    service_player_id: str,
+) -> StoredPlayerSlot:
+    for slot in player_slots:
+        if slot.service_player_id == service_player_id:
+            return slot
+    raise KeyError(service_player_id)

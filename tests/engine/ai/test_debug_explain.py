@@ -92,6 +92,47 @@ def test_explain_action_score_total_matches_evaluate_action() -> None:
     assert breakdown.terms
 
 
+def test_explain_action_score_preserves_unsupported_pending_choice_reason() -> None:
+    state = (
+        scenario("explain_unsupported_pending_choice")
+        .player("p1", hand=[card("p1_archer", "scoiatael_dol_blathanna_archer")])
+        .player("p2", hand=[card("p2_hidden_card", "scoiatael_mahakaman_defender")])
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    assert observation.visible_pending_choice is None
+    action = ResolveChoiceAction(
+        player_id=PLAYER_ONE_ID,
+        choice_id=ChoiceId("stale_choice"),
+        selected_card_instance_ids=(CardInstanceId("p1_archer"),),
+    )
+    assessment = build_assessment(observation, CARD_REGISTRY)
+    context = classify_context(assessment)
+    profile = compose_profile(
+        DEFAULT_BASELINE_CONFIG,
+        assessment,
+        context,
+        base_profile=DEFAULT_BASE_PROFILE,
+    )
+
+    breakdown = explain_action_score(
+        action,
+        observation=observation,
+        assessment=assessment,
+        context=context,
+        profile=profile,
+        card_registry=CARD_REGISTRY,
+    )
+
+    penalty_term = next(
+        term for term in breakdown.terms if term.name == "unsupported_action_penalty"
+    )
+    unsupported_reasons = [
+        detail.value for detail in penalty_term.details if detail.key == "unsupported_reason"
+    ]
+    assert unsupported_reasons == ["No visible pending choice to explain."]
+
+
 def test_explain_heuristic_decision_surfaces_minimum_commitment_override() -> None:
     state = _minimum_commitment_override_state()
     legal_actions = enumerate_legal_actions(

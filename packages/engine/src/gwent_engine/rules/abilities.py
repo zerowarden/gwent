@@ -4,13 +4,13 @@ from dataclasses import dataclass, replace
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import (
     AbilityKind,
-    EffectSourceCategory,
     GameStatus,
     Phase,
     Row,
     Zone,
 )
 from gwent_engine.core.actions import PlayCardAction
+from gwent_engine.core.config import SCORCH_THRESHOLD
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import (
     CardPlayedEvent,
@@ -26,7 +26,7 @@ from gwent_engine.core.events import (
 )
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.randomness import SupportsRandom
-from gwent_engine.core.state import GameState, PlayerState, RowState
+from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.avenger import resolve_leave_battlefield_triggers
 from gwent_engine.rules.effect_applicability import (
@@ -39,12 +39,11 @@ from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
 from gwent_engine.rules.players import (
     opponent_player_id_from_state,
     other_player_from_state,
-    replace_player,
 )
 from gwent_engine.rules.row_effects import horn_source_for_row, row_has_active_mardroeme
 from gwent_engine.rules.state_ops import (
     append_to_row,
-    drawable_card_ids,
+    draw_cards_into_hand,
     next_player_after_non_pass_action,
     remove_from_play_source_zone,
     replace_card_instance,
@@ -114,23 +113,19 @@ def apply_unit_card(
     return next_state, context.event_builder.build()
 
 
-def strongest_battlefield_unit_card_ids(
+def strongest_eligible_unit_card_ids(
     state: GameState,
     card_registry: CardRegistry,
+    candidate_card_ids: tuple[CardInstanceId, ...],
     *,
-    source_category: EffectSourceCategory,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[CardInstanceId, ...]:
     from gwent_engine.rules.scoring import calculate_effective_strength
 
-    battlefield_card_ids = tuple(
-        card.instance_id for card in state.card_instances if card.zone == Zone.BATTLEFIELD
-    )
     eligible_card_ids = eligible_destroyable_unit_ids(
         state,
         card_registry,
-        battlefield_card_ids,
-        source_category=source_category,
+        candidate_card_ids,
     )
     if not eligible_card_ids:
         return ()
@@ -144,16 +139,33 @@ def strongest_battlefield_unit_card_ids(
         for card_id in eligible_card_ids
     )
     return tuple(
-        card.instance_id
-        for card in state.card_instances
-        if card.instance_id in eligible_card_ids
+        card_id
+        for card_id in candidate_card_ids
+        if card_id in eligible_card_ids
         and calculate_effective_strength(
             state,
             card_registry,
-            card.instance_id,
+            card_id,
             leader_registry=leader_registry,
         )
         == strongest_strength
+    )
+
+
+def strongest_battlefield_unit_card_ids(
+    state: GameState,
+    card_registry: CardRegistry,
+    *,
+    leader_registry: LeaderRegistry | None = None,
+) -> tuple[CardInstanceId, ...]:
+    battlefield_card_ids = tuple(
+        card.instance_id for card in state.card_instances if card.zone == Zone.BATTLEFIELD
+    )
+    return strongest_eligible_unit_card_ids(
+        state,
+        card_registry,
+        battlefield_card_ids,
+        leader_registry=leader_registry,
     )
 
 
@@ -323,26 +335,7 @@ def _resolve_spy_after_play(
     context: AbilityResolutionContext,
 ) -> GameState:
     player = state.player(played_by_player_id)
-    drawn_card_ids = drawable_card_ids(player, 2)
-    updated_player = replace(
-        player,
-        deck=player.deck[len(drawn_card_ids) :],
-        hand=(*player.hand, *drawn_card_ids),
-    )
-    updated_cards = {
-        drawn_card_id: replace(
-            state.card(drawn_card_id),
-            zone=Zone.HAND,
-            row=None,
-            battlefield_side=None,
-        )
-        for drawn_card_id in drawn_card_ids
-    }
-    next_state = replace(
-        state,
-        players=replace_player(state.players, updated_player),
-        card_instances=replace_card_instances(state.card_instances, updated_cards),
-    )
+    next_state, drawn_card_ids = draw_cards_into_hand(state, player, 2)
     if drawn_card_ids:
         _append_event(
             context,
@@ -581,33 +574,12 @@ def _resolve_unit_scorch_after_play(
     )
     destroyed_card_ids: tuple[CardInstanceId, ...] = ()
     next_state = state
-    eligible_targets = eligible_destroyable_unit_ids(
-        state,
-        context.card_registry,
-        opponent_row_cards,
-        source_category=EffectSourceCategory.UNIT_ABILITY,
-    )
-    if row_total >= 10 and eligible_targets:
-        strongest_strength = max(
-            calculate_effective_strength(
-                state,
-                context.card_registry,
-                row_card_id,
-                leader_registry=context.leader_registry,
-            )
-            for row_card_id in eligible_targets
-        )
-        destroyed_card_ids = tuple(
-            row_card_id
-            for row_card_id in opponent_row_cards
-            if row_card_id in eligible_targets
-            and calculate_effective_strength(
-                state,
-                context.card_registry,
-                row_card_id,
-                leader_registry=context.leader_registry,
-            )
-            == strongest_strength
+    if row_total >= SCORCH_THRESHOLD:
+        destroyed_card_ids = strongest_eligible_unit_card_ids(
+            state,
+            context.card_registry,
+            opponent_row_cards,
+            leader_registry=context.leader_registry,
         )
         if destroyed_card_ids:
             next_state, destroy_events = destroy_battlefield_cards(
@@ -640,7 +612,6 @@ def _resolve_global_unit_scorch_after_play(
     destroyed_card_ids = strongest_battlefield_unit_card_ids(
         state,
         context.card_registry,
-        source_category=EffectSourceCategory.UNIT_ABILITY,
         leader_registry=context.leader_registry,
     )
     next_state = state
@@ -723,25 +694,8 @@ def _belongs_to_muster_group(
     card_id: CardInstanceId,
     muster_group: str,
 ) -> bool:
-    return _card_group_matches(
-        state,
-        card_registry,
-        card_id,
-        group_for_definition=lambda definition: definition.muster_group,
-        group=muster_group,
-    )
-
-
-def _card_group_matches(
-    state: GameState,
-    card_registry: CardRegistry,
-    card_id: CardInstanceId,
-    *,
-    group_for_definition: Callable[[CardDefinition], str | None],
-    group: str,
-) -> bool:
     definition = card_registry.get(state.card(card_id).definition_id)
-    return group_for_definition(definition) == group
+    return definition.muster_group == muster_group
 
 
 def _resolve_target_row(
@@ -783,19 +737,7 @@ def _destroy_player_cards(
     return replace(
         player,
         discard=player.discard + owned_destroyed_cards,
-        rows=_remove_cards_from_rows(player.rows, removed_row_cards),
-    )
-
-
-def _remove_cards_from_rows(
-    rows: RowState,
-    removed_card_ids: tuple[CardInstanceId, ...],
-) -> RowState:
-    removed = set(removed_card_ids)
-    return RowState(
-        close=tuple(card_id for card_id in rows.close if card_id not in removed),
-        ranged=tuple(card_id for card_id in rows.ranged if card_id not in removed),
-        siege=tuple(card_id for card_id in rows.siege if card_id not in removed),
+        rows=player.rows.without(removed_row_cards),
     )
 
 

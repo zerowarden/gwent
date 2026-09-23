@@ -121,11 +121,11 @@ class LeaderAbilityKind(StrEnum):
     HALVE_WEATHER_PENALTY = "halve_weather_penalty"
 
 
-BATTLE_ROWS: tuple[Row, ...] = (Row.CLOSE, Row.RANGED, Row.SIEGE)
 ACTIVE_TURN_PHASES: tuple[Phase, ...] = (Phase.IN_ROUND,)
-WEATHER_ABILITY_KINDS: tuple[AbilityKind, ...] = (
-    AbilityKind.BITING_FROST,
-    AbilityKind.IMPENETRABLE_FOG,
-    AbilityKind.TORRENTIAL_RAIN,
-    AbilityKind.SKELLIGE_STORM,
-)
+WEATHER_ROWS_BY_ABILITY: dict[AbilityKind, tuple[Row, ...]] = {
+    AbilityKind.BITING_FROST: (Row.CLOSE,),
+    AbilityKind.IMPENETRABLE_FOG: (Row.RANGED,),
+    AbilityKind.TORRENTIAL_RAIN: (Row.SIEGE,),
+    AbilityKind.SKELLIGE_STORM: (Row.RANGED, Row.SIEGE),
+}
+WEATHER_ABILITY_KINDS: tuple[AbilityKind, ...] = tuple(WEATHER_ROWS_BY_ABILITY)

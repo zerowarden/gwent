@@ -8,7 +8,6 @@ from gwent_engine.ai.baseline.bot import HeuristicBot
 from gwent_engine.ai.baseline.candidates import (
     CandidateAction,
     build_candidate_pool,
-    build_candidates,
 )
 from gwent_engine.ai.baseline.context import (
     DecisionContext,
@@ -25,12 +24,10 @@ from gwent_engine.ai.baseline.evaluation import (
     evaluate_action,
     explain_action_score,
     explain_ranked_actions,
-    rank_actions,
 )
 from gwent_engine.ai.baseline.mulligan import choose_mulligan_selection
 from gwent_engine.ai.baseline.overrides import (
     TacticalOverride,
-    choose_tactical_override,
     explain_tactical_override,
 )
 from gwent_engine.ai.baseline.pass_logic import (
@@ -107,11 +104,9 @@ __all__ = [
     "available_base_profile_ids",
     "build_assessment",
     "build_candidate_pool",
-    "build_candidates",
     "build_decision_plan",
     "choose_mulligan_selection",
     "choose_pending_choice_action",
-    "choose_tactical_override",
     "classify_context",
     "compose_profile",
     "evaluate_action",
@@ -122,7 +117,6 @@ __all__ = [
     "load_base_profiles",
     "load_default_base_profiles",
     "minimum_commitment_finish",
-    "rank_actions",
     "should_continue_contesting",
     "should_pass_now",
 ]

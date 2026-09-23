@@ -41,12 +41,15 @@ def row_has_special_commanders_horn(
     player_id: PlayerId,
     row: Row,
 ) -> bool:
-    return _row_has_special_effect(
-        state,
-        card_registry,
-        player_id,
-        row,
-        ability_kind=AbilityKind.COMMANDERS_HORN,
+    return (
+        special_row_effect_card_id(
+            state,
+            card_registry,
+            player_id,
+            row,
+            ability_kind=AbilityKind.COMMANDERS_HORN,
+        )
+        is not None
     )
 
 
@@ -56,30 +59,13 @@ def row_has_special_mardroeme(
     player_id: PlayerId,
     row: Row,
 ) -> bool:
-    return _row_has_special_effect(
-        state,
-        card_registry,
-        player_id,
-        row,
-        ability_kind=AbilityKind.MARDROEME,
-    )
-
-
-def _row_has_special_effect(
-    state: GameState,
-    card_registry: CardRegistry,
-    player_id: PlayerId,
-    row: Row,
-    *,
-    ability_kind: AbilityKind,
-) -> bool:
     return (
         special_row_effect_card_id(
             state,
             card_registry,
             player_id,
             row,
-            ability_kind=ability_kind,
+            ability_kind=AbilityKind.MARDROEME,
         )
         is not None
     )

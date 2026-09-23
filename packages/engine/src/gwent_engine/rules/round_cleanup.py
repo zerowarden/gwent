@@ -155,11 +155,7 @@ def _cleanup_player(
         player,
         leader=replace(player.leader, horn_row=None),
         discard=player.discard + owned_moved_battlefield_cards + battlefield_weather_card_ids,
-        rows=RowState(
-            close=tuple(card_id for card_id in player.rows.close if card_id in retained_card_ids),
-            ranged=tuple(card_id for card_id in player.rows.ranged if card_id in retained_card_ids),
-            siege=tuple(card_id for card_id in player.rows.siege if card_id in retained_card_ids),
-        ),
+        rows=player.rows.retained(retained_card_ids),
         has_passed=False,
     )
 

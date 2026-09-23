@@ -1,8 +1,6 @@
 from gwent_engine.ai.baseline.policies.leader import (
     AGGRESSIVE_LEADER_POLICY,
     CONSERVATIVE_LEADER_POLICY,
-    AggressiveLeaderPolicy,
-    ConservativeLeaderPolicy,
     leader_policy_components,
 )
 from gwent_engine.ai.baseline.policies.protocol import (
@@ -34,8 +32,6 @@ __all__ = [
     "POLICY_CATALOG",
     "RESERVE_SCORCH_POLICY",
     "SCORCH_POLICIES",
-    "AggressiveLeaderPolicy",
-    "ConservativeLeaderPolicy",
     "LeaderPolicy",
     "OpportunisticScorchPolicy",
     "PolicyBundle",

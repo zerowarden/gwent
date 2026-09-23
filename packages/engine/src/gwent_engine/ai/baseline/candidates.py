@@ -122,27 +122,6 @@ def build_candidate_pool(
     )
 
 
-def build_candidates(
-    observation: PlayerObservation,
-    legal_actions: tuple[GameAction, ...],
-    assessment: DecisionAssessment,
-    *,
-    config: BaselineConfig,
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry | None = None,
-    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
-) -> tuple[CandidateAction, ...]:
-    return build_candidate_pool(
-        observation,
-        legal_actions,
-        assessment,
-        config=config,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        viewer_hand_definitions=viewer_hand_definitions,
-    ).retained_candidates
-
-
 def shortlist_actions(
     candidates: tuple[CandidateAction, ...],
     *,

@@ -5,6 +5,7 @@ from gwent_engine.core.actions import StartGameAction
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.serialize import game_state_to_dict
 from gwent_service.application.projections import project_match_for_player
+from gwent_service.application.snapshot import snapshot_from_stored_match
 from gwent_service.domain.models import (
     StagedMulliganSubmission,
     StoredMatch,
@@ -59,7 +60,11 @@ def test_projection_hides_opponent_hand_contents_and_never_exposes_staged_mullig
         ),
     )
 
-    projected = project_match_for_player(stored_match, "alice", adapter=adapter)
+    projected = project_match_for_player(
+        snapshot_from_stored_match(stored_match, adapter=adapter),
+        "alice",
+        adapter=adapter,
+    )
     dumped = projected.model_dump_json()
 
     assert projected.viewer.service_player_id == "alice"
@@ -119,8 +124,9 @@ def test_projection_restricts_pending_choice_to_chooser() -> None:
         ),
     )
 
-    chooser_view = project_match_for_player(stored_match, "alice", adapter=adapter)
-    opponent_view = project_match_for_player(stored_match, "bob", adapter=adapter)
+    snapshot = snapshot_from_stored_match(stored_match, adapter=adapter)
+    chooser_view = project_match_for_player(snapshot, "alice", adapter=adapter)
+    opponent_view = project_match_for_player(snapshot, "bob", adapter=adapter)
 
     assert chooser_view.pending_choice is not None
     assert chooser_view.pending_choice.chooser_engine_player_id == "p1"

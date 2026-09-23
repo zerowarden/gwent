@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from gwent_engine.cards import CardRegistry
-from gwent_engine.core import Zone
+from gwent_engine.cards import CardDefinition, CardRegistry
+from gwent_engine.core import CardType, FactionId, Row, Zone
 from gwent_engine.core.ids import CardDefinitionId, PlayerId
 from gwent_engine.core.state import CardInstance, GameState
 from gwent_engine.rules.players import opponent_player_id_from_state
@@ -16,16 +16,31 @@ from gwent_engine.rules.players import opponent_player_id_from_state
 # - legal public state transitions
 # - deterministic reducer behavior for searched public lines
 # while removing the specific hidden card identities from the search surface.
-PUBLIC_INFO_HIDDEN_CARD_DEFINITION_ID = CardDefinitionId("scoiatael_mahakaman_defender")
+# The placeholder is provisioned for search rather than borrowed from the
+# ordinary card catalog, so no incidental definition has to exist.
+PUBLIC_INFO_HIDDEN_CARD_DEFINITION = CardDefinition(
+    definition_id=CardDefinitionId("search_hidden_card"),
+    name="Hidden Card",
+    faction=FactionId.SCOIATAEL,
+    card_type=CardType.UNIT,
+    base_strength=5,
+    allowed_rows=(Row.CLOSE,),
+)
+
+
+def provision_search_registry(card_registry: CardRegistry) -> CardRegistry:
+    if PUBLIC_INFO_HIDDEN_CARD_DEFINITION.definition_id in card_registry:
+        return card_registry
+    return CardRegistry.from_definitions(
+        (*tuple(card_registry), PUBLIC_INFO_HIDDEN_CARD_DEFINITION)
+    )
 
 
 def redact_private_information(
     state: GameState,
     *,
     viewer_player_id: PlayerId,
-    card_registry: CardRegistry,
 ) -> GameState:
-    _ = card_registry.get(PUBLIC_INFO_HIDDEN_CARD_DEFINITION_ID)
     opponent_id = opponent_player_id_from_state(state, viewer_player_id)
     redacted_cards = tuple(
         _redact_hidden_card(card, opponent_id=opponent_id) for card in state.card_instances
@@ -38,4 +53,7 @@ def redact_private_information(
 def _redact_hidden_card(card: CardInstance, *, opponent_id: PlayerId) -> CardInstance:
     if card.owner != opponent_id or card.zone not in {Zone.HAND, Zone.DECK}:
         return card
-    return replace(card, definition_id=PUBLIC_INFO_HIDDEN_CARD_DEFINITION_ID)
+    return replace(
+        card,
+        definition_id=PUBLIC_INFO_HIDDEN_CARD_DEFINITION.definition_id,
+    )

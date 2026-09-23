@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import NoReturn, cast
 
 from gwent_shared import expect_int
-from gwent_shared.error_translation import translate_exception
 
 from gwent_service.application.errors import (
     MatchAlreadyExistsError,
@@ -16,6 +15,7 @@ from gwent_service.application.errors import (
 from gwent_service.domain.models import StoredMatch
 from gwent_service.infrastructure.sqlite.payloads import (
     deserialize_stored_match,
+    row_field,
     serialize_stored_match,
 )
 
@@ -29,8 +29,8 @@ class SQLiteMatchRepository:
     def create(self, stored_match: StoredMatch) -> None:
         payload = serialize_stored_match(stored_match)
         with closing(self._connect()) as connection, connection:
-            _ = translate_exception(
-                lambda: connection.execute(
+            try:
+                _ = connection.execute(
                     """
                     INSERT INTO matches (
                         match_id,
@@ -44,10 +44,9 @@ class SQLiteMatchRepository:
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     payload,
-                ),
-                sqlite3.IntegrityError,
-                lambda _exc: MatchAlreadyExistsError(stored_match.match_id),
-            )
+                )
+            except sqlite3.IntegrityError as exc:
+                raise MatchAlreadyExistsError(stored_match.match_id) from exc
 
     def get(self, match_id: str) -> StoredMatch | None:
         with closing(self._connect()) as connection:
@@ -123,7 +122,7 @@ class SQLiteMatchRepository:
         raise MatchVersionConflictError(
             match_id,
             expected_version=expected_version,
-            actual_version=expect_int(existing["version"], context="sqlite.version"),
+            actual_version=expect_int(row_field(existing, "version"), context="sqlite.version"),
         )
 
     def _initialize_schema(self) -> None:

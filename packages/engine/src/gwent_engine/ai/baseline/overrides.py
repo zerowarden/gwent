@@ -23,28 +23,6 @@ class TacticalOverride:
     reason: str
 
 
-def choose_tactical_override(
-    legal_actions: tuple[GameAction, ...],
-    *,
-    observation: PlayerObservation,
-    assessment: DecisionAssessment,
-    context: DecisionContext,
-    card_registry: CardRegistry,
-    config: BaselineConfig,
-    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
-) -> GameAction | None:
-    override = explain_tactical_override(
-        legal_actions,
-        observation=observation,
-        assessment=assessment,
-        context=context,
-        card_registry=card_registry,
-        config=config,
-        viewer_hand_definitions=viewer_hand_definitions,
-    )
-    return None if override is None else override.action
-
-
 def explain_tactical_override(
     legal_actions: tuple[GameAction, ...],
     *,

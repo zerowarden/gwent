@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from gwent_shared.error_translation import translate_exception
-
 from gwent_engine.cards import CardDefinition, CardRegistry, DeckDefinition
 from gwent_engine.core import FactionId
 from gwent_engine.core.errors import (
@@ -103,11 +101,10 @@ def _get_deck_leader_definition(
     *,
     context: str,
 ) -> LeaderDefinition:
-    return translate_exception(
-        lambda: leader_registry.get(leader_id),
-        UnknownLeaderDefinitionError,
-        lambda _exc: DefinitionLoadError(f"{context} references unknown leader id {leader_id!r}."),
-    )
+    try:
+        return leader_registry.get(leader_id)
+    except UnknownLeaderDefinitionError as exc:
+        raise DefinitionLoadError(f"{context} references unknown leader id {leader_id!r}.") from exc
 
 
 def _get_deck_card_definition(
@@ -116,13 +113,12 @@ def _get_deck_card_definition(
     *,
     context: str,
 ) -> CardDefinition:
-    return translate_exception(
-        lambda: card_registry.get(definition_id),
-        UnknownCardDefinitionError,
-        lambda _exc: DefinitionLoadError(
+    try:
+        return card_registry.get(definition_id)
+    except UnknownCardDefinitionError as exc:
+        raise DefinitionLoadError(
             f"{context} references unknown card definition id {definition_id!r}."
-        ),
-    )
+        ) from exc
 
 
 def _validate_deck_copy_limits(

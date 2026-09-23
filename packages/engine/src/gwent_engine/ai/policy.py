@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from gwent_engine.core import AbilityKind
+from gwent_engine.core.config import SCORCH_THRESHOLD
 
 OPPORTUNISTIC_SCORCH_POLICY_ID = "opportunistic_scorch"
 RESERVE_SCORCH_POLICY_ID = "reserve_scorch"
@@ -216,7 +217,7 @@ class FeaturePolicyConfig:
     """Shared feature-extraction constants used by evaluation projections."""
 
     preserved_leader_value: float = 6.0
-    scorch_threshold: int = 10
+    scorch_threshold: int = SCORCH_THRESHOLD
 
 
 @dataclass(frozen=True, slots=True)

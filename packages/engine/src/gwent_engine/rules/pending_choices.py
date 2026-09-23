@@ -6,7 +6,6 @@ from gwent_engine.core import (
     CardType,
     ChoiceKind,
     ChoiceSourceKind,
-    EffectSourceCategory,
     LeaderAbilityKind,
     Row,
 )
@@ -27,6 +26,7 @@ from gwent_engine.rules.effect_applicability import (
     can_target_for_medic,
 )
 from gwent_engine.rules.leader_abilities import apply_use_leader_ability
+from gwent_engine.rules.leader_common import discard_and_choose_selection_required
 from gwent_engine.rules.leader_effects import (
     leader_definition_for_player,
     restore_selection_is_randomized,
@@ -171,7 +171,11 @@ def _discard_and_choose_targets(
     hand_discard_count: int,
     deck_pick_count: int,
 ) -> _LeaderPendingChoiceTargets | None:
-    if len(player.hand) < hand_discard_count or len(player.deck) < deck_pick_count:
+    if not discard_and_choose_selection_required(
+        player,
+        hand_discard_count=hand_discard_count,
+        deck_pick_count=deck_pick_count,
+    ):
         return None
     selection_count = hand_discard_count + deck_pick_count
     return _LeaderPendingChoiceTargets(
@@ -295,7 +299,6 @@ def _can_target_for_discard_retrieval_leader(
     return definition.card_type == CardType.UNIT and can_affect_card(
         state,
         card_registry,
-        source_category=EffectSourceCategory.LEADER_ABILITY,
         target_card_id=target_card_id,
     )
 

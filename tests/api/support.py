@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 
 from fastapi.testclient import TestClient
@@ -14,7 +14,7 @@ from tests.service.support import identity_rng_factory
 
 
 @contextmanager
-def api_client() -> Iterator[tuple[TestClient, InMemoryMatchRepository]]:
+def api_client() -> Generator[tuple[TestClient, InMemoryMatchRepository], None, None]:
     repository = InMemoryMatchRepository()
     service = MatchService(
         repository=repository,

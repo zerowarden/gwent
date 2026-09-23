@@ -11,8 +11,8 @@ from gwent_engine.core.actions import (
 )
 from gwent_engine.core.enums import (
     ACTIVE_TURN_PHASES,
-    BATTLE_ROWS,
     WEATHER_ABILITY_KINDS,
+    WEATHER_ROWS_BY_ABILITY,
     AbilityKind,
     CardType,
     ChoiceKind,
@@ -57,8 +57,8 @@ from gwent_engine.core.events import (
 
 __all__ = [
     "ACTIVE_TURN_PHASES",
-    "BATTLE_ROWS",
     "WEATHER_ABILITY_KINDS",
+    "WEATHER_ROWS_BY_ABILITY",
     "AbilityKind",
     "CardPlayedEvent",
     "CardType",

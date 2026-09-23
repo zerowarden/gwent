@@ -4,7 +4,6 @@ import json
 from collections.abc import Callable
 from typing import cast
 
-from gwent_shared.error_translation import translate_exception
 from gwent_shared.extract import expect_mapping, expect_sequence, expect_str
 
 ErrorFactory = Callable[[str], Exception]
@@ -62,11 +61,10 @@ def _load_json(
     error_factory: ErrorFactory = TypeError,
 ) -> object:
     raw_json = expect_str(raw_value, context=context, error_factory=error_factory)
-    return translate_exception(
-        lambda: _loads_json_document(raw_json),
-        json.JSONDecodeError,
-        lambda exc: error_factory(f"{context} must be valid JSON: {exc}"),
-    )
+    try:
+        return _loads_json_document(raw_json)
+    except json.JSONDecodeError as exc:
+        raise error_factory(f"{context} must be valid JSON: {exc}") from exc
 
 
 def _loads_json_document(raw_json: str) -> object:

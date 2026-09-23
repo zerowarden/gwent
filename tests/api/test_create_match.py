@@ -1,3 +1,5 @@
+from typing import cast
+
 from tests.api.support import api_client, create_match_payload
 
 
@@ -9,9 +11,10 @@ def test_create_match_works_via_http() -> None:
         )
 
     assert response.status_code == 200
-    payload = response.json()
+    payload = cast(dict[str, object], response.json())
+    viewer_hand = cast(list[object], payload["viewer_hand"])
     assert payload["match_id"] == "api_create_match"
     assert payload["phase"] == "mulligan"
     assert payload["viewer_player_id"] == "alice"
-    assert len(payload["viewer_hand"]) == 10
+    assert len(viewer_hand) == 10
     assert repository.get("api_create_match") is not None

@@ -13,8 +13,7 @@ from gwent_engine.rules.players import replace_player
 from gwent_engine.rules.round_resolution import RoundOutcome
 from gwent_engine.rules.state_ops import (
     append_to_row,
-    drawable_card_ids,
-    replace_card_instance,
+    draw_cards_into_hand,
     replace_card_instances,
 )
 
@@ -207,22 +206,13 @@ class NorthernRealmsPassive(FactionPassive):
         if outcome.winner != owner.player_id:
             return state, ()
 
-        drawn_card_ids = drawable_card_ids(owner, 1)
+        drawn_state, drawn_card_ids = draw_cards_into_hand(state, owner, 1)
         if not drawn_card_ids:
             return state, ()
 
         drawn_card_id = drawn_card_ids[0]
-        updated_owner = replace(
-            owner,
-            deck=owner.deck[1:],
-            hand=(*owner.hand, drawn_card_id),
-        )
-        updated_players = replace_player(state.players, updated_owner)
-        updated_card = replace(state.card(drawn_card_id), zone=Zone.HAND)
         next_state = replace(
-            state,
-            players=updated_players,
-            card_instances=replace_card_instance(state.card_instances, updated_card),
+            drawn_state,
             event_counter=state.event_counter + 2,
         )
         return next_state, (

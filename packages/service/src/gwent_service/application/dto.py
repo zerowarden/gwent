@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -8,9 +8,11 @@ type RowName = Literal["close", "ranged", "siege"]
 type NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
-class CardView(BaseModel):
-    model_config = ConfigDict(frozen=True)
+class FrozenModel(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+
+class CardView(FrozenModel):
     instance_id: str
     definition_id: str
     name: str
@@ -23,9 +25,7 @@ class CardView(BaseModel):
     is_hero: bool
 
 
-class LeaderView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class LeaderView(FrozenModel):
     leader_id: str
     name: str
     faction: str
@@ -34,17 +34,13 @@ class LeaderView(BaseModel):
     horn_row: str | None = None
 
 
-class RowCardsView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class RowCardsView(FrozenModel):
     close: tuple[CardView, ...] = Field(default_factory=tuple)
     ranged: tuple[CardView, ...] = Field(default_factory=tuple)
     siege: tuple[CardView, ...] = Field(default_factory=tuple)
 
 
-class PublicPlayerView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PublicPlayerView(FrozenModel):
     service_player_id: str
     engine_player_id: str
     faction: str
@@ -58,9 +54,7 @@ class PublicPlayerView(BaseModel):
     has_passed: bool
 
 
-class PendingChoiceView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PendingChoiceView(FrozenModel):
     choice_id: str
     chooser_engine_player_id: str
     kind: str
@@ -74,16 +68,12 @@ class PendingChoiceView(BaseModel):
     source_row: str | None = None
 
 
-class MulliganSubmissionStatusView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class MulliganSubmissionStatusView(FrozenModel):
     service_player_id: str
     submitted: bool
 
 
-class MatchView(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class MatchView(FrozenModel):
     match_id: str
     viewer_player_id: str
     viewer_engine_player_id: str
@@ -103,23 +93,17 @@ class MatchView(BaseModel):
     mulligan_submissions: tuple[MulliganSubmissionStatusView, ...] = Field(default_factory=tuple)
 
 
-class HealthResponse(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class HealthResponse(FrozenModel):
     status: str
 
 
-class CreateMatchParticipantRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class CreateMatchParticipantRequest(FrozenModel):
     service_player_id: NonBlankStr
     engine_player_id: NonBlankStr
     deck_id: NonBlankStr
 
 
-class CreateMatchRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class CreateMatchRequest(FrozenModel):
     match_id: NonBlankStr
     viewer_player_id: NonBlankStr
     participants: tuple[CreateMatchParticipantRequest, CreateMatchParticipantRequest]
@@ -136,16 +120,12 @@ class CreateMatchRequest(BaseModel):
         return self
 
 
-class SubmitMulliganRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class SubmitMulliganRequest(FrozenModel):
     service_player_id: NonBlankStr
     card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
 
 
-class PlayCardRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PlayCardRequest(FrozenModel):
     service_player_id: NonBlankStr
     card_instance_id: NonBlankStr
     target_row: RowName | None = None
@@ -153,21 +133,15 @@ class PlayCardRequest(BaseModel):
     secondary_target_card_instance_id: NonBlankStr | None = None
 
 
-class PassTurnRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class PassTurnRequest(FrozenModel):
     service_player_id: NonBlankStr
 
 
-class LeaveMatchRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class LeaveMatchRequest(FrozenModel):
     service_player_id: NonBlankStr
 
 
-class UseLeaderAbilityRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class UseLeaderAbilityRequest(FrozenModel):
     service_player_id: NonBlankStr
     target_row: RowName | None = None
     target_player: NonBlankStr | None = None
@@ -176,9 +150,7 @@ class UseLeaderAbilityRequest(BaseModel):
     selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
 
 
-class ResolveChoiceRequest(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
+class ResolveChoiceRequest(FrozenModel):
     service_player_id: NonBlankStr
     choice_id: NonBlankStr
     selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)

@@ -61,27 +61,6 @@ def write_bot_match_review(
     return report_path
 
 
-def render_bot_match_review_html(
-    run: CliRun,
-    *,
-    player_one_bot_spec: str,
-    player_two_bot_spec: str,
-    seed: int,
-) -> str:
-    return ReportWriter(output_dir=DEFAULT_REPORT_DIR).render(
-        template_name="match_review.html.j2",
-        title=f"{player_one_bot_spec} vs {player_two_bot_spec}",
-        context={
-            "match": build_report_context(
-                run,
-                player_one_bot_spec=player_one_bot_spec,
-                player_two_bot_spec=player_two_bot_spec,
-                seed=seed,
-            )
-        },
-    )
-
-
 def _report_dirname(
     *,
     player_one_bot_spec: str,

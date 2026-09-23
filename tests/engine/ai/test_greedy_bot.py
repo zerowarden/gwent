@@ -3,6 +3,7 @@ from gwent_engine.ai.agents.greedy_bot import GreedyBot
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.core import ChoiceSourceKind, GameStatus, Phase, Row
 from gwent_engine.core.actions import (
+    MulliganSelection,
     PlayCardAction,
     ResolveChoiceAction,
     ResolveMulligansAction,
@@ -161,7 +162,7 @@ def test_greedy_bot_completes_seeded_game_legally() -> None:
         if state.status == GameStatus.MATCH_ENDED:
             break
         if state.phase == Phase.MULLIGAN:
-            selections = []
+            selections: list[MulliganSelection] = []
             for player_id in (PLAYER_ONE_ID, PLAYER_TWO_ID):
                 legal_selections = enumerate_mulligan_selections(state, player_id)
                 selection = bots[player_id].choose_mulligan(

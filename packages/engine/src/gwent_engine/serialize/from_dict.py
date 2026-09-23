@@ -1,11 +1,8 @@
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import cast
 
-from gwent_shared.error_translation import (
-    TranslatedExceptionContext,
-    translate_exception_context,
-)
 from gwent_shared.extract import (
     expect_mapping,
     expect_optional_int,
@@ -842,11 +839,12 @@ def _parse_enum[EnumT: StrEnum](enum_type: type[EnumT], raw_value: str, *, conte
     raise SerializationError(f"Unknown {context} value: {raw_value!r}")
 
 
-def _translate_value_error(context: str) -> TranslatedExceptionContext:
-    return translate_exception_context(
-        ValueError,
-        lambda exc: SerializationError(f"Invalid serialized {context}: {exc}"),
-    )
+@contextmanager
+def _translate_value_error(context: str) -> Generator[None, None, None]:
+    try:
+        yield
+    except ValueError as exc:
+        raise SerializationError(f"Invalid serialized {context}: {exc}") from exc
 
 
 def _validate_root(

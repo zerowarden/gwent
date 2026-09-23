@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from gwent_engine.ai.baseline import BaseProfileDefinition, HeuristicBot, build_assessment
 from gwent_engine.ai.observations import PlayerObservation
@@ -12,13 +12,14 @@ from gwent_engine.ai.search.explain import (
     SearchDecisionExplanation,
 )
 from gwent_engine.ai.search.move_ordering import order_search_candidates
-from gwent_engine.ai.search.public_info import redact_private_information
+from gwent_engine.ai.search.public_info import (
+    provision_search_registry,
+    redact_private_information,
+)
 from gwent_engine.ai.search.turn_resolution import TurnSearchResolver
 from gwent_engine.ai.search.types import (
     SearchCandidate,
     SearchCandidateEvaluation,
-    SearchLine,
-    SearchLineExplanation,
     SearchResult,
     SearchTraceFact,
     SearchValueTerm,
@@ -135,17 +136,17 @@ class SearchEngine:
                 reason="missing_engine_state",
                 entry=entry,
             )
+        search_registry = provision_search_registry(card_registry)
         search_state = redact_private_information(
             state,
             viewer_player_id=observation.viewer_player_id,
-            card_registry=card_registry,
         )
         ordered_candidates = order_search_candidates(
             generate_search_candidates(
                 observation,
                 action_options,
                 config=self.config,
-                card_registry=card_registry,
+                card_registry=search_registry,
                 leader_registry=leader_registry,
             )
         )
@@ -153,7 +154,7 @@ class SearchEngine:
             viewer_player_id=observation.viewer_player_id,
             profile_definition=self.profile_definition,
             config=self.config,
-            card_registry=card_registry,
+            card_registry=search_registry,
             leader_registry=leader_registry,
         )
         evaluated_candidates = self._evaluate_candidates(
@@ -327,67 +328,50 @@ class SearchEngine:
             if evaluation != pass_evaluation:
                 adjusted_evaluations.append(evaluation)
                 continue
-            adjusted_evaluations.append(
-                SearchCandidateEvaluation(
-                    action=evaluation.action,
-                    root_rank=evaluation.root_rank,
-                    ordering_score=evaluation.ordering_score,
-                    reason=evaluation.reason,
-                    selected=evaluation.selected,
-                    line=SearchLine(
-                        actions=evaluation.line.actions,
-                        reply_actions=evaluation.line.reply_actions,
-                        value=(
-                            evaluation.line.value - self.config.elimination_pass_live_line_penalty
-                        ),
-                        explanation=SearchLineExplanation(
-                            self_turn_facts=evaluation.line.explanation.self_turn_facts,
-                            leaf_facts=evaluation.line.explanation.leaf_facts,
-                            leaf_terms=evaluation.line.explanation.leaf_terms,
-                            reply=evaluation.line.explanation.reply,
-                            root_adjustments=(
-                                *evaluation.line.explanation.root_adjustments,
-                                SearchValueTerm(
-                                    name="elimination_pass_with_live_lines",
-                                    value=-self.config.elimination_pass_live_line_penalty,
-                                    formula="-elimination_pass_live_line_penalty",
-                                    details=(
-                                        SearchTraceFact(
-                                            "live_non_pass_lines",
-                                            str(len(live_non_pass_lines)),
-                                        ),
-                                        SearchTraceFact(
-                                            "elimination_pass_live_line_margin",
-                                            (
-                                                f"{self.config.elimination_pass_live_line_margin:.2f}"
-                                            ),
-                                        ),
-                                        SearchTraceFact(
-                                            "elimination_pass_live_line_penalty",
-                                            (
-                                                f"{self.config.elimination_pass_live_line_penalty:.2f}"
-                                            ),
-                                        ),
-                                    ),
-                                ),
+            adjusted_explanation = replace(
+                evaluation.line.explanation,
+                root_adjustments=(
+                    *evaluation.line.explanation.root_adjustments,
+                    SearchValueTerm(
+                        name="elimination_pass_with_live_lines",
+                        value=-self.config.elimination_pass_live_line_penalty,
+                        formula="-elimination_pass_live_line_penalty",
+                        details=(
+                            SearchTraceFact(
+                                "live_non_pass_lines",
+                                str(len(live_non_pass_lines)),
                             ),
-                        ),
-                        notes=(
-                            *evaluation.line.notes,
-                            "root_adjustment=elimination_pass_with_live_lines",
-                            f"live_non_pass_lines={len(live_non_pass_lines)}",
-                            (
-                                "elimination_pass_live_line_margin="
-                                f"{self.config.elimination_pass_live_line_margin:.2f}"
+                            SearchTraceFact(
+                                "elimination_pass_live_line_margin",
+                                f"{self.config.elimination_pass_live_line_margin:.2f}",
                             ),
-                            (
-                                "elimination_pass_live_line_penalty="
-                                f"{self.config.elimination_pass_live_line_penalty:.2f}"
+                            SearchTraceFact(
+                                "elimination_pass_live_line_penalty",
+                                f"{self.config.elimination_pass_live_line_penalty:.2f}",
                             ),
                         ),
                     ),
-                )
+                ),
             )
+            adjusted_line = replace(
+                evaluation.line,
+                value=evaluation.line.value - self.config.elimination_pass_live_line_penalty,
+                explanation=adjusted_explanation,
+                notes=(
+                    *evaluation.line.notes,
+                    "root_adjustment=elimination_pass_with_live_lines",
+                    f"live_non_pass_lines={len(live_non_pass_lines)}",
+                    (
+                        "elimination_pass_live_line_margin="
+                        f"{self.config.elimination_pass_live_line_margin:.2f}"
+                    ),
+                    (
+                        "elimination_pass_live_line_penalty="
+                        f"{self.config.elimination_pass_live_line_penalty:.2f}"
+                    ),
+                ),
+            )
+            adjusted_evaluations.append(replace(evaluation, line=adjusted_line))
         return tuple(adjusted_evaluations)
 
     def _is_live_non_pass_line(

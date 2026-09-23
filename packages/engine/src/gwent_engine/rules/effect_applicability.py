@@ -1,15 +1,7 @@
 from gwent_engine.cards import CardRegistry
-from gwent_engine.core import CardType, EffectSourceCategory, Zone
+from gwent_engine.core import CardType, Zone
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.state import GameState, PlayerState
-
-HERO_IMMUNE_SOURCE_CATEGORIES: frozenset[EffectSourceCategory] = frozenset(
-    {
-        EffectSourceCategory.SPECIAL_CARD,
-        EffectSourceCategory.UNIT_ABILITY,
-        EffectSourceCategory.LEADER_ABILITY,
-    }
-)
 
 
 def is_hero(
@@ -25,16 +17,9 @@ def can_affect_card(
     state: GameState,
     card_registry: CardRegistry,
     *,
-    source_category: EffectSourceCategory,
     target_card_id: CardInstanceId,
 ) -> bool:
-    if source_category in HERO_IMMUNE_SOURCE_CATEGORIES and is_hero(
-        state,
-        card_registry,
-        target_card_id,
-    ):
-        return False
-    return True
+    return not is_hero(state, card_registry, target_card_id)
 
 
 def can_target_for_decoy(
@@ -53,7 +38,6 @@ def can_target_for_decoy(
     return definition.card_type == CardType.UNIT and can_affect_card(
         state,
         card_registry,
-        source_category=EffectSourceCategory.SPECIAL_CARD,
         target_card_id=target_card_id,
     )
 
@@ -71,7 +55,6 @@ def can_target_for_medic(
     return definition.card_type == CardType.UNIT and can_affect_card(
         state,
         card_registry,
-        source_category=EffectSourceCategory.UNIT_ABILITY,
         target_card_id=target_card_id,
     )
 
@@ -80,8 +63,6 @@ def eligible_destroyable_unit_ids(
     state: GameState,
     card_registry: CardRegistry,
     candidate_card_ids: tuple[CardInstanceId, ...],
-    *,
-    source_category: EffectSourceCategory,
 ) -> tuple[CardInstanceId, ...]:
     return tuple(
         card_id
@@ -90,7 +71,6 @@ def eligible_destroyable_unit_ids(
         and can_affect_card(
             state,
             card_registry,
-            source_category=source_category,
             target_card_id=card_id,
         )
     )

@@ -1,4 +1,3 @@
-from collections.abc import Callable
 from dataclasses import replace
 
 from gwent_engine.cards import CardRegistry
@@ -37,11 +36,6 @@ from gwent_engine.rules.pending_choices import (
 )
 from gwent_engine.rules.trigger_resolution import resolve_post_action_transitions
 from gwent_engine.rules.turn_flow import apply_pass, apply_play_card
-
-type ActionHandler = Callable[
-    [GameState, GameAction, SupportsRandom | None, CardRegistry | None, LeaderRegistry | None],
-    tuple[GameState, tuple[GameEvent, ...]],
-]
 
 
 def apply_action(
@@ -130,143 +124,72 @@ def _dispatch_action(
     card_registry: CardRegistry | None,
     leader_registry: LeaderRegistry | None,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    if isinstance(action, ResolveChoiceAction):
-        raise IllegalActionError("ResolveChoiceAction requires a pending choice.")
-    handler = ACTION_HANDLERS.get(type(action))
-    if handler is None:
-        raise IllegalActionError(f"Unsupported action type: {type(action)!r}")
-    return handler(state, action, rng, card_registry, leader_registry)
-
-
-def _handle_start_game(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del card_registry
-    assert isinstance(action, StartGameAction)
-    validate_start_game_action(state, action, rng=rng)
-    return apply_start_game(
-        state,
-        action,
-        rng=rng,
-        leader_registry=leader_registry,
-    )
-
-
-def _handle_resolve_mulligans(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del rng, card_registry, leader_registry
-    assert isinstance(action, ResolveMulligansAction)
-    validate_resolve_mulligans_action(state, action)
-    return apply_mulligan(state, action)
-
-
-def _handle_play_card(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    assert isinstance(action, PlayCardAction)
-    validate_play_card_action(
-        state,
-        action,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        rng=rng,
-    )
-    assert card_registry is not None
-    pending_choice = maybe_create_pending_choice_for_play(
-        state,
-        action,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-    )
-    if pending_choice is not None:
-        return replace(state, pending_choice=pending_choice), ()
-    return apply_play_card(
-        state,
-        action,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        rng=rng,
-    )
-
-
-def _handle_pass(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del rng, card_registry, leader_registry
-    assert isinstance(action, PassAction)
-    validate_pass_action(state, action)
-    return apply_pass(state, action)
-
-
-def _handle_leave(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del rng, card_registry, leader_registry
-    assert isinstance(action, LeaveAction)
-    validate_leave_action(state, action)
-    return apply_leave(state, action)
-
-
-def _handle_use_leader_ability(
-    state: GameState,
-    action: GameAction,
-    rng: SupportsRandom | None,
-    card_registry: CardRegistry | None,
-    leader_registry: LeaderRegistry | None,
-) -> tuple[GameState, tuple[GameEvent, ...]]:
-    assert isinstance(action, UseLeaderAbilityAction)
-    validate_use_leader_ability_action(
-        state,
-        action,
-        leader_registry=leader_registry,
-        card_registry=card_registry,
-        rng=rng,
-    )
-    assert leader_registry is not None
-    assert card_registry is not None
-    pending_choice = maybe_create_pending_choice_for_leader(
-        state,
-        action,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-    )
-    if pending_choice is not None:
-        return replace(state, pending_choice=pending_choice), ()
-    return apply_use_leader_ability(
-        state,
-        action,
-        leader_registry=leader_registry,
-        card_registry=card_registry,
-        rng=rng,
-    )
-
-
-ACTION_HANDLERS: dict[type[GameAction], ActionHandler] = {
-    StartGameAction: _handle_start_game,
-    ResolveMulligansAction: _handle_resolve_mulligans,
-    PlayCardAction: _handle_play_card,
-    PassAction: _handle_pass,
-    LeaveAction: _handle_leave,
-    UseLeaderAbilityAction: _handle_use_leader_ability,
-}
+    match action:
+        case ResolveChoiceAction():
+            raise IllegalActionError("ResolveChoiceAction requires a pending choice.")
+        case StartGameAction():
+            validate_start_game_action(state, action, rng=rng)
+            return apply_start_game(
+                state,
+                action,
+                rng=rng,
+                leader_registry=leader_registry,
+            )
+        case ResolveMulligansAction():
+            validate_resolve_mulligans_action(state, action)
+            return apply_mulligan(state, action)
+        case PlayCardAction():
+            validate_play_card_action(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                rng=rng,
+            )
+            assert card_registry is not None
+            pending_choice = maybe_create_pending_choice_for_play(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+            )
+            if pending_choice is not None:
+                return replace(state, pending_choice=pending_choice), ()
+            return apply_play_card(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                rng=rng,
+            )
+        case PassAction():
+            validate_pass_action(state, action)
+            return apply_pass(state, action)
+        case LeaveAction():
+            validate_leave_action(state, action)
+            return apply_leave(state, action)
+        case UseLeaderAbilityAction():
+            validate_use_leader_ability_action(
+                state,
+                action,
+                leader_registry=leader_registry,
+                card_registry=card_registry,
+                rng=rng,
+            )
+            assert leader_registry is not None
+            assert card_registry is not None
+            pending_choice = maybe_create_pending_choice_for_leader(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+            )
+            if pending_choice is not None:
+                return replace(state, pending_choice=pending_choice), ()
+            return apply_use_leader_ability(
+                state,
+                action,
+                leader_registry=leader_registry,
+                card_registry=card_registry,
+                rng=rng,
+            )

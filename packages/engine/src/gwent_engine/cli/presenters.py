@@ -4,9 +4,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import singledispatch
 
-from rich.text import Text
-
-from gwent_engine.cli.models import CliMetadata
 from gwent_engine.cli.view_formatters import card_ref_text
 from gwent_engine.core import AbilityKind
 from gwent_engine.core.actions import (
@@ -40,13 +37,6 @@ from gwent_engine.core.events import (
     UnitScorchResolvedEvent,
 )
 from gwent_engine.core.ids import CardInstanceId, PlayerId
-from gwent_engine.core.state import PendingChoice
-
-
-@dataclass(frozen=True, slots=True)
-class ActionLabelStyle:
-    border_style: str
-    label_style: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,30 +45,11 @@ class _SummaryCardContext:
     values_by_instance_id: Mapping[CardInstanceId, int]
 
     def card_ref(self, card_instance_id: CardInstanceId) -> str:
-        return card_ref(
+        return card_ref_text(
             card_instance_id,
             self.names_by_instance_id,
             self.values_by_instance_id,
         )
-
-
-DEFAULT_ACTION_LABEL_STYLE = ActionLabelStyle(
-    border_style="white",
-    label_style="bold white on grey23",
-)
-ACTION_LABEL_STYLES: dict[str, ActionLabelStyle] = {
-    "StartGameAction": ActionLabelStyle("cyan", "bold white on dark_cyan"),
-    "ResolveMulligansAction": ActionLabelStyle("magenta", "bold white on dark_magenta"),
-    "PlayCardAction": ActionLabelStyle("green", "bold white on dark_green"),
-    "PassAction": ActionLabelStyle("yellow3", "bold black on yellow3"),
-    "LeaveAction": ActionLabelStyle("red", "bold white on dark_red"),
-    "ResolveChoiceAction": ActionLabelStyle("purple", "bold white on purple"),
-    "UseLeaderAbilityAction": ActionLabelStyle("bright_blue", "bold white on blue"),
-}
-
-
-def action_type_name(action: GameAction) -> str:
-    return type(action).__name__
 
 
 def event_type_name(event: GameEvent) -> str:
@@ -94,16 +65,6 @@ def round_ended_event(events: tuple[GameEvent, ...]) -> RoundEndedEvent | None:
 
 def winner_text(winner: PlayerId | None) -> str:
     return "draw" if winner is None else str(winner)
-
-
-def render_action_label(action: GameAction) -> Text:
-    label = action_type_name(action)
-    palette = ACTION_LABEL_STYLES.get(label, DEFAULT_ACTION_LABEL_STYLE)
-    return Text.assemble(
-        ("[", palette.border_style),
-        (f" {label} ", palette.label_style),
-        ("]", palette.border_style),
-    )
 
 
 def summarize_action(
@@ -415,71 +376,7 @@ def _summarize_special_scorch_targets(
     return f"scorched {scorched}"
 
 
-def metadata_items(metadata: CliMetadata) -> tuple[tuple[str, str], ...]:
-    items: list[tuple[str, str]] = [
-        ("Game Id", str(metadata.game_id)),
-        ("Player One", str(metadata.player_one_id)),
-    ]
-    if metadata.player_one_actor is not None:
-        items.append(("Player One Actor", metadata.player_one_actor))
-    items.extend(
-        [
-            ("Player Two", str(metadata.player_two_id)),
-        ]
-    )
-    if metadata.player_two_actor is not None:
-        items.append(("Player Two Actor", metadata.player_two_actor))
-    items.extend(
-        [
-            ("Player One Deck", str(metadata.player_one_deck_id)),
-            ("Player Two Deck", str(metadata.player_two_deck_id)),
-            ("Player One Leader", metadata.player_one_leader_name),
-            ("Player Two Leader", metadata.player_two_leader_name),
-            ("RNG Policy", metadata.rng_name),
-            ("Pending Choice", "yes" if metadata.pending_choice_encountered else "no"),
-        ]
-    )
-    return tuple(items)
-
-
-def pending_choice_items(
-    choice: PendingChoice,
-    *,
-    card_names_by_instance_id: Mapping[CardInstanceId, str],
-    card_values_by_instance_id: Mapping[CardInstanceId, int],
-) -> tuple[tuple[str, str], ...]:
-    legal_targets = ", ".join(
-        card_ref(card_id, card_names_by_instance_id, card_values_by_instance_id)
-        for card_id in choice.legal_target_card_instance_ids
-    )
-    legal_rows = ", ".join(row.value for row in choice.legal_rows)
-    return (
-        ("Chooser", str(choice.player_id)),
-        ("Choice Id", str(choice.choice_id)),
-        ("Choice Kind", choice.kind.value),
-        ("Source Kind", choice.source_kind.value),
-        ("Legal Target Count", str(len(choice.legal_target_card_instance_ids))),
-        (
-            "Legal Targets",
-            legal_targets if legal_targets else "none",
-        ),
-        ("Legal Rows", legal_rows if legal_rows else "none"),
-    )
-
-
 def _summarize_mulligan_selection(selection: MulliganSelection) -> str:
     count = len(selection.cards_to_replace)
     replacement_text = "replacement" if count == 1 else "replacements"
     return f"{selection.player_id} resolves mulligan ({count} {replacement_text})"
-
-
-def card_ref(
-    card_instance_id: CardInstanceId,
-    card_names_by_instance_id: Mapping[CardInstanceId, str],
-    card_values_by_instance_id: Mapping[CardInstanceId, int],
-) -> str:
-    return card_ref_text(
-        card_instance_id,
-        card_names_by_instance_id,
-        card_values_by_instance_id,
-    )

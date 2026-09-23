@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Protocol
 
 from gwent_engine.ai.baseline.assessment import DecisionAssessment
@@ -45,21 +46,13 @@ class ScorchPolicy(ABC):
     ) -> float: ...
 
 
-class LeaderPolicy(ABC):
-    """Policy for leader timing.
+@dataclass(frozen=True, slots=True)
+class LeaderPolicy:
+    """Named leader timing policy resolved from the policy catalog.
 
-    Leader abilities are scarce battle resources, so profiles often need a
-    separate timing rule that is more conservative or more tempo-oriented than
-    ordinary card play.
+    Leader timing is a name-keyed rule evaluated by
+    `leader_policy_components`, so the policy object only needs to carry its
+    canonical name.
     """
 
     name: str
-
-    @abstractmethod
-    def evaluate(
-        self,
-        *,
-        assessment: DecisionAssessment,
-        context: DecisionContext,
-        profile: PolicyProfile,
-    ) -> float: ...

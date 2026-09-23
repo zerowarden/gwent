@@ -7,7 +7,6 @@ from gwent_engine.cards import CardRegistry
 from gwent_engine.core import (
     AbilityKind,
     CardType,
-    EffectSourceCategory,
     GameStatus,
     Phase,
     Zone,
@@ -354,7 +353,6 @@ def _apply_scorch(
     killed_card_ids = strongest_battlefield_unit_card_ids(
         state,
         card_registry,
-        source_category=EffectSourceCategory.SPECIAL_CARD,
         leader_registry=leader_registry,
     )
     discarded_card_ids = (*killed_card_ids, action.card_instance_id)

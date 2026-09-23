@@ -12,7 +12,7 @@ from gwent_engine.core.enums import (
 )
 from gwent_engine.core.errors import InvariantError
 from gwent_engine.core.ids import CardInstanceId, PlayerId
-from gwent_engine.core.state import CardInstance, GameState, PlayerState
+from gwent_engine.core.state import GameState, PlayerState
 
 
 def check_game_state_invariants(
@@ -46,7 +46,7 @@ def _check_card_locations(
     located_cards = list(_iter_located_cards(state))
     _check_card_container_membership(state, located_cards)
 
-    for owner, zone, row, card_id, location_kind in located_cards:
+    for owner, zone, row, card_id in located_cards:
         card = state.card(card_id)
         _check_card_location_identity(card_id, card.zone, zone, card.row, row)
         if zone == Zone.BATTLEFIELD:
@@ -54,7 +54,6 @@ def _check_card_locations(
                 state,
                 owner=owner,
                 card_id=card_id,
-                location_kind=location_kind,
                 card_registry=card_registry,
             )
             continue
@@ -140,10 +139,10 @@ def _check_match_end_consistency(state: GameState) -> None:
 
 def _check_card_container_membership(
     state: GameState,
-    located_cards: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId, str]],
+    located_cards: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId]],
 ) -> None:
     card_ids = {card.instance_id for card in state.card_instances}
-    counts = Counter(card_id for _, _, _, card_id, _ in located_cards)
+    counts = Counter(card_id for _, _, _, card_id in located_cards)
 
     duplicate_ids = sorted(card_id for card_id, count in counts.items() if count > 1)
     if duplicate_ids:
@@ -197,14 +196,9 @@ def _check_battlefield_card_location(
     *,
     owner: PlayerId | None,
     card_id: CardInstanceId,
-    location_kind: str,
     card_registry: CardRegistry | None,
 ) -> None:
     card = state.card(card_id)
-    if location_kind == "battlefield_weather":
-        _check_battlefield_weather_card_has_no_side(card, card_id=card_id)
-        return
-
     assert owner is not None
     if card.battlefield_side != owner:
         raise InvariantError(
@@ -220,15 +214,6 @@ def _check_battlefield_card_location(
     raise InvariantError(
         f"Card {card_id!r} belongs to {card.owner!r} but is stored under {owner!r}."
     )
-
-
-def _check_battlefield_weather_card_has_no_side(
-    card: CardInstance,
-    *,
-    card_id: CardInstanceId,
-) -> None:
-    if card.battlefield_side is not None:
-        raise InvariantError(f"Weather card {card_id!r} cannot declare battlefield_side.")
 
 
 def _check_weather_card_location(
@@ -317,13 +302,13 @@ def _check_pending_avenger_summons(state: GameState) -> None:
 
 def _iter_located_cards(
     state: GameState,
-) -> tuple[tuple[PlayerId | None, Zone, Row | None, CardInstanceId, str], ...]:
-    locations: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId, str]] = []
+) -> tuple[tuple[PlayerId | None, Zone, Row | None, CardInstanceId], ...]:
+    locations: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId]] = []
     for player in state.players:
         locations.extend(_player_zone_entries(player))
     for row in (Row.CLOSE, Row.RANGED, Row.SIEGE):
         locations.extend(
-            (None, Zone.WEATHER, row, card_id, "battlefield_weather")
+            (None, Zone.WEATHER, row, card_id)
             for card_id in state.battlefield_weather.cards_for(row)
         )
     return tuple(locations)
@@ -331,20 +316,14 @@ def _iter_located_cards(
 
 def _player_zone_entries(
     player: PlayerState,
-) -> tuple[tuple[PlayerId | None, Zone, Row | None, CardInstanceId, str], ...]:
-    entries: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId, str]] = []
-    entries.extend(
-        (player.player_id, Zone.DECK, None, card_id, "player_zone") for card_id in player.deck
-    )
-    entries.extend(
-        (player.player_id, Zone.HAND, None, card_id, "player_zone") for card_id in player.hand
-    )
-    entries.extend(
-        (player.player_id, Zone.DISCARD, None, card_id, "player_zone") for card_id in player.discard
-    )
+) -> tuple[tuple[PlayerId | None, Zone, Row | None, CardInstanceId], ...]:
+    entries: list[tuple[PlayerId | None, Zone, Row | None, CardInstanceId]] = []
+    entries.extend((player.player_id, Zone.DECK, None, card_id) for card_id in player.deck)
+    entries.extend((player.player_id, Zone.HAND, None, card_id) for card_id in player.hand)
+    entries.extend((player.player_id, Zone.DISCARD, None, card_id) for card_id in player.discard)
     for row in (Row.CLOSE, Row.RANGED, Row.SIEGE):
         entries.extend(
-            (player.player_id, Zone.BATTLEFIELD, row, card_id, "player_row")
+            (player.player_id, Zone.BATTLEFIELD, row, card_id)
             for card_id in player.rows.cards_for(row)
         )
     return tuple(entries)

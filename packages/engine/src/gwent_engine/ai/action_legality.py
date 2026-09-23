@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from gwent_shared.error_translation import recover_exception
-
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     GameAction,
@@ -36,17 +34,16 @@ def is_legal_action(
     leader_registry: LeaderRegistry | None,
     rng: SupportsRandom | None,
 ) -> bool:
-    return recover_exception(
-        lambda: _validate_action(
+    try:
+        return _validate_action(
             state,
             action,
             card_registry=card_registry,
             leader_registry=leader_registry,
             rng=rng,
-        ),
-        IllegalActionError,
-        lambda _exc: False,
-    )
+        )
+    except IllegalActionError:
+        return False
 
 
 def _validate_action(

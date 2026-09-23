@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime
+from typing import cast
 
 from gwent_shared import dump_json, expect_int, expect_mapping, expect_sequence, expect_str
 from gwent_shared.json_payloads import load_json_list, load_json_mapping, load_json_object_list
@@ -43,10 +44,17 @@ def serialize_stored_match(stored_match: StoredMatch) -> tuple[object, ...]:
     )
 
 
+def row_field(row: sqlite3.Row, column: str) -> object:
+    return cast(object, row[column])
+
+
 def deserialize_stored_match(row: sqlite3.Row) -> StoredMatch:
-    player_slots_payload = load_json_list(row["player_slots"], context="sqlite.player_slots")
+    player_slots_payload = load_json_list(
+        row_field(row, "player_slots"),
+        context="sqlite.player_slots",
+    )
     staged_mulligans_payload = load_json_list(
-        row["staged_mulligans"],
+        row_field(row, "staged_mulligans"),
         context="sqlite.staged_mulligans",
     )
     player_slots = tuple(
@@ -55,22 +63,28 @@ def deserialize_stored_match(row: sqlite3.Row) -> StoredMatch:
     if len(player_slots) != 2:
         raise TypeError("Expected exactly two serialized player slots.")
     return StoredMatch(
-        match_id=expect_str(row["match_id"], context="sqlite.match_id"),
-        state_payload=load_json_mapping(row["state_payload"], context="sqlite.state_payload"),
+        match_id=expect_str(row_field(row, "match_id"), context="sqlite.match_id"),
+        state_payload=load_json_mapping(
+            row_field(row, "state_payload"),
+            context="sqlite.state_payload",
+        ),
         event_log_payloads=tuple(
-            load_json_object_list(row["event_log_payloads"], context="sqlite.event_log_payloads")
+            load_json_object_list(
+                row_field(row, "event_log_payloads"),
+                context="sqlite.event_log_payloads",
+            )
         ),
         player_slots=(player_slots[0], player_slots[1]),
         staged_mulligans=tuple(
             deserialize_staged_mulligan(submission_payload)
             for submission_payload in staged_mulligans_payload
         ),
-        version=expect_int(row["version"], context="sqlite.version"),
+        version=expect_int(row_field(row, "version"), context="sqlite.version"),
         created_at=datetime.fromisoformat(
-            expect_str(row["created_at"], context="sqlite.created_at")
+            expect_str(row_field(row, "created_at"), context="sqlite.created_at")
         ),
         updated_at=datetime.fromisoformat(
-            expect_str(row["updated_at"], context="sqlite.updated_at")
+            expect_str(row_field(row, "updated_at"), context="sqlite.updated_at")
         ),
     )
 

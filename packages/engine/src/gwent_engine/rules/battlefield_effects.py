@@ -1,15 +1,8 @@
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core import WEATHER_ROWS_BY_ABILITY, AbilityKind, CardType, Row
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.state import GameState
 from gwent_engine.rules.row_effects import special_ability_kind
-
-WEATHER_ROWS_BY_ABILITY = {
-    AbilityKind.BITING_FROST: (Row.CLOSE,),
-    AbilityKind.IMPENETRABLE_FOG: (Row.RANGED,),
-    AbilityKind.TORRENTIAL_RAIN: (Row.SIEGE,),
-    AbilityKind.SKELLIGE_STORM: (Row.RANGED, Row.SIEGE),
-}
 
 
 def is_weather_ability(ability_kind: AbilityKind) -> bool:

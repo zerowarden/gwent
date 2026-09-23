@@ -11,8 +11,9 @@ from collections import Counter
 from collections.abc import Collection, Sequence
 from typing import Protocol
 
+from gwent_engine.ai.utils import is_non_hero_unit
 from gwent_engine.cards import CardDefinition
-from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core import AbilityKind, Row
 
 
 class RowWeatherSummary(Protocol):
@@ -84,7 +85,7 @@ def projected_synergy_value(
             (
                 definition.base_strength
                 for definition in discard_definitions
-                if definition.card_type == CardType.UNIT and not definition.is_hero
+                if is_non_hero_unit(definition)
             ),
             default=0,
         )

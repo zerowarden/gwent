@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import override
-
 from gwent_engine.ai.baseline.assessment import DecisionAssessment
 from gwent_engine.ai.baseline.context import DecisionContext
 from gwent_engine.ai.baseline.features import preserved_leader_value
@@ -68,50 +65,5 @@ def leader_policy_components(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class _LeaderPolicyBase(LeaderPolicy):
-    name: str
-
-    @override
-    def evaluate(
-        self,
-        *,
-        assessment: DecisionAssessment,
-        context: DecisionContext,
-        profile: PolicyProfile,
-    ) -> float:
-        return sum(
-            value
-            for _, value in leader_policy_components(
-                policy_name=self.name,
-                assessment=assessment,
-                context=context,
-                profile=profile,
-            )
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class ConservativeLeaderPolicy(_LeaderPolicyBase):
-    """Bias against spending leader unless the position truly needs it.
-
-    This policy exists for profiles that treat leader value as a scarce
-    reserve and want to preserve it for later rounds or tighter board states.
-    """
-
-    name: str = CONSERVATIVE_LEADER_POLICY_ID
-
-
-@dataclass(frozen=True, slots=True)
-class AggressiveLeaderPolicy(_LeaderPolicyBase):
-    """Increase willingness to convert leader into immediate tempo.
-
-    This policy exists for profiles that are comfortable spending leader to
-    push an active round rather than saving it for maximum later flexibility.
-    """
-
-    name: str = AGGRESSIVE_LEADER_POLICY_ID
-
-
-CONSERVATIVE_LEADER_POLICY = ConservativeLeaderPolicy()
-AGGRESSIVE_LEADER_POLICY = AggressiveLeaderPolicy()
+CONSERVATIVE_LEADER_POLICY = LeaderPolicy(name=CONSERVATIVE_LEADER_POLICY_ID)
+AGGRESSIVE_LEADER_POLICY = LeaderPolicy(name=AGGRESSIVE_LEADER_POLICY_ID)

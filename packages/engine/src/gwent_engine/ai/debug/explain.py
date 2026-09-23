@@ -156,21 +156,6 @@ class DecisionExplainer:
         )
 
 
-def explain_heuristic_decision(
-    observation: PlayerObservation,
-    legal_actions: tuple[GameAction, ...],
-    *,
-    card_registry: CardRegistry,
-    config: BaselineConfig = DEFAULT_BASELINE_CONFIG,
-    profile_definition: BaseProfileDefinition = DEFAULT_BASE_PROFILE,
-) -> HeuristicDecisionExplanation:
-    return DecisionExplainer(
-        card_registry=card_registry,
-        config=config,
-        profile_definition=profile_definition,
-    ).explain_heuristic(observation, legal_actions)
-
-
 def explain_heuristic_decision_from_state(
     state: GameState,
     *,

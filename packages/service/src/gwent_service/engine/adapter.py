@@ -43,7 +43,7 @@ from gwent_engine.serialize import (
     game_state_from_dict,
     game_state_to_dict,
 )
-from gwent_shared.error_translation import translate_exception, translate_mapping_key
+from gwent_shared.error_translation import translate_mapping_key
 
 from gwent_service.application.errors import UnknownDeckError
 from gwent_service.config import ServiceConfig, default_service_config
@@ -268,11 +268,10 @@ def _optional_card_instance_id(raw_value: str | None) -> CardInstanceId | None:
 
 
 def _row(raw_value: str) -> Row:
-    return translate_exception(
-        lambda: Row(raw_value),
-        ValueError,
-        lambda _exc: IllegalActionError(f"Unknown row: {raw_value!r}"),
-    )
+    try:
+        return Row(raw_value)
+    except ValueError as exc:
+        raise IllegalActionError(f"Unknown row: {raw_value!r}") from exc
 
 
 def _optional_row(raw_value: str | None) -> Row | None:

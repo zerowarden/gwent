@@ -101,7 +101,17 @@ def selected_weather_card_in_deck(
         and len(matching_weather_ids) > 1
     ):
         raise IllegalActionError("Leader must choose which weather card to play from deck.")
-    return _first_matching_weather_card(matching_weather_ids)
+    assert matching_weather_ids
+    return matching_weather_ids[0]
+
+
+def discard_and_choose_selection_required(
+    player: PlayerState,
+    *,
+    hand_discard_count: int,
+    deck_pick_count: int,
+) -> bool:
+    return len(player.hand) >= hand_discard_count and len(player.deck) >= deck_pick_count
 
 
 def _selected_matching_weather_card(
@@ -112,13 +122,6 @@ def _selected_matching_weather_card(
     if action.target_card_instance_id not in matching_weather_ids:
         raise IllegalActionError("Leader must target a matching weather card in your deck.")
     return action.target_card_instance_id
-
-
-def _first_matching_weather_card(
-    matching_weather_ids: tuple[CardInstanceId, ...],
-) -> CardInstanceId:
-    card_id, *_ = matching_weather_ids
-    return card_id
 
 
 def deck_card_matches_weather_selection(

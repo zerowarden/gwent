@@ -25,7 +25,7 @@ def test_card_registry_lookup_fails_for_unknown_ids() -> None:
     registry = CardRegistry.from_definitions(load_card_definitions(DATA_DIR / "cards.yaml"))
 
     with pytest.raises(UnknownCardDefinitionError, match="Unknown card definition id"):
-        registry.get(CardDefinitionId("missing_card"))
+        _ = registry.get(CardDefinitionId("missing_card"))
 
 
 def test_faction_registry_lookup_succeeds_for_known_ids() -> None:
@@ -44,4 +44,4 @@ def test_faction_registry_lookup_fails_for_unknown_ids() -> None:
     )
 
     with pytest.raises(UnknownFactionError, match="Unknown faction id"):
-        registry.get(cast(FactionId, cast(object, "not_a_faction")))
+        _ = registry.get(cast(FactionId, cast(object, "not_a_faction")))

@@ -1,5 +1,3 @@
-from gwent_shared.error_translation import recover_exception, translate_exception
-
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     LeaveAction,
@@ -19,7 +17,7 @@ from gwent_engine.core.errors import (
     UnknownCardInstanceError,
 )
 from gwent_engine.core.randomness import SupportsRandom
-from gwent_engine.core.state import GameState, PlayerState
+from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.leader_abilities import validate_use_leader_ability_legality
 from gwent_engine.rules.legality import (
@@ -115,20 +113,20 @@ def validate_play_card_action(
         raise IllegalActionError("PlayCardAction requires a card registry.")
 
     player = state.player(action.player_id)
-    translate_exception(
-        lambda: _validate_in_round_play_card(
+    try:
+        validate_in_round_player_can_act(state, player)
+        validate_play_card_legality(
             state,
             player,
             action,
-            card_registry=card_registry,
+            card_registry,
             leader_registry=leader_registry,
             rng=rng,
-        ),
-        IllegalActionError,
-        lambda exc: IllegalActionError(
+        )
+    except IllegalActionError as exc:
+        raise IllegalActionError(
             _play_card_error_message(state, action, card_registry=card_registry, message=str(exc))
-        ),
-    )
+        ) from exc
 
 
 def validate_pass_action(state: GameState, action: PassAction) -> None:
@@ -136,26 +134,6 @@ def validate_pass_action(state: GameState, action: PassAction) -> None:
 
     player = state.player(action.player_id)
     validate_in_round_player_can_act(state, player)
-
-
-def _validate_in_round_play_card(
-    state: GameState,
-    player: PlayerState,
-    action: PlayCardAction,
-    *,
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry | None,
-    rng: SupportsRandom | None,
-) -> None:
-    validate_in_round_player_can_act(state, player)
-    validate_play_card_legality(
-        state,
-        player,
-        action,
-        card_registry,
-        leader_registry=leader_registry,
-        rng=rng,
-    )
 
 
 def validate_leave_action(state: GameState, action: LeaveAction) -> None:
@@ -253,16 +231,15 @@ def _play_card_error_message(
     card_registry: CardRegistry,
     message: str,
 ) -> str:
-    return recover_exception(
-        lambda: _play_card_context_message(
+    try:
+        return _play_card_context_message(
             state,
             action,
             card_registry=card_registry,
             message=message,
-        ),
-        (UnknownCardDefinitionError, UnknownCardInstanceError, KeyError, ValueError),
-        lambda _exc: message,
-    )
+        )
+    except (UnknownCardDefinitionError, UnknownCardInstanceError, KeyError, ValueError):
+        return message
 
 
 def _play_card_context_message(

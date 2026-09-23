@@ -19,6 +19,7 @@ from gwent_engine.ai.baseline.projection.context import active_weather_rows, vie
 from gwent_engine.ai.baseline.projection.models import ProjectedRowState, PublicBoardProjection
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
+from gwent_engine.ai.utils import is_non_hero_unit
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.rules.battlefield_effects import is_weather_ability, weather_rows_for
@@ -211,12 +212,9 @@ def best_visible_revival_strength(
 ) -> int:
     return max(
         (
-            card_registry.get(card.definition_id).base_strength
+            definition.base_strength
             for card in cards
-            if (
-                card_registry.get(card.definition_id).card_type == CardType.UNIT
-                and not card_registry.get(card.definition_id).is_hero
-            )
+            if is_non_hero_unit(definition := card_registry.get(card.definition_id))
         ),
         default=0,
     )
@@ -450,12 +448,9 @@ def projected_synergy_value(
     if any(AbilityKind.MEDIC in definition.ability_kinds for definition in remaining_hand):
         synergy += max(
             (
-                card_registry.get(card.definition_id).base_strength
+                definition.base_strength
                 for card in context.viewer.discard
-                if (
-                    card_registry.get(card.definition_id).card_type == CardType.UNIT
-                    and not card_registry.get(card.definition_id).is_hero
-                )
+                if is_non_hero_unit(definition := card_registry.get(card.definition_id))
             ),
             default=0,
         )

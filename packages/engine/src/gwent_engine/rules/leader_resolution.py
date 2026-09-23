@@ -2,7 +2,6 @@ from dataclasses import replace
 
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import (
-    EffectSourceCategory,
     GameStatus,
     LeaderAbilityKind,
     LeaderAbilityMode,
@@ -16,11 +15,14 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
-from gwent_engine.rules.abilities import destroy_battlefield_cards
+from gwent_engine.rules.abilities import (
+    destroy_battlefield_cards,
+    strongest_eligible_unit_card_ids,
+)
 from gwent_engine.rules.battlefield_effects import weather_row_for
-from gwent_engine.rules.effect_applicability import eligible_destroyable_unit_ids
 from gwent_engine.rules.leader_common import (
     ActiveLeaderHandler,
+    discard_and_choose_selection_required,
     is_agile_battlefield_unit,
     move_battlefield_card_to_row,
     pick_random_card_ids,
@@ -37,7 +39,7 @@ from gwent_engine.rules.scoring import calculate_effective_strength
 from gwent_engine.rules.state_ops import (
     append_to_row,
     discard_owned_weather_cards,
-    drawable_card_ids,
+    draw_cards_into_hand,
     next_player_after_non_pass_action,
     replace_card_instance,
     replace_card_instances,
@@ -158,24 +160,14 @@ def _resolve_draw_extra_opening_card(
     player: PlayerState,
     leader_definition: LeaderDefinition,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    drawn_card_ids = drawable_card_ids(player, leader_definition.cards_to_draw)
+    drawn_state, drawn_card_ids = draw_cards_into_hand(
+        state,
+        player,
+        leader_definition.cards_to_draw,
+    )
     if not drawn_card_ids:
         return state, ()
 
-    updated_player = replace(
-        player,
-        deck=player.deck[len(drawn_card_ids) :],
-        hand=(*player.hand, *drawn_card_ids),
-    )
-    updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.HAND,
-            row=None,
-            battlefield_side=None,
-        )
-        for card_id in drawn_card_ids
-    }
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
             event_id=state.event_counter + 1,
@@ -192,9 +184,7 @@ def _resolve_draw_extra_opening_card(
         ),
     )
     next_state = replace(
-        state,
-        players=replace_player(state.players, updated_player),
-        card_instances=replace_card_instances(state.card_instances, updated_cards),
+        drawn_state,
         event_counter=state.event_counter + len(events),
     )
     return next_state, events
@@ -352,33 +342,12 @@ def _activate_scorch_opponent_row_leader(
     destroyed_card_ids: tuple[CardInstanceId, ...] = ()
     next_state = state
     destroy_events: tuple[GameEvent, ...] = ()
-    eligible_targets = eligible_destroyable_unit_ids(
-        state,
-        card_registry,
-        opponent_row_cards,
-        source_category=EffectSourceCategory.LEADER_ABILITY,
-    )
-    if row_total >= leader_definition.minimum_opponent_row_total and eligible_targets:
-        strongest_strength = max(
-            calculate_effective_strength(
-                state,
-                card_registry,
-                card_id,
-                leader_registry=leader_registry,
-            )
-            for card_id in eligible_targets
-        )
-        destroyed_card_ids = tuple(
-            card_id
-            for card_id in opponent_row_cards
-            if card_id in eligible_targets
-            and calculate_effective_strength(
-                state,
-                card_registry,
-                card_id,
-                leader_registry=leader_registry,
-            )
-            == strongest_strength
+    if row_total >= leader_definition.minimum_opponent_row_total:
+        destroyed_card_ids = strongest_eligible_unit_card_ids(
+            state,
+            card_registry,
+            opponent_row_cards,
+            leader_registry=leader_registry,
         )
         if destroyed_card_ids:
             next_state, destroy_events = destroy_battlefield_cards(
@@ -473,7 +442,11 @@ def _resolve_discard_and_choose_without_selection(
     player: PlayerState,
     leader_definition: LeaderDefinition,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    if _leader_requires_discard_and_pick_selection(player, leader_definition):
+    if discard_and_choose_selection_required(
+        player,
+        hand_discard_count=leader_definition.hand_discard_count,
+        deck_pick_count=leader_definition.deck_pick_count,
+    ):
         raise IllegalActionError(
             "Leader requires a pending discard-and-pick selection before resolving."
         )
@@ -488,16 +461,6 @@ def _resolve_discard_and_choose_without_selection(
                 ability_mode=leader_definition.ability_mode,
             ),
         ),
-    )
-
-
-def _leader_requires_discard_and_pick_selection(
-    player: PlayerState,
-    leader_definition: LeaderDefinition,
-) -> bool:
-    return (
-        len(player.hand) >= leader_definition.hand_discard_count
-        and len(player.deck) >= leader_definition.deck_pick_count
     )
 
 

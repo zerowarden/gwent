@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from contextlib import suppress
 from dataclasses import dataclass
 
 from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.assessment import DecisionAssessment, PlayerAssessment, RowSummary
 from gwent_engine.ai.baseline.context import DecisionContext, PressureMode, TacticalMode, TempoState
-from gwent_engine.ai.baseline.pending_choice import explain_pending_choice_score_components
+from gwent_engine.ai.baseline.pending_choice import (
+    UnsupportedPendingChoiceError,
+    explain_pending_choice_score_components,
+)
 from gwent_engine.ai.baseline.policies.leader import leader_policy_components
 from gwent_engine.ai.baseline.profiles import HeuristicProfile
 from gwent_engine.ai.baseline.projection import (
@@ -293,14 +295,15 @@ def _resolve_choice_action_score(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None,
 ) -> ActionScoreBreakdown:
-    components: tuple[tuple[str, float], ...] = ()
-    with suppress(ValueError):
+    try:
         components = explain_pending_choice_score_components(
             action,
             observation=observation,
             card_registry=card_registry,
             leader_registry=leader_registry,
         )
+    except UnsupportedPendingChoiceError as exc:
+        return _unsupported_action_score(action, profile=profile, reason=str(exc))
     if not components:
         return _unsupported_action_score(action, profile=profile)
     return ActionScoreBreakdown(
@@ -348,8 +351,17 @@ def _unsupported_action_score(
     action: GameAction,
     *,
     profile: HeuristicProfile,
+    reason: str | None = None,
 ) -> ActionScoreBreakdown:
     penalty = profile.action_bonus.unsupported_action_penalty
+    details = (
+        (_detail("unsupported_action_penalty", penalty),)
+        if reason is None
+        else (
+            _detail("unsupported_action_penalty", penalty),
+            _detail("unsupported_reason", reason),
+        )
+    )
     return ActionScoreBreakdown(
         action=action,
         terms=(
@@ -357,7 +369,7 @@ def _unsupported_action_score(
                 "unsupported_action_penalty",
                 penalty,
                 formula="unsupported_action_penalty",
-                details=(_detail("unsupported_action_penalty", penalty),),
+                details=details,
             ),
         ),
     )
@@ -1302,37 +1314,6 @@ def _estimated_opponent_tempo_per_card(
     if context.pressure == PressureMode.ELIMINATION:
         return profile.elimination_estimated_opponent_tempo_per_card
     return profile.estimated_opponent_tempo_per_card
-
-
-def rank_actions(
-    legal_actions: tuple[GameAction, ...],
-    *,
-    observation: PlayerObservation,
-    assessment: DecisionAssessment,
-    context: DecisionContext,
-    profile: HeuristicProfile,
-    card_registry: CardRegistry,
-    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
-) -> tuple[tuple[GameAction, float], ...]:
-    ranked = sorted(
-        (
-            (
-                breakdown.action,
-                breakdown.total,
-            )
-            for breakdown in explain_ranked_actions(
-                legal_actions,
-                observation=observation,
-                assessment=assessment,
-                context=context,
-                profile=profile,
-                card_registry=card_registry,
-                viewer_hand_definitions=viewer_hand_definitions,
-            )
-        ),
-        key=lambda item: (-item[1], action_to_id(item[0])),
-    )
-    return tuple(ranked)
 
 
 def _weather_action_value(

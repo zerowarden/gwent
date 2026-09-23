@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from typing import final
 
 from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.mulligan_scoring import mulligan_selection_score
 from gwent_engine.ai.observations import (
-    ObservedCard,
     PlayerObservation,
-    PublicPlayerStateView,
 )
 from gwent_engine.ai.policy import DEFAULT_GREEDY_ACTION_POLICY, DEFAULT_MULLIGAN_POLICY
 from gwent_engine.ai.row_preference import row_preference
+from gwent_engine.ai.utils import visible_definitions
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import (
@@ -78,11 +77,11 @@ class GreedyBot:
         del leader_registry
         if not legal_actions:
             raise ValueError("GreedyBot requires at least one legal action.")
-        visible_definitions = _visible_definitions(observation, card_registry)
+        definition_index = visible_definitions(observation, card_registry)
         ranked = sorted(
             legal_actions,
             key=lambda action: (
-                -_action_score(action, visible_definitions),
+                -_action_score(action, definition_index),
                 action_to_id(action),
             ),
         )
@@ -212,27 +211,3 @@ def _card_selection_score(definition: CardDefinition | None) -> int:
     if AbilityKind.SPY in definition.ability_kinds:
         score += DEFAULT_GREEDY_ACTION_POLICY.selection_spy_bonus
     return score
-
-
-def _visible_definitions(
-    observation: PlayerObservation,
-    card_registry: CardRegistry,
-) -> dict[CardInstanceId, CardDefinition]:
-    visible_cards = (
-        *observation.viewer_hand,
-        *_player_visible_cards(observation.public_state.players[0]),
-        *_player_visible_cards(observation.public_state.players[1]),
-        *observation.public_state.battlefield_weather.close,
-        *observation.public_state.battlefield_weather.ranged,
-        *observation.public_state.battlefield_weather.siege,
-    )
-    return {card.instance_id: card_registry.get(card.definition_id) for card in visible_cards}
-
-
-def _player_visible_cards(player: PublicPlayerStateView) -> Iterable[ObservedCard]:
-    return (
-        *player.discard,
-        *player.rows.close,
-        *player.rows.ranged,
-        *player.rows.siege,
-    )
