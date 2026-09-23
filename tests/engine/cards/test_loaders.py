@@ -16,11 +16,11 @@ from gwent_engine.decks import load_sample_decks
 from gwent_engine.factions.loaders import load_faction_definitions
 from gwent_engine.leaders.loaders import load_leader_definitions
 from gwent_engine.leaders.registry import LeaderRegistry
+from gwent_engine.resources import bundled_data_dir
 
 from tests.support import write_yaml_fixture
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = REPO_ROOT / "data"
+DATA_DIR = bundled_data_dir()
 
 
 def _assert_loader_rejects(

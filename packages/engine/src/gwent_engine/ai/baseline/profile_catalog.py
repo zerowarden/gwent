@@ -20,9 +20,9 @@ from gwent_engine.ai.policy import (
 )
 from gwent_engine.core.errors import DefinitionLoadError
 from gwent_engine.core.yaml_parsing import load_yaml_document
+from gwent_engine.resources import bundled_data_path
 
-WORKSPACE_ROOT = Path(__file__).resolve().parents[6]
-DEFAULT_BASE_PROFILES_PATH = WORKSPACE_ROOT / "data" / "heuristic_profiles.yaml"
+DEFAULT_BASE_PROFILES_PATH = bundled_data_path("heuristic_profiles.yaml")
 LEGACY_PROFILE_ALIASES = {
     "tempo": "aggro",
 }

@@ -1,5 +1,4 @@
 from dataclasses import replace
-from pathlib import Path
 
 from gwent_engine.ai.action_legality import is_legal_action
 from gwent_engine.ai.actions import enumerate_legal_actions
@@ -43,6 +42,7 @@ from gwent_engine.core.state import (
 from gwent_engine.decks import load_sample_decks
 from gwent_engine.leaders.loaders import load_leader_definitions
 from gwent_engine.leaders.registry import LeaderRegistry
+from gwent_engine.resources import bundled_data_dir
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 
 from tests.engine.primitives import (
@@ -98,8 +98,7 @@ __all__ = (
     "weather_card",
 )
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_DIR = REPO_ROOT / "data"
+DATA_DIR = bundled_data_dir()
 EMPTY_ROWS = RowState()
 
 MONSTERS_CLOSE_HORN_LEADER_ID = LeaderId("monsters_eredin_commander_of_the_red_riders")

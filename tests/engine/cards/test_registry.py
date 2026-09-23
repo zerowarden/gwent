@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import cast
 
 import pytest
@@ -9,9 +8,9 @@ from gwent_engine.core.errors import UnknownCardDefinitionError, UnknownFactionE
 from gwent_engine.core.ids import CardDefinitionId
 from gwent_engine.factions.loaders import load_faction_definitions
 from gwent_engine.factions.registry import FactionRegistry
+from gwent_engine.resources import bundled_data_dir
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DATA_DIR = REPO_ROOT / "data"
+DATA_DIR = bundled_data_dir()
 
 
 def test_card_registry_lookup_succeeds_for_known_ids() -> None:

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+import hashlib
+from dataclasses import dataclass, replace
 
+from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline import BaseProfileDefinition
 from gwent_engine.ai.observations import build_player_observation
@@ -46,7 +48,7 @@ class TurnSearchResolver:
     config: SearchConfig
     card_registry: CardRegistry
     leader_registry: LeaderRegistry | None = None
-    rng: SeededRandom = field(default_factory=lambda: SeededRandom(0))
+    seed: int = 0
 
     @dataclass(frozen=True, slots=True)
     class ResolvedTurn:
@@ -58,7 +60,8 @@ class TurnSearchResolver:
         state: GameState,
         root_action: GameAction,
     ) -> SearchLine:
-        viewer_turn = self._resolve_turn(state, (root_action,))
+        branch_seed = _branch_seed(self.seed, root_action)
+        viewer_turn = self._resolve_turn(state, (root_action,), branch_seed=branch_seed)
         reply_decision = should_search_opponent_reply(
             viewer_turn.end_state,
             viewer_player_id=self.viewer_player_id,
@@ -117,6 +120,7 @@ class TurnSearchResolver:
                 viewer_turn,
                 candidate,
                 opponent_resolver=opponent_resolver,
+                branch_seed=branch_seed,
             )
             if worst_reply is None or reply_line.value < worst_reply.value:
                 worst_reply = reply_line
@@ -127,26 +131,34 @@ class TurnSearchResolver:
         self,
         state: GameState,
         root_actions: tuple[GameAction, ...],
+        *,
+        branch_seed: int,
     ) -> ResolvedTurn:
         next_state, _, _ = apply_action_with_intermediate_state(
             state,
             root_actions[0],
-            rng=self.rng,
+            rng=SeededRandom(branch_seed),
             card_registry=self.card_registry,
             leader_registry=self.leader_registry,
         )
-        return self._resolve_after_action(next_state, root_actions)
+        return self._resolve_after_action(next_state, root_actions, branch_seed=branch_seed)
 
     def _resolve_after_action(
         self,
         state: GameState,
         actions: tuple[GameAction, ...],
+        *,
+        branch_seed: int,
     ) -> ResolvedTurn:
         if (
             state.pending_choice is not None
             and state.pending_choice.player_id == self.viewer_player_id
         ):
-            return self._resolve_same_player_pending_choice(state, actions)
+            return self._resolve_same_player_pending_choice(
+                state,
+                actions,
+                branch_seed=branch_seed,
+            )
         evaluation = evaluate_search_state(
             state,
             viewer_player_id=self.viewer_player_id,
@@ -172,13 +184,15 @@ class TurnSearchResolver:
         self,
         state: GameState,
         actions: tuple[GameAction, ...],
+        *,
+        branch_seed: int,
     ) -> ResolvedTurn:
         legal_actions = enumerate_legal_actions(
             state,
             player_id=self.viewer_player_id,
             card_registry=self.card_registry,
             leader_registry=self.leader_registry,
-            rng=self.rng,
+            rng=SeededRandom(branch_seed),
         )
         observation = build_player_observation(
             state,
@@ -200,6 +214,7 @@ class TurnSearchResolver:
                 state,
                 candidate,
                 actions,
+                branch_seed=branch_seed,
             )
             if best_line is None or line.line.value > best_line.line.value:
                 best_line = line
@@ -232,15 +247,22 @@ class TurnSearchResolver:
         state: GameState,
         candidate: SearchCandidate,
         actions: tuple[GameAction, ...],
+        *,
+        branch_seed: int,
     ) -> ResolvedTurn:
+        candidate_seed = _branch_seed(branch_seed, candidate.action)
         next_state, _, _ = apply_action_with_intermediate_state(
             state,
             candidate.action,
-            rng=self.rng,
+            rng=SeededRandom(candidate_seed),
             card_registry=self.card_registry,
             leader_registry=self.leader_registry,
         )
-        next_line = self._resolve_after_action(next_state, (*actions, candidate.action))
+        next_line = self._resolve_after_action(
+            next_state,
+            (*actions, candidate.action),
+            branch_seed=candidate_seed,
+        )
         return self.ResolvedTurn(
             line=SearchLine(
                 actions=next_line.line.actions,
@@ -264,6 +286,7 @@ class TurnSearchResolver:
         candidate: OpponentReplyCandidate,
         *,
         opponent_resolver: TurnSearchResolver,
+        branch_seed: int,
     ) -> SearchLine:
         reply_action = candidate.action
         reply_reason = candidate.reason
@@ -282,7 +305,11 @@ class TurnSearchResolver:
                     f"reply_penalty={candidate.inferred_penalty:.2f}",
                 ),
             )
-        reply_turn = opponent_resolver._resolve_turn(viewer_turn.end_state, (reply_action,))
+        reply_turn = opponent_resolver._resolve_turn(
+            viewer_turn.end_state,
+            (reply_action,),
+            branch_seed=_branch_seed(branch_seed, reply_action),
+        )
         evaluation = evaluate_search_state(
             reply_turn.end_state,
             viewer_player_id=self.viewer_player_id,
@@ -338,3 +365,8 @@ class TurnSearchResolver:
             explanation=replace(line.explanation, reply=reply_explanation),
             notes=(*line.notes, *notes),
         )
+
+
+def _branch_seed(parent_seed: int, action: GameAction) -> int:
+    digest = hashlib.sha256(f"{parent_seed}:{action_to_id(action)}".encode()).digest()
+    return int.from_bytes(digest[:8], "big")
