@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+type RowName = Literal["close", "ranged", "siege"]
+type NonBlankStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 class CardView(BaseModel):
@@ -107,64 +112,74 @@ class HealthResponse(BaseModel):
 class CreateMatchParticipantRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
-    engine_player_id: str
-    deck_id: str
+    service_player_id: NonBlankStr
+    engine_player_id: NonBlankStr
+    deck_id: NonBlankStr
 
 
 class CreateMatchRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    match_id: str
-    viewer_player_id: str
+    match_id: NonBlankStr
+    viewer_player_id: NonBlankStr
     participants: tuple[CreateMatchParticipantRequest, CreateMatchParticipantRequest]
     rng_seed: int | None = None
+
+    @model_validator(mode="after")
+    def _require_unique_participant_ids(self) -> CreateMatchRequest:
+        service_player_ids = [participant.service_player_id for participant in self.participants]
+        engine_player_ids = [participant.engine_player_id for participant in self.participants]
+        if len(set(service_player_ids)) != len(service_player_ids):
+            raise ValueError("Participant service_player_id values must be unique.")
+        if len(set(engine_player_ids)) != len(engine_player_ids):
+            raise ValueError("Participant engine_player_id values must be unique.")
+        return self
 
 
 class SubmitMulliganRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
-    card_instance_ids: tuple[str, ...] = Field(default_factory=tuple)
+    service_player_id: NonBlankStr
+    card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
 
 
 class PlayCardRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
-    card_instance_id: str
-    target_row: str | None = None
-    target_card_instance_id: str | None = None
-    secondary_target_card_instance_id: str | None = None
+    service_player_id: NonBlankStr
+    card_instance_id: NonBlankStr
+    target_row: RowName | None = None
+    target_card_instance_id: NonBlankStr | None = None
+    secondary_target_card_instance_id: NonBlankStr | None = None
 
 
 class PassTurnRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
+    service_player_id: NonBlankStr
 
 
 class LeaveMatchRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
+    service_player_id: NonBlankStr
 
 
 class UseLeaderAbilityRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
-    target_row: str | None = None
-    target_player: str | None = None
-    target_card_instance_id: str | None = None
-    secondary_target_card_instance_id: str | None = None
-    selected_card_instance_ids: tuple[str, ...] = Field(default_factory=tuple)
+    service_player_id: NonBlankStr
+    target_row: RowName | None = None
+    target_player: NonBlankStr | None = None
+    target_card_instance_id: NonBlankStr | None = None
+    secondary_target_card_instance_id: NonBlankStr | None = None
+    selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
 
 
 class ResolveChoiceRequest(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    service_player_id: str
-    choice_id: str
-    selected_card_instance_ids: tuple[str, ...] = Field(default_factory=tuple)
-    selected_rows: tuple[str, ...] = Field(default_factory=tuple)
+    service_player_id: NonBlankStr
+    choice_id: NonBlankStr
+    selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
+    selected_rows: tuple[RowName, ...] = Field(default_factory=tuple)

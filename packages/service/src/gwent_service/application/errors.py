@@ -20,6 +20,10 @@ class MatchNotFoundError(_SingleValueMatchServiceError):
     message_template: ClassVar[str] = "Match {value!r} was not found."
 
 
+class UnknownDeckError(_SingleValueMatchServiceError):
+    message_template: ClassVar[str] = "Unknown deck {value!r}."
+
+
 class MatchVersionConflictError(MatchServiceError):
     match_id: str
     expected_version: int

@@ -1,3 +1,5 @@
+import pytest
+from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.ids import DeckId
 from gwent_service.engine.adapter import GwentEngineAdapter
 from gwent_service.engine.contracts import CreateMatchStateSpec, EnginePlayerDeckSpec
@@ -28,6 +30,17 @@ def test_engine_adapter_can_create_initial_match_state() -> None:
     assert state.phase.value == "not_started"
     assert tuple(str(player.player_id) for player in state.players) == ("p1", "p2")
     assert state.rng_seed == 7
+
+
+def test_engine_adapter_rejects_unknown_row_value() -> None:
+    adapter = GwentEngineAdapter()
+
+    with pytest.raises(IllegalActionError, match="Unknown row"):
+        _ = adapter.build_play_card_action(
+            player_id="p1",
+            card_instance_id="p1_card_1",
+            target_row="invalid",
+        )
 
 
 def test_engine_adapter_round_trips_serialized_state() -> None:

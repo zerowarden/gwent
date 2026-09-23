@@ -1,3 +1,6 @@
+import pytest
+from gwent_service.application.errors import UnknownMatchPlayerError
+
 from tests.service.support import build_create_match_command, build_service
 
 
@@ -22,3 +25,22 @@ def test_match_service_create_match_starts_game_and_returns_safe_projection() ->
     assert stored_match.version == 1
     assert "p2_card_1" not in alice_view.model_dump_json()
     assert "p1_card_1" not in bob_view.model_dump_json()
+
+
+def test_create_match_with_unknown_viewer_leaves_no_stored_match() -> None:
+    service, repository = build_service()
+
+    with pytest.raises(UnknownMatchPlayerError):
+        _ = service.create_match(
+            build_create_match_command(match_id="create_match"),
+            viewer_service_player_id="mallory",
+        )
+
+    assert repository.get("create_match") is None
+
+    created_view = service.create_match(
+        build_create_match_command(match_id="create_match"),
+        viewer_service_player_id="alice",
+    )
+
+    assert created_view.viewer_player_id == "alice"

@@ -7,7 +7,7 @@ from gwent_engine.cards import (
     DeckDefinition,
     load_card_definitions,
 )
-from gwent_engine.core import Row
+from gwent_engine.core import IllegalActionError, Row
 from gwent_engine.core.actions import (
     GameAction,
     LeaveAction,
@@ -43,8 +43,9 @@ from gwent_engine.serialize import (
     game_state_from_dict,
     game_state_to_dict,
 )
-from gwent_shared.error_translation import translate_exception
+from gwent_shared.error_translation import translate_exception, translate_mapping_key
 
+from gwent_service.application.errors import UnknownDeckError
 from gwent_service.config import ServiceConfig, default_service_config
 from gwent_service.engine.contracts import (
     CardCatalogEntry,
@@ -195,7 +196,7 @@ class GwentEngineAdapter:
             selected_card_instance_ids=tuple(
                 CardInstanceId(card_instance_id) for card_instance_id in selected_card_instance_ids
             ),
-            selected_rows=tuple(Row(row) for row in selected_rows),
+            selected_rows=tuple(_row(row) for row in selected_rows),
         )
 
     def apply_engine_action(
@@ -249,10 +250,10 @@ class GwentEngineAdapter:
         )
 
     def _build_player_deck(self, player_spec: EnginePlayerDeckSpec) -> PlayerDeck:
-        deck = translate_exception(
-            lambda: self._decks_by_id[player_spec.deck_id],
-            KeyError,
-            lambda _exc: ValueError(f"Unknown sample deck id: {player_spec.deck_id!r}"),
+        deck = translate_mapping_key(
+            self._decks_by_id,
+            player_spec.deck_id,
+            UnknownDeckError,
         )
         return PlayerDeck(
             player_id=PlayerId(player_spec.player_id),
@@ -266,7 +267,15 @@ def _optional_card_instance_id(raw_value: str | None) -> CardInstanceId | None:
     return CardInstanceId(raw_value)
 
 
+def _row(raw_value: str) -> Row:
+    return translate_exception(
+        lambda: Row(raw_value),
+        ValueError,
+        lambda _exc: IllegalActionError(f"Unknown row: {raw_value!r}"),
+    )
+
+
 def _optional_row(raw_value: str | None) -> Row | None:
     if raw_value is None:
         return None
-    return Row(raw_value)
+    return _row(raw_value)

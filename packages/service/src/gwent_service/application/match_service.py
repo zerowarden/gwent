@@ -114,6 +114,7 @@ class MatchService:
             created_at=now,
             updated_at=now,
         )
+        _ = self._require_player_slot(stored_match, viewer_service_player_id)
         self._repository.create(stored_match)
         return project_match_for_player(
             stored_match,
