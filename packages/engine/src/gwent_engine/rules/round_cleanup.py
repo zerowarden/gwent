@@ -118,6 +118,7 @@ def end_match(
         phase=Phase.MATCH_ENDED,
         status=GameStatus.MATCH_ENDED,
         match_winner=winner,
+        pending_choice=None,
         event_counter=state.event_counter + 1,
     )
     return next_state, (event,)

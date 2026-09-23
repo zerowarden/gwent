@@ -1,12 +1,14 @@
 import pytest
 from gwent_engine.core import GameStatus, Phase
-from gwent_engine.core.actions import LeaveAction, StartGameAction
+from gwent_engine.core.actions import LeaveAction, PlayCardAction, StartGameAction
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import MatchEndedEvent, PlayerLeftEvent
-from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
 
+from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import (
+    CARD_REGISTRY,
     PLAYER_ONE_ID,
     PLAYER_TWO_ID,
     IdentityShuffle,
@@ -69,6 +71,51 @@ def test_player_can_leave_during_round_even_when_not_the_current_player() -> Non
     assert ended_state.player(PLAYER_TWO_ID).gems_remaining == 0
     assert events[0].event_id == in_round_state.event_counter + 1
     assert events[1].event_id == in_round_state.event_counter + 2
+
+
+def test_leave_is_permitted_during_pending_choice_for_chooser_and_opponent() -> None:
+    decoy_card_id = CardInstanceId("p1_decoy_trick_card")
+    frontliner_card_id = CardInstanceId("p1_vanguard_frontliner")
+    state = (
+        scenario("leave_during_pending_choice")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card(decoy_card_id, "neutral_decoy")],
+            board=rows(close=[card(frontliner_card_id, "scoiatael_mahakaman_defender")]),
+        )
+        .player(PLAYER_TWO_ID)
+        .build()
+    )
+    pending_state, _ = apply_action(
+        state,
+        PlayCardAction(player_id=PLAYER_ONE_ID, card_instance_id=decoy_card_id),
+        card_registry=CARD_REGISTRY,
+    )
+    assert pending_state.pending_choice is not None
+
+    chooser_ended_state, chooser_events = apply_action(
+        pending_state,
+        LeaveAction(player_id=PLAYER_ONE_ID),
+    )
+    opponent_ended_state, opponent_events = apply_action(
+        pending_state,
+        LeaveAction(player_id=PLAYER_TWO_ID),
+    )
+
+    assert chooser_ended_state.phase == Phase.MATCH_ENDED
+    assert chooser_ended_state.status == GameStatus.MATCH_ENDED
+    assert chooser_ended_state.match_winner == PLAYER_TWO_ID
+    assert chooser_ended_state.pending_choice is None
+    assert chooser_ended_state.player(PLAYER_ONE_ID).gems_remaining == 0
+    assert opponent_ended_state.phase == Phase.MATCH_ENDED
+    assert opponent_ended_state.status == GameStatus.MATCH_ENDED
+    assert opponent_ended_state.match_winner == PLAYER_ONE_ID
+    assert opponent_ended_state.pending_choice is None
+    assert opponent_ended_state.player(PLAYER_TWO_ID).gems_remaining == 0
+    assert isinstance(chooser_events[0], PlayerLeftEvent)
+    assert isinstance(chooser_events[1], MatchEndedEvent)
+    assert isinstance(opponent_events[0], PlayerLeftEvent)
+    assert isinstance(opponent_events[1], MatchEndedEvent)
 
 
 def test_leave_action_is_illegal_after_the_match_has_already_ended() -> None:

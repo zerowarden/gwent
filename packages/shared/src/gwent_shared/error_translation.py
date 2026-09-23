@@ -12,10 +12,10 @@ def handle_exception[ResultT](
     handled_exception: HandledException,
     error_handler: Callable[[BaseException], ResultT],
 ) -> ResultT:
-    context = RecoverExceptionContext(handled_exception, error_handler)
-    with context:
+    try:
         return operation()
-    return context.result
+    except handled_exception as exc:
+        return error_handler(exc)
 
 
 def translate_exception[ResultT](
@@ -60,35 +60,6 @@ class TranslatedExceptionContext(_ExceptionContextBase):
         if exc is None or not isinstance(exc, self._handled_exception):
             return False
         raise self._error_factory(exc) from exc
-
-
-@final
-class RecoverExceptionContext[ResultT](_ExceptionContextBase):
-    def __init__(
-        self,
-        handled_exception: HandledException,
-        fallback: Callable[[BaseException], ResultT],
-    ) -> None:
-        self._handled_exception: HandledException = handled_exception
-        self._fallback: Callable[[BaseException], ResultT] = fallback
-        self._result: ResultT | None = None
-
-    @property
-    def result(self) -> ResultT:
-        assert self._result is not None
-        return self._result
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> bool:
-        del exc_type, traceback
-        if exc is None or not isinstance(exc, self._handled_exception):
-            return False
-        self._result = self._fallback(exc)
-        return True
 
 
 def translate_exception_context(

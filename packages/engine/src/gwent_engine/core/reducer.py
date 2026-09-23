@@ -70,7 +70,7 @@ def apply_action_with_intermediate_state(
     card_registry: CardRegistry | None = None,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[GameState, tuple[GameEvent, ...], GameState]:
-    if state.pending_choice is not None:
+    if state.pending_choice is not None and not isinstance(action, LeaveAction):
         next_state, events = _resolve_pending_choice(
             state,
             action,
