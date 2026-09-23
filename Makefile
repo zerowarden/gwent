@@ -4,7 +4,7 @@ RUFF := uv run ruff
 MYPY := uv run mypy
 BASEDPYRIGHT := uv run basedpyright
 
-.PHONY: help sync pytest unit-tests test\:cov ruff fix mypy basedpyright check ai-play service service-sqlite
+.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play service service-sqlite
 
 ## Sync workspace environment
 sync:
@@ -57,6 +57,8 @@ deadcode:
 test:
 	$(PYTEST)
 
+pytest: test
+
 ## Run full unit test suite with coverage
 test\:cov:
 	@mkdir -p .cache/coverage
@@ -81,11 +83,7 @@ basedpyright:
 	$(BASEDPYRIGHT)
 
 ## Run all checks
-check:
-	$(MAKE) pytest
-	$(MAKE) ruff
-	$(MAKE) mypy
-	$(MAKE) basedpyright
+check: test ruff mypy basedpyright
 
 ## Run interactive AI match. Set AI_PLAY=default for fixed reference run
 ai-play:

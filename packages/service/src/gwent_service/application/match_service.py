@@ -135,6 +135,12 @@ class MatchService:
         if state_phase(stored_match.state_payload) != "mulligan":
             raise MatchPhaseError("Mulligan submissions are only valid during the mulligan phase.")
 
+        self._adapter.validate_mulligan_selection(
+            self._adapter.deserialize_state(stored_match.state_payload),
+            player_id=viewer_slot.engine_player_id,
+            card_instance_ids=command.card_instance_ids,
+        )
+
         next_staged_mulligans = stage_mulligan_submission(
             stored_match.staged_mulligans,
             StagedMulliganSubmission(

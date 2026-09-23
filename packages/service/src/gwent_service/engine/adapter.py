@@ -31,10 +31,14 @@ from gwent_engine.core.ids import (
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
+from gwent_engine.core.validators import (
+    validate_mulligan_selection as validate_engine_mulligan_selection,
+)
 from gwent_engine.decks import load_sample_decks
 from gwent_engine.leaders import LeaderRegistry, load_leader_definitions
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 from gwent_engine.serialize import (
+    events_from_dict,
     events_to_dict,
     game_state_from_dict,
     game_state_to_dict,
@@ -108,6 +112,23 @@ class GwentEngineAdapter:
                 )
                 for player_id in player_order
             )
+        )
+
+    def validate_mulligan_selection(
+        self,
+        state: GameState,
+        *,
+        player_id: str,
+        card_instance_ids: tuple[str, ...],
+    ) -> None:
+        validate_engine_mulligan_selection(
+            state,
+            MulliganSelection(
+                player_id=PlayerId(player_id),
+                cards_to_replace=tuple(
+                    CardInstanceId(card_instance_id) for card_instance_id in card_instance_ids
+                ),
+            ),
         )
 
     def build_play_card_action(
@@ -202,6 +223,12 @@ class GwentEngineAdapter:
 
     def serialize_events(self, events: Sequence[GameEvent]) -> tuple[dict[str, object], ...]:
         return tuple(events_to_dict(events))
+
+    def deserialize_events(
+        self,
+        payloads: Sequence[Mapping[str, object]],
+    ) -> tuple[GameEvent, ...]:
+        return events_from_dict(payloads)
 
     def get_card_entry(self, definition_id: str) -> CardCatalogEntry:
         definition = self._card_registry.get(CardDefinitionId(definition_id))

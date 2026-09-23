@@ -5,6 +5,7 @@ from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import MulliganPerformedEvent
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.core.validators import validate_mulligan_selection
 
 from tests.engine.support import IdentityShuffle, build_sample_game_state
 
@@ -134,6 +135,45 @@ def test_resolve_mulligans_requires_mulligan_phase_and_both_players() -> None:
                 )
             ),
         )
+
+
+def test_validate_mulligan_selection_checks_player_eligibility() -> None:
+    initial_state = build_sample_game_state()
+    started_state, _ = apply_action(
+        initial_state,
+        StartGameAction(starting_player=PlayerId("p1")),
+        rng=IdentityShuffle(),
+    )
+    player_one = started_state.player(PlayerId("p1"))
+
+    with pytest.raises(IllegalActionError, match="is not in player"):
+        validate_mulligan_selection(
+            started_state,
+            MulliganSelection(
+                player_id=PlayerId("p1"),
+                cards_to_replace=(CardInstanceId("p1_card_16"),),
+            ),
+        )
+
+    with pytest.raises(IllegalActionError, match="at most 2 cards per player"):
+        validate_mulligan_selection(
+            started_state,
+            MulliganSelection(
+                player_id=PlayerId("p1"),
+                cards_to_replace=player_one.hand[:3],
+            ),
+        )
+
+    with pytest.raises(IllegalActionError, match="Unknown mulligan player"):
+        validate_mulligan_selection(
+            started_state,
+            MulliganSelection(player_id=PlayerId("p3"), cards_to_replace=()),
+        )
+
+    validate_mulligan_selection(
+        started_state,
+        MulliganSelection(player_id=PlayerId("p1"), cards_to_replace=player_one.hand[:2]),
+    )
 
 
 def test_resolve_mulligans_rejects_duplicate_or_excessive_card_selection() -> None:

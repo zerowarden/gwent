@@ -12,6 +12,7 @@ dependencies = ["gwent-engine", "gwent-service", "gwent-shared"]
 
 [dependency-groups]
 dev = [
+    "basedpyright>=1.40.1",
     "httpx>=0.28.0",
     "mypy>=1.11.2",
     "pytest>=8.3.3",

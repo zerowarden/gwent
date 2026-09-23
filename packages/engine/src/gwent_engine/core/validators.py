@@ -3,6 +3,7 @@ from gwent_shared.error_translation import recover_exception, translate_exceptio
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     LeaveAction,
+    MulliganSelection,
     PassAction,
     PlayCardAction,
     ResolveChoiceAction,
@@ -58,6 +59,30 @@ def validate_start_game_action(
             )
 
 
+def validate_mulligan_selection(state: GameState, selection: MulliganSelection) -> None:
+    if selection.player_id not in state.player_ids():
+        raise IllegalActionError(f"Unknown mulligan player: {selection.player_id!r}")
+    if len(selection.cards_to_replace) > MAX_MULLIGAN_REPLACEMENTS:
+        raise IllegalActionError(
+            "Mulligan selection may replace at most "
+            + f"{MAX_MULLIGAN_REPLACEMENTS} cards per player."
+        )
+    if len(set(selection.cards_to_replace)) != len(selection.cards_to_replace):
+        raise IllegalActionError(
+            "Mulligan selection cannot replace the same card twice for one player."
+        )
+    player = state.player(selection.player_id)
+    hand_card_ids = set(player.hand)
+    for card_id in selection.cards_to_replace:
+        if card_id not in hand_card_ids:
+            raise IllegalActionError(
+                f"Mulligan selection card {card_id!r} is not in "
+                + f"player {selection.player_id!r} hand."
+            )
+    if len(player.deck) < len(selection.cards_to_replace):
+        raise IllegalActionError("Mulligan selection cannot draw more cards than remain in deck.")
+
+
 def validate_resolve_mulligans_action(
     state: GameState,
     action: ResolveMulligansAction,
@@ -74,27 +99,7 @@ def validate_resolve_mulligans_action(
         raise IllegalActionError("ResolveMulligansAction cannot repeat the same player.")
 
     for selection in action.selections:
-        if len(selection.cards_to_replace) > MAX_MULLIGAN_REPLACEMENTS:
-            raise IllegalActionError(
-                "ResolveMulligansAction may replace at most "
-                + f"{MAX_MULLIGAN_REPLACEMENTS} cards per player."
-            )
-        if len(set(selection.cards_to_replace)) != len(selection.cards_to_replace):
-            raise IllegalActionError(
-                "ResolveMulligansAction cannot replace the same card twice for one player."
-            )
-        player = state.player(selection.player_id)
-        hand_card_ids = set(player.hand)
-        for card_id in selection.cards_to_replace:
-            if card_id not in hand_card_ids:
-                raise IllegalActionError(
-                    f"ResolveMulligansAction card {card_id!r} is not in "
-                    + f"player {selection.player_id!r} hand."
-                )
-        if len(player.deck) < len(selection.cards_to_replace):
-            raise IllegalActionError(
-                "ResolveMulligansAction cannot draw more cards than remain in deck."
-            )
+        validate_mulligan_selection(state, selection)
 
 
 def validate_play_card_action(

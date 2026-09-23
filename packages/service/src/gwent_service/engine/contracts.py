@@ -59,6 +59,14 @@ class EngineAdapter(Protocol):
         selections_by_player_id: Mapping[str, tuple[str, ...]],
     ) -> GameAction: ...
 
+    def validate_mulligan_selection(
+        self,
+        state: GameState,
+        *,
+        player_id: str,
+        card_instance_ids: tuple[str, ...],
+    ) -> None: ...
+
     def build_play_card_action(
         self,
         *,
