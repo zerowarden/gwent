@@ -7,7 +7,12 @@ from gwent_engine.ai.baseline.projection import projected_future_card_value
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
 from gwent_engine.ai.row_preference import row_preference
-from gwent_engine.ai.utils import is_non_hero_unit, visible_definitions
+from gwent_engine.ai.utils import (
+    is_non_hero_unit,
+    viewer_deck_count,
+    viewer_deck_instance_ids,
+    visible_definitions,
+)
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, ChoiceSourceKind, LeaderAbilityKind
 from gwent_engine.core.actions import GameAction, ResolveChoiceAction
@@ -158,7 +163,7 @@ def _leader_choice_score_components(
 def _leader_choice_zones(observation: PlayerObservation) -> _LeaderChoiceZones:
     return _LeaderChoiceZones(
         viewer_hand_ids={card.instance_id for card in observation.viewer_hand},
-        viewer_deck_ids={card.instance_id for card in observation.viewer_deck},
+        viewer_deck_ids=set(viewer_deck_instance_ids(observation)),
         viewer_discard_ids={
             card.instance_id
             for card in _public_player_discard(
@@ -335,7 +340,7 @@ def _medic_target_score_components(
     if AbilityKind.SPY in definition.ability_kinds:
         spy_bonus = DEFAULT_PENDING_CHOICE_POLICY.medic_target_spy_draw_bonus * min(
             DEFAULT_PENDING_CHOICE_POLICY.medic_target_spy_max_draws,
-            len(observation.viewer_deck),
+            viewer_deck_count(observation),
         )
         if spy_bonus > 0:
             components["medic_target_spy_bonus"] = spy_bonus

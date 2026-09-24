@@ -21,10 +21,6 @@ from gwent_engine.ai.observations import (
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
 from gwent_engine.ai.search.candidate_generation import generate_search_candidates
 from gwent_engine.ai.search.move_ordering import order_search_candidates
-from gwent_engine.ai.search.public_info import (
-    provision_search_registry,
-    redact_private_information,
-)
 from gwent_engine.ai.search.types import (
     SearchReplyExplanation,
     SearchTraceFact,
@@ -77,11 +73,6 @@ def generate_opponent_reply_candidates(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[OpponentReplyCandidate, ...]:
-    card_registry = provision_search_registry(card_registry)
-    state = redact_private_information(
-        state,
-        viewer_player_id=viewer_player_id,
-    )
     opponent_id = opponent_player_id_from_state(state, viewer_player_id)
     if state.pending_choice is not None and state.pending_choice.player_id == opponent_id:
         return _pending_choice_reply_candidates(

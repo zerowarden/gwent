@@ -19,7 +19,7 @@ from gwent_engine.ai.baseline.projection.context import active_weather_rows, vie
 from gwent_engine.ai.baseline.projection.models import ProjectedRowState, PublicBoardProjection
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
-from gwent_engine.ai.utils import is_non_hero_unit
+from gwent_engine.ai.utils import is_non_hero_unit, viewer_deck_count, viewer_deck_definitions
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.rules.battlefield_effects import is_weather_ability, weather_rows_for
@@ -79,7 +79,7 @@ def _projected_future_unit_bonus(
         board=board,
     )
     if AbilityKind.SPY in definition.ability_kinds:
-        bonus += min(2, len(observation.viewer_deck)) * 4
+        bonus += min(2, viewer_deck_count(observation)) * 4
     if AbilityKind.MEDIC in definition.ability_kinds:
         bonus += best_visible_revival_strength(
             viewer_public(observation).discard,
@@ -110,9 +110,9 @@ def _projected_future_muster_bonus(
     ):
         return 0
     return sum(
-        card_registry.get(card.definition_id).base_strength
-        for card in observation.viewer_deck
-        if card_registry.get(card.definition_id).muster_group == definition.resolved_musters_group
+        card_registry.get(entry.definition_id).base_strength * entry.count
+        for entry in observation.viewer_deck_composition
+        if card_registry.get(entry.definition_id).muster_group == definition.resolved_musters_group
     )
 
 
@@ -128,13 +128,17 @@ def _projected_future_tight_bond_bonus(
         1
         for card in (
             *observation.viewer_hand,
-            *observation.viewer_deck,
             *viewer_public(observation).discard,
             *viewer_public(observation).rows.close,
             *viewer_public(observation).rows.ranged,
             *viewer_public(observation).rows.siege,
         )
         if card_registry.get(card.definition_id).bond_group == definition.bond_group
+    )
+    visible_bond_matches += sum(
+        entry.count
+        for entry in observation.viewer_deck_composition
+        if card_registry.get(entry.definition_id).bond_group == definition.bond_group
     )
     return max(0, visible_bond_matches - 1) * definition.base_strength
 
@@ -330,11 +334,11 @@ def reachable_horn_option_value(
         (row_gains[row] for row in guaranteed_rows if row in row_gains),
         default=0.0,
     )
-    if draw_count <= 0 or not observation.viewer_deck:
+    deck_definitions = viewer_deck_definitions(observation, card_registry)
+    if draw_count <= 0 or not deck_definitions:
         return guaranteed_gain
 
-    draws = min(draw_count, len(observation.viewer_deck))
-    deck_definitions = [card_registry.get(card.definition_id) for card in observation.viewer_deck]
+    draws = min(draw_count, len(deck_definitions))
     probabilistic_gain = 0.0
     for row, gain in row_gains.items():
         if row in guaranteed_rows:

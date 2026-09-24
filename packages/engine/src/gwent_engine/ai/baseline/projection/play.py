@@ -30,7 +30,11 @@ from gwent_engine.ai.baseline.projection.resolver_context import (
 )
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
-from gwent_engine.ai.utils import is_non_hero_unit, viewer_hand_definition
+from gwent_engine.ai.utils import (
+    is_non_hero_unit,
+    viewer_deck_count,
+    viewer_hand_definition,
+)
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import PlayCardAction
@@ -370,13 +374,14 @@ def projected_muster_cards_from_viewer_deck(
 
     return tuple(
         ProjectedBattlefieldCard(
-            definition=card_registry.get(card.definition_id),
+            definition=definition,
             owner=owner,
             battlefield_side=battlefield_side,
             row=row,
         )
-        for card in observation.viewer_deck
-        if card_registry.get(card.definition_id).muster_group == muster_group
+        for entry in observation.viewer_deck_composition
+        if (definition := card_registry.get(entry.definition_id)).muster_group == muster_group
+        for _ in entry.instance_ids
     )
 
 
@@ -418,7 +423,7 @@ def best_medic_revive(
 def reachable_spy_draw_count(observation: PlayerObservation) -> int:
     """Return the exact public draw count a Spy can still realize immediately."""
 
-    return min(2, len(observation.viewer_deck))
+    return min(2, viewer_deck_count(observation))
 
 
 def medic_revive_priority(

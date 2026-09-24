@@ -37,10 +37,10 @@ from gwent_engine.rules.players import opponent_player_id_from_state
 class TurnSearchResolver:
     """Resolve a full same-player turn from a root action.
 
-    The resolver operates on the already-redacted Phase 3 search state. It
-    searches the acting player's fully resolved turn, including same-player
-    pending choices, and stops once control passes away or the round/match
-    materially changes.
+    The resolver operates on the player-safe simulation state materialized from
+    the acting player's observation. It searches the acting player's fully
+    resolved turn, including same-player pending choices, and stops once control
+    passes away or the round/match materially changes.
     """
 
     viewer_player_id: PlayerId

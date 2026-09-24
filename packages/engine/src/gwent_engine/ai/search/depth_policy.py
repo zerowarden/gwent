@@ -5,10 +5,6 @@ from dataclasses import dataclass
 from gwent_engine.ai.baseline import DecisionAssessment, build_assessment
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.policy import SearchConfig
-from gwent_engine.ai.search.public_info import (
-    provision_search_registry,
-    redact_private_information,
-)
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.core.state import GameState
@@ -30,11 +26,6 @@ def should_search_opponent_reply(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None = None,
 ) -> ReplySearchDecision:
-    card_registry = provision_search_registry(card_registry)
-    state = redact_private_information(
-        state,
-        viewer_player_id=viewer_player_id,
-    )
     observation = build_player_observation(state, viewer_player_id, leader_registry)
     assessment = build_assessment(observation, card_registry)
     opponent_id = opponent_player_id_from_state(state, viewer_player_id)

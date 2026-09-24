@@ -37,7 +37,7 @@ def test_player_observation_hides_opponent_hand_identities() -> None:
     assert observation.public_state.players[1].hand_count == len(opponent_hand_ids)
 
 
-def test_player_observation_exposes_viewer_deck_and_available_horn_row() -> None:
+def test_player_observation_exposes_viewer_deck_composition_and_available_horn_row() -> None:
     state = (
         scenario("observation_viewer_deck")
         .player(
@@ -52,12 +52,23 @@ def test_player_observation_exposes_viewer_deck_and_available_horn_row() -> None
 
     observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
 
-    assert tuple(card.instance_id for card in observation.viewer_deck) == (
-        "p1_deck_archer",
-        "p1_deck_horn",
+    assert tuple(
+        (str(entry.definition_id), entry.count) for entry in observation.viewer_deck_composition
+    ) == (
+        ("neutral_commanders_horn", 1),
+        ("scoiatael_dol_blathanna_archer", 1),
     )
     assert observation.public_state.players[0].leader.available_horn_row == Row.RANGED
     assert observation.public_state.players[1].leader.available_horn_row == Row.RANGED
+
+
+def test_player_observation_has_no_engine_state_escape_hatch() -> None:
+    state, _ = build_in_round_game_state()
+
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+
+    assert not hasattr(observation, "engine_state")
+    assert not hasattr(observation, "viewer_deck")
 
 
 def test_only_pending_choice_player_sees_legal_targets() -> None:

@@ -12,11 +12,8 @@ from gwent_engine.ai.baseline import (
 from gwent_engine.ai.baseline.projection import projected_future_card_value
 from gwent_engine.ai.observations import PlayerObservation, build_player_observation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
-from gwent_engine.ai.search.public_info import (
-    provision_search_registry,
-    redact_private_information,
-)
 from gwent_engine.ai.search.types import SearchTraceFact, SearchValueTerm
+from gwent_engine.ai.utils import viewer_deck_count, viewer_deck_definitions
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import AbilityKind, CardType, GameStatus
 from gwent_engine.core.ids import PlayerId
@@ -41,11 +38,6 @@ def evaluate_search_state(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None = None,
 ) -> SearchStateEvaluation:
-    card_registry = provision_search_registry(card_registry)
-    state = redact_private_information(
-        state,
-        viewer_player_id=viewer_player_id,
-    )
     observation = build_player_observation(state, viewer_player_id, leader_registry)
     assessment = build_assessment(observation, card_registry)
     context = classify_context(assessment)
@@ -273,7 +265,7 @@ def _known_reachable_draw_followup_value(
 
     if assessment.viewer.passed:
         return 0.0
-    deck_count = len(observation.viewer_deck)
+    deck_count = viewer_deck_count(observation)
     if deck_count <= 0:
         return 0.0
     reachable_draws = min(
@@ -344,11 +336,11 @@ def _optimistic_known_draw_value(
     candidate_values = sorted(
         (
             projected_future_card_value(
-                card_registry.get(card.definition_id),
+                definition,
                 observation=observation,
                 card_registry=card_registry,
             )
-            for card in observation.viewer_deck
+            for definition in viewer_deck_definitions(observation, card_registry)
         ),
         reverse=True,
     )

@@ -13,15 +13,42 @@ def is_non_hero_unit(definition: CardDefinition) -> bool:
     return definition.card_type == CardType.UNIT and not definition.is_hero
 
 
+def viewer_deck_instance_ids(observation: PlayerObservation) -> tuple[CardInstanceId, ...]:
+    return tuple(
+        instance_id
+        for entry in observation.viewer_deck_composition
+        for instance_id in entry.instance_ids
+    )
+
+
+def viewer_deck_count(observation: PlayerObservation) -> int:
+    return sum(entry.count for entry in observation.viewer_deck_composition)
+
+
+def viewer_deck_definitions(
+    observation: PlayerObservation,
+    card_registry: CardRegistry,
+) -> tuple[CardDefinition, ...]:
+    return tuple(
+        card_registry.get(entry.definition_id)
+        for entry in observation.viewer_deck_composition
+        for _ in entry.instance_ids
+    )
+
+
 def visible_definitions(
     observation: PlayerObservation,
     card_registry: CardRegistry,
     *,
     include_viewer_deck: bool = False,
 ) -> dict[CardInstanceId, CardDefinition]:
-    visible_cards: list[ObservedCard] = list(observation.viewer_hand)
+    definitions: dict[CardInstanceId, CardDefinition] = {}
     if include_viewer_deck:
-        visible_cards.extend(observation.viewer_deck)
+        for entry in observation.viewer_deck_composition:
+            definition = card_registry.get(entry.definition_id)
+            for instance_id in entry.instance_ids:
+                definitions[instance_id] = definition
+    visible_cards: list[ObservedCard] = list(observation.viewer_hand)
     for player in observation.public_state.players:
         visible_cards.extend(player.discard)
         visible_cards.extend(player.rows.close)
@@ -31,7 +58,9 @@ def visible_definitions(
     visible_cards.extend(weather.close)
     visible_cards.extend(weather.ranged)
     visible_cards.extend(weather.siege)
-    return {card.instance_id: card_registry.get(card.definition_id) for card in visible_cards}
+    for card in visible_cards:
+        definitions[card.instance_id] = card_registry.get(card.definition_id)
+    return definitions
 
 
 def filter_non_leave_actions(legal_actions: Sequence[GameAction]) -> tuple[GameAction, ...]:

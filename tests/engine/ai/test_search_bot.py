@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline.profile_catalog import DEFAULT_BASE_PROFILE
-from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.observations import (
+    ObservedCard,
+    ObservedDeckEntry,
+    ObservedLeader,
+    ObservedRows,
+    PlayerObservation,
+    PublicGameStateView,
+    PublicPlayerStateView,
+    build_player_observation,
+)
 from gwent_engine.ai.search import (
     DEFAULT_SEARCH_CONFIG,
     SearchBot,
@@ -14,16 +21,21 @@ from gwent_engine.ai.search import (
 )
 from gwent_engine.ai.search.depth_policy import should_search_opponent_reply
 from gwent_engine.ai.search.opponent_model import generate_opponent_reply_candidates
-from gwent_engine.ai.search.public_info import (
-    PUBLIC_INFO_HIDDEN_CARD_DEFINITION,
-    provision_search_registry,
-    redact_private_information,
-)
 from gwent_engine.ai.search.types import SearchResult
+from gwent_engine.ai.simulation import (
+    SIMULATION_HIDDEN_CARD_DEFINITION,
+    materialize_player_simulation,
+)
 from gwent_engine.cards import CardRegistry
-from gwent_engine.core import ChoiceSourceKind, Row, Zone
+from gwent_engine.core import ChoiceSourceKind, FactionId, GameStatus, Phase, Row
 from gwent_engine.core.actions import PassAction, PlayCardAction, ResolveChoiceAction
-from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
+from gwent_engine.core.ids import (
+    CardDefinitionId,
+    CardInstanceId,
+    GameId,
+    LeaderId,
+    PlayerId,
+)
 from gwent_engine.core.state import GameState
 
 from ..scenario_builder import card, rows, scenario
@@ -35,6 +47,15 @@ from ..support import (
     PLAYER_ONE_ID,
     PLAYER_TWO_ID,
 )
+
+
+def _simulate(state: GameState, *, viewer_player_id: PlayerId = PLAYER_ONE_ID):
+    observation = build_player_observation(state, viewer_player_id, LEADER_REGISTRY)
+    return materialize_player_simulation(
+        observation,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
 
 
 def test_search_engine_resolves_same_turn_medic_choice_in_principal_line() -> None:
@@ -91,24 +112,82 @@ def test_search_engine_resolves_same_turn_medic_choice_in_principal_line() -> No
     assert result.principal_line.reply_actions == ()
 
 
-def test_search_engine_falls_back_without_engine_state() -> None:
-    state = (
-        scenario("search_fallback_without_state")
-        .player(
-            "p1",
-            hand=[
-                card("p1_archer", "scoiatael_dol_blathanna_archer"),
-                card("p1_defender", "scoiatael_mahakaman_defender"),
-            ],
-        )
-        .build()
+def _manual_observation() -> PlayerObservation:
+    return PlayerObservation(
+        viewer_player_id=PLAYER_ONE_ID,
+        public_state=PublicGameStateView(
+            game_id=GameId("manual_observation"),
+            phase=Phase.IN_ROUND,
+            status=GameStatus.IN_PROGRESS,
+            current_player=PLAYER_ONE_ID,
+            starting_player=PLAYER_ONE_ID,
+            round_starter=PLAYER_ONE_ID,
+            round_number=1,
+            match_winner=None,
+            players=(
+                PublicPlayerStateView(
+                    player_id=PLAYER_ONE_ID,
+                    faction=FactionId.SCOIATAEL,
+                    leader=ObservedLeader(
+                        leader_id=LeaderId("scoiatael_francesca_the_beautiful"),
+                        used=False,
+                        disabled=False,
+                        horn_row=None,
+                    ),
+                    deck_count=1,
+                    hand_count=1,
+                    discard=(),
+                    rows=ObservedRows(),
+                    gems_remaining=2,
+                    round_wins=0,
+                    has_passed=False,
+                ),
+                PublicPlayerStateView(
+                    player_id=PLAYER_TWO_ID,
+                    faction=FactionId.NILFGAARD,
+                    leader=ObservedLeader(
+                        leader_id=LeaderId("nilfgaard_emhyr_the_white_flame"),
+                        used=False,
+                        disabled=False,
+                        horn_row=None,
+                    ),
+                    deck_count=2,
+                    hand_count=1,
+                    discard=(),
+                    rows=ObservedRows(),
+                    gems_remaining=2,
+                    round_wins=0,
+                    has_passed=False,
+                ),
+            ),
+            battlefield_weather=ObservedRows(),
+            pending_choice=None,
+        ),
+        viewer_hand=(
+            ObservedCard(
+                instance_id=CardInstanceId("viewer_archer"),
+                definition_id=CardDefinitionId("scoiatael_dol_blathanna_archer"),
+                owner=PLAYER_ONE_ID,
+            ),
+        ),
+        viewer_deck_composition=(
+            ObservedDeckEntry(
+                definition_id=CardDefinitionId("neutral_geralt"),
+                instance_ids=(CardInstanceId("viewer_deck_geralt"),),
+            ),
+        ),
+        visible_pending_choice=None,
     )
-    observation = replace(build_player_observation(state, PLAYER_ONE_ID), engine_state=None)
-    legal_actions = enumerate_legal_actions(
-        state,
-        player_id=PLAYER_ONE_ID,
-        card_registry=CARD_REGISTRY,
-        leader_registry=LEADER_REGISTRY,
+
+
+def test_search_engine_runs_from_observation_without_source_state() -> None:
+    observation = _manual_observation()
+    legal_actions = (
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=CardInstanceId("viewer_archer"),
+            target_row=Row.RANGED,
+        ),
     )
     engine = build_search_engine(
         config=DEFAULT_SEARCH_CONFIG,
@@ -123,9 +202,9 @@ def test_search_engine_falls_back_without_engine_state() -> None:
         leader_registry=LEADER_REGISTRY,
     )
 
-    assert result.used_fallback_policy is True
-    assert result.principal_line is None
-    assert "reason=missing_engine_state" in result.notes
+    assert result.used_fallback_policy is False
+    assert result.chosen_action == legal_actions[0]
+    assert result.principal_line is not None
 
 
 def test_search_bot_pending_choice_uses_search_line_when_state_is_present() -> None:
@@ -166,6 +245,57 @@ def test_search_bot_pending_choice_uses_search_line_when_state_is_present() -> N
 
     assert selected.player_id == PLAYER_ONE_ID
     assert selected.selected_card_instance_ids == (CardInstanceId("p1_spy_target"),)
+
+
+def test_search_bot_pending_choice_resolves_deck_targets_via_simulation() -> None:
+    legal_target_ids = (
+        CardInstanceId("p1_discard_recruit"),
+        CardInstanceId("p1_discard_archer"),
+        CardInstanceId("p1_pick_geralt"),
+        CardInstanceId("p1_skip_trebuchet"),
+    )
+    state = (
+        scenario("search_leader_pending_choice_deck_targets")
+        .player(
+            "p1",
+            faction="monsters",
+            leader_id=str(MONSTERS_DISCARD_AND_CHOOSE_LEADER_ID),
+            hand=[
+                card("p1_discard_recruit", "scoiatael_vrihedd_brigade_recruit"),
+                card("p1_discard_archer", "scoiatael_dol_blathanna_archer"),
+            ],
+            deck=[
+                card("p1_pick_geralt", "neutral_geralt"),
+                card("p1_skip_trebuchet", "northern_realms_trebuchet"),
+            ],
+        )
+        .leader_choice(
+            choice_id="leader_discard_and_choose_choice",
+            player_id="p1",
+            source_leader_id=str(MONSTERS_DISCARD_AND_CHOOSE_LEADER_ID),
+            legal_target_card_instance_ids=tuple(str(card_id) for card_id in legal_target_ids),
+            min_selections=3,
+            max_selections=3,
+        )
+        .build()
+    )
+    bot = SearchBot()
+
+    selected = bot.choose_pending_choice(
+        build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY),
+        enumerate_legal_actions(
+            state,
+            player_id=PLAYER_ONE_ID,
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert selected.player_id == PLAYER_ONE_ID
+    assert len(selected.selected_card_instance_ids) == 3
+    assert set(selected.selected_card_instance_ids) <= set(legal_target_ids)
 
 
 def test_search_engine_avoids_public_leader_reply_trap() -> None:
@@ -277,12 +407,13 @@ def test_generate_opponent_reply_candidates_adds_inferred_hidden_pressure() -> N
         .build()
     )
 
+    simulation = _simulate(state)
     candidates = generate_opponent_reply_candidates(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_ONE_ID,
         profile_definition=DEFAULT_BASE_PROFILE,
         config=DEFAULT_SEARCH_CONFIG,
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -313,14 +444,15 @@ def test_generate_opponent_reply_candidates_respect_hidden_pressure_config() -> 
         .build()
     )
 
+    simulation = _simulate(state)
     default_inferred = next(
         candidate
         for candidate in generate_opponent_reply_candidates(
-            state,
+            simulation.state,
             viewer_player_id=PLAYER_ONE_ID,
             profile_definition=DEFAULT_BASE_PROFILE,
             config=DEFAULT_SEARCH_CONFIG,
-            card_registry=CARD_REGISTRY,
+            card_registry=simulation.card_registry,
             leader_registry=LEADER_REGISTRY,
         )
         if candidate.reason == "inferred_hidden_hand_pressure"
@@ -328,14 +460,14 @@ def test_generate_opponent_reply_candidates_respect_hidden_pressure_config() -> 
     reduced_inferred = next(
         candidate
         for candidate in generate_opponent_reply_candidates(
-            state,
+            simulation.state,
             viewer_player_id=PLAYER_ONE_ID,
             profile_definition=DEFAULT_BASE_PROFILE,
             config=SearchConfig(
                 hidden_reply_unused_leader_bonus=0.0,
                 hidden_reply_hand_parity_bonus=0.0,
             ),
-            card_registry=CARD_REGISTRY,
+            card_registry=simulation.card_registry,
             leader_registry=LEADER_REGISTRY,
         )
         if candidate.reason == "inferred_hidden_hand_pressure"
@@ -444,12 +576,13 @@ def test_generate_opponent_reply_candidates_caps_pending_choice_replies() -> Non
         .build()
     )
 
+    simulation = _simulate(state, viewer_player_id=PLAYER_ONE_ID)
     candidates = generate_opponent_reply_candidates(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_TWO_ID,
         profile_definition=DEFAULT_BASE_PROFILE,
         config=SearchConfig(max_opponent_replies=1),
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -465,11 +598,12 @@ def test_reply_depth_policy_triggers_for_close_score_gap() -> None:
         .build()
     )
 
+    simulation = _simulate(state)
     decision = should_search_opponent_reply(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_ONE_ID,
         config=DEFAULT_SEARCH_CONFIG,
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -477,49 +611,7 @@ def test_reply_depth_policy_triggers_for_close_score_gap() -> None:
     assert decision.reason in {"close_score_gap", "opponent_hidden_pressure"}
 
 
-def test_redact_private_information_replaces_only_opponent_hidden_zones() -> None:
-    state = (
-        scenario("search_public_redaction")
-        .player(
-            "p1",
-            hand=[card("p1_known_archer", "scoiatael_dol_blathanna_archer")],
-            deck=[card("p1_known_deck", "northern_realms_trebuchet")],
-        )
-        .player(
-            "p2",
-            hand=[card("p2_hidden_hand", "neutral_geralt")],
-            deck=[card("p2_hidden_deck", "northern_realms_catapult")],
-            discard=[card("p2_public_discard", "scoiatael_mahakaman_defender")],
-            board=rows(ranged=[card("p2_public_board", "northern_realms_trebuchet")]),
-        )
-        .build()
-    )
-
-    redacted = redact_private_information(
-        state,
-        viewer_player_id=PLAYER_ONE_ID,
-    )
-
-    assert redacted.card(CardInstanceId("p1_known_archer")).definition_id == CardDefinitionId(
-        "scoiatael_dol_blathanna_archer"
-    )
-    assert redacted.card(CardInstanceId("p1_known_deck")).definition_id == CardDefinitionId(
-        "northern_realms_trebuchet"
-    )
-    assert redacted.card(CardInstanceId("p2_hidden_hand")).zone == Zone.HAND
-    assert redacted.card(CardInstanceId("p2_hidden_deck")).zone == Zone.DECK
-    assert redacted.card(CardInstanceId("p2_hidden_hand")).definition_id == (
-        redacted.card(CardInstanceId("p2_hidden_deck")).definition_id
-    )
-    assert redacted.card(CardInstanceId("p2_public_discard")).definition_id == (
-        CardDefinitionId("scoiatael_mahakaman_defender")
-    )
-    assert redacted.card(CardInstanceId("p2_public_board")).definition_id == (
-        CardDefinitionId("northern_realms_trebuchet")
-    )
-
-
-def test_search_works_without_incidental_catalog_placeholder() -> None:
+def test_search_materializes_without_incidental_catalog_placeholder() -> None:
     state = (
         scenario("search_custom_registry")
         .player(
@@ -538,14 +630,16 @@ def test_search_works_without_incidental_catalog_placeholder() -> None:
         for definition in CARD_REGISTRY
         if definition.definition_id != CardDefinitionId("scoiatael_mahakaman_defender")
     )
-    provisioned_registry = provision_search_registry(custom_registry)
-
-    redacted = redact_private_information(state, viewer_player_id=PLAYER_ONE_ID)
     observation = build_player_observation(state, PLAYER_ONE_ID)
+    simulation = materialize_player_simulation(
+        observation,
+        card_registry=custom_registry,
+        leader_registry=LEADER_REGISTRY,
+    )
     legal_actions = enumerate_legal_actions(
         state,
         player_id=PLAYER_ONE_ID,
-        card_registry=provisioned_registry,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )
     engine = build_search_engine(
@@ -561,8 +655,9 @@ def test_search_works_without_incidental_catalog_placeholder() -> None:
         leader_registry=LEADER_REGISTRY,
     )
 
-    assert redacted.card(CardInstanceId("p2_hidden_unit")).definition_id == (
-        PUBLIC_INFO_HIDDEN_CARD_DEFINITION.definition_id
+    assert SIMULATION_HIDDEN_CARD_DEFINITION.definition_id in simulation.card_registry
+    assert simulation.state.card(CardInstanceId("opponent_hidden_hand_001")).definition_id == (
+        SIMULATION_HIDDEN_CARD_DEFINITION.definition_id
     )
     assert result.used_fallback_policy is False
 
@@ -668,12 +763,13 @@ def test_generate_opponent_reply_candidates_do_not_exact_search_hidden_pending_c
         .build()
     )
 
+    simulation = _simulate(state, viewer_player_id=PLAYER_TWO_ID)
     candidates = generate_opponent_reply_candidates(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_ONE_ID,
         profile_definition=DEFAULT_BASE_PROFILE,
         config=DEFAULT_SEARCH_CONFIG,
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -709,20 +805,21 @@ def test_generate_opponent_reply_candidates_respect_hidden_pending_choice_bonus(
         .build()
     )
 
+    simulation = _simulate(state, viewer_player_id=PLAYER_TWO_ID)
     default_inferred = generate_opponent_reply_candidates(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_ONE_ID,
         profile_definition=DEFAULT_BASE_PROFILE,
         config=DEFAULT_SEARCH_CONFIG,
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )[0]
     boosted_inferred = generate_opponent_reply_candidates(
-        state,
+        simulation.state,
         viewer_player_id=PLAYER_ONE_ID,
         profile_definition=DEFAULT_BASE_PROFILE,
         config=SearchConfig(hidden_pending_choice_bonus=9.0),
-        card_registry=CARD_REGISTRY,
+        card_registry=simulation.card_registry,
         leader_registry=LEADER_REGISTRY,
     )[0]
 

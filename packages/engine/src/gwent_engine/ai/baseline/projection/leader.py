@@ -18,7 +18,11 @@ from gwent_engine.ai.baseline.projection.resolver_context import (
     ProjectionResolverContext,
 )
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.utils import is_non_hero_unit
+from gwent_engine.ai.utils import (
+    is_non_hero_unit,
+    viewer_deck_count,
+    viewer_deck_definitions,
+)
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, LeaderAbilityKind, Row
 from gwent_engine.core.actions import UseLeaderAbilityAction
@@ -166,10 +170,10 @@ class LeaderProjectionResolver(ProjectionResolverContext):
     def _project_discard_and_choose_from_deck(self) -> LeaderActionProjection:
         assert self.leader_definition is not None
         hand_cards = self.observation.viewer_hand
-        deck_cards = self.observation.viewer_deck
+        deck_count = viewer_deck_count(self.observation)
         if (
             len(hand_cards) < self.leader_definition.hand_discard_count
-            or len(deck_cards) < self.leader_definition.deck_pick_count
+            or deck_count < self.leader_definition.deck_pick_count
         ):
             return self._noop(ability_kind=LeaderAbilityKind.DISCARD_AND_CHOOSE_FROM_DECK)
 
@@ -184,11 +188,14 @@ class LeaderProjectionResolver(ProjectionResolverContext):
         pick_values = sorted(
             (
                 projected_future_card_value(
-                    self.card_registry.get(card.definition_id),
+                    definition,
                     observation=self.observation,
                     card_registry=self.card_registry,
                 )
-                for card in deck_cards
+                for definition in viewer_deck_definitions(
+                    self.observation,
+                    self.card_registry,
+                )
             ),
             reverse=True,
         )
@@ -205,7 +212,7 @@ class LeaderProjectionResolver(ProjectionResolverContext):
             is_noop=False,
             minimum_row_total=None,
             opponent_row_total=None,
-            live_targets=len(hand_cards) + len(deck_cards),
+            live_targets=len(hand_cards) + deck_count,
         )
 
     def _project_return_card_from_own_discard_to_hand(self) -> LeaderActionProjection:
@@ -435,16 +442,16 @@ class LeaderProjectionResolver(ProjectionResolverContext):
         if self.leader_definition is None:
             return None
         if self.action.target_card_instance_id is not None:
-            chosen_card = next(
+            chosen_definition_id = next(
                 (
-                    card
-                    for card in self.observation.viewer_deck
-                    if card.instance_id == self.action.target_card_instance_id
+                    entry.definition_id
+                    for entry in self.observation.viewer_deck_composition
+                    if self.action.target_card_instance_id in entry.instance_ids
                 ),
                 None,
             )
-            if chosen_card is not None:
-                definition = self.card_registry.get(chosen_card.definition_id)
+            if chosen_definition_id is not None:
+                definition = self.card_registry.get(chosen_definition_id)
                 if definition.card_type == CardType.SPECIAL:
                     return special_ability_kind(definition)
         weather_ability_kind = self.leader_definition.weather_ability_kind

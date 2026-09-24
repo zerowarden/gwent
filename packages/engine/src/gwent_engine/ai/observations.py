@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from gwent_shared.extract import stringify_optional
 
@@ -102,18 +102,31 @@ class PublicGameStateView:
 
 
 @dataclass(frozen=True, slots=True)
+class ObservedDeckEntry:
+    """Canonicalized known composition of the viewer's remaining deck.
+
+    Entries group the viewer's own deck cards by definition so equality and
+    serialization never depend on the authoritative deck tuple order. Instance
+    ids stay available for resolving actions that legally target the viewer's
+    own deck (leader picks and discard-and-choose selections), but their
+    ordering carries no draw-order meaning.
+    """
+
+    definition_id: CardDefinitionId
+    instance_ids: tuple[CardInstanceId, ...]
+
+    @property
+    def count(self) -> int:
+        return len(self.instance_ids)
+
+
+@dataclass(frozen=True, slots=True)
 class PlayerObservation:
     viewer_player_id: PlayerId
     public_state: PublicGameStateView
     viewer_hand: tuple[ObservedCard, ...]
-    viewer_deck: tuple[ObservedCard, ...]
+    viewer_deck_composition: tuple[ObservedDeckEntry, ...]
     visible_pending_choice: VisiblePendingChoiceView | None
-    engine_state: GameState | None = field(
-        default=None,
-        repr=False,
-        compare=False,
-        hash=False,
-    )
 
 
 def build_public_game_view(
@@ -148,13 +161,8 @@ def build_player_observation(
         viewer_player_id=viewer_player_id,
         public_state=build_public_game_view(state, leader_registry),
         viewer_hand=tuple(_observe_card(state, card_id) for card_id in viewer.hand),
-        viewer_deck=tuple(_observe_card(state, card_id) for card_id in viewer.deck),
+        viewer_deck_composition=_build_deck_composition(state, viewer),
         visible_pending_choice=_build_visible_pending_choice_view(state, viewer_player_id),
-        # Internal hook for search-style agents. This is intentionally omitted
-        # from the public dict export surface so other consumers continue to
-        # treat `PlayerObservation` as an observation object rather than a
-        # serialized engine state carrier.
-        engine_state=state,
     )
 
 
@@ -187,10 +195,19 @@ def player_observation_to_dict(observation: PlayerObservation) -> dict[str, obje
         "viewer_player_id": str(observation.viewer_player_id),
         "public_state": public_game_view_to_dict(observation.public_state),
         "viewer_hand": [observed_card_to_dict(card) for card in observation.viewer_hand],
-        "viewer_deck": [observed_card_to_dict(card) for card in observation.viewer_deck],
+        "viewer_deck_composition": [
+            observed_deck_entry_to_dict(entry) for entry in observation.viewer_deck_composition
+        ],
         "visible_pending_choice": _visible_pending_choice_to_dict(
             observation.visible_pending_choice
         ),
+    }
+
+
+def observed_deck_entry_to_dict(entry: ObservedDeckEntry) -> dict[str, object]:
+    return {
+        "definition_id": str(entry.definition_id),
+        "count": entry.count,
     }
 
 
@@ -286,6 +303,23 @@ def _observe_cards(
     card_ids: tuple[CardInstanceId, ...],
 ) -> tuple[ObservedCard, ...]:
     return tuple(_observe_card(state, card_id) for card_id in card_ids)
+
+
+def _build_deck_composition(
+    state: GameState,
+    viewer: PlayerState,
+) -> tuple[ObservedDeckEntry, ...]:
+    grouped: dict[CardDefinitionId, list[CardInstanceId]] = {}
+    for card_id in viewer.deck:
+        definition_id = state.card(card_id).definition_id
+        grouped.setdefault(definition_id, []).append(card_id)
+    return tuple(
+        ObservedDeckEntry(
+            definition_id=definition_id,
+            instance_ids=tuple(sorted(grouped[definition_id], key=str)),
+        )
+        for definition_id in sorted(grouped, key=str)
+    )
 
 
 def _build_observed_leader(
