@@ -14,15 +14,11 @@ from gwent_evaluation import (
     SpecError,
     SuitePurpose,
     SuiteSpec,
-    load_agent_spec,
-    load_suite_spec,
+    load_agent_catalog,
+    load_suite_catalog,
     parse_agent_spec,
     parse_suite_spec,
 )
-
-FIXTURES = Path(__file__).parent / "fixtures" / "specs"
-AGENTS_DIR = FIXTURES / "agents"
-VALID_SUITE_PATH = FIXTURES / "suites" / "smoke-valid.json"
 
 
 def _stub_resolver(reference: str) -> AgentSpec:
@@ -32,13 +28,23 @@ def _stub_resolver(reference: str) -> AgentSpec:
     )
 
 
+def _agent_payload(agent_id: str = "random", **overrides: object) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "schema_version": SUPPORTED_SCHEMA_VERSION,
+        "agent_id": agent_id,
+        "family": "random",
+    }
+    payload.update(overrides)
+    return payload
+
+
 def _suite_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
         "schema_version": SUPPORTED_SCHEMA_VERSION,
         "suite_id": "smoke-v1",
         "purpose": "smoke",
-        "candidate": "../agents/heuristic-neutral.json",
-        "opponents": ["../agents/random.json", "../agents/greedy.json"],
+        "candidate": "heuristic-neutral",
+        "opponents": ["random", "greedy"],
         "deck_pairs": [["monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"]],
         "seeds": [3, 11],
         "scheduling": "balanced",
@@ -49,18 +55,21 @@ def _suite_payload(**overrides: object) -> dict[str, object]:
 
 
 def _parse_suite(payload: object, *, resolve_agent: AgentResolver = _stub_resolver) -> SuiteSpec:
-    return parse_suite_spec(payload, resolve_agent=resolve_agent, context="suite.json")
+    return parse_suite_spec(payload, resolve_agent=resolve_agent, context="suite catalog entry")
 
 
-def test_load_valid_suite_resolves_relative_agent_references() -> None:
-    suite = load_suite_spec(VALID_SUITE_PATH)
+def _write_json(path: Path, payload: object) -> Path:
+    _ = path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_parse_suite_resolves_catalog_agent_ids() -> None:
+    suite = _parse_suite(_suite_payload())
 
     assert suite.schema_version == SUPPORTED_SCHEMA_VERSION
     assert suite.suite_id == "smoke-v1"
     assert suite.purpose is SuitePurpose.SMOKE
-    assert suite.candidate == load_agent_spec(AGENTS_DIR / "heuristic-neutral.json")
-    assert suite.candidate.family is BotFamily.HEURISTIC
-    assert suite.candidate.profile == "neutral"
+    assert suite.candidate.agent_id == "heuristic-neutral"
     assert [agent.agent_id for agent in suite.opponents] == ["random", "greedy"]
     assert suite.deck_pairs == (
         ("monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"),
@@ -69,6 +78,58 @@ def test_load_valid_suite_resolves_relative_agent_references() -> None:
     assert suite.scheduling is SchedulingPolicy.BALANCED
     assert suite.action_budget == 512
     assert suite.observation_contract_version == OBSERVATION_CONTRACT_VERSION
+
+
+def test_agent_catalog_loads_entries_and_rejects_duplicate_ids(tmp_path: Path) -> None:
+    agents_path = _write_json(
+        tmp_path / "agents.json",
+        {
+            "schema_version": 1,
+            "agents": [
+                _agent_payload("greedy", family="greedy"),
+                _agent_payload("heuristic-neutral", family="heuristic", profile="neutral"),
+            ],
+        },
+    )
+
+    catalog = load_agent_catalog(agents_path)
+
+    assert set(catalog) == {"greedy", "heuristic-neutral"}
+    assert catalog["heuristic-neutral"].family is BotFamily.HEURISTIC
+    assert catalog["heuristic-neutral"].profile == "neutral"
+
+    duplicate_path = _write_json(
+        tmp_path / "duplicates.json",
+        {"schema_version": 1, "agents": [_agent_payload("greedy"), _agent_payload("greedy")]},
+    )
+    with pytest.raises(SpecError, match="duplicate agent id"):
+        _ = load_agent_catalog(duplicate_path)
+
+
+def test_suite_catalog_resolves_agent_ids_and_rejects_unknown_ids(tmp_path: Path) -> None:
+    agents_path = _write_json(
+        tmp_path / "agents.json",
+        {"schema_version": 1, "agents": [_agent_payload()]},
+    )
+    agents = load_agent_catalog(agents_path)
+    suites_path = _write_json(
+        tmp_path / "suites.json",
+        {
+            "schema_version": 1,
+            "suites": [_suite_payload(candidate="random", opponents=["random"])],
+        },
+    )
+
+    catalog = load_suite_catalog(suites_path, agents=agents)
+
+    assert catalog["smoke-v1"].candidate.agent_id == "random"
+
+    missing_path = _write_json(
+        tmp_path / "missing.json",
+        {"schema_version": 1, "suites": [_suite_payload(candidate="missing")]},
+    )
+    with pytest.raises(SpecError, match="cannot resolve agent reference"):
+        _ = load_suite_catalog(missing_path, agents=agents)
 
 
 @pytest.mark.parametrize("profile_id", ["does-not-exist", "tempo", "baseline", "aggro"])
@@ -96,7 +157,7 @@ def test_rejects_unrecognized_profile_ids(profile_id: str) -> None:
         ("seeds", []),
         ("seeds", [3, 3]),
         ("opponents", []),
-        ("opponents", ["a.json", "a.json"]),
+        ("opponents", ["random", "random"]),
         ("deck_pairs", []),
         ("deck_pairs", [["only-one"]]),
         ("deck_pairs", [["a", "b"], ["a", "b"]]),
@@ -154,30 +215,23 @@ def test_rejects_unsupported_agent_schema_version() -> None:
 
 
 def test_rejects_non_finite_json_constant(tmp_path: Path) -> None:
-    path = tmp_path / "suite.json"
-    _ = path.write_text('{"schema_version": 1, "seeds": [NaN]}', encoding="utf-8")
+    path = tmp_path / "agents.json"
+    _ = path.write_text(
+        '{"schema_version": 1, "agents": [{"schema_version": 1, "agent_id": "a", '
+        + '"family": "random"}], "extra": NaN}',
+        encoding="utf-8",
+    )
 
     with pytest.raises(SpecError, match="non-finite"):
-        _ = load_suite_spec(path)
+        _ = load_agent_catalog(path)
 
 
 def test_rejects_duplicate_json_keys(tmp_path: Path) -> None:
-    path = tmp_path / "agent.json"
+    path = tmp_path / "agents.json"
     _ = path.write_text(
-        '{"schema_version": 1, "agent_id": "a", "agent_id": "b", "family": "random"}',
+        '{"schema_version": 1, "agents": [], "agents": []}',
         encoding="utf-8",
     )
 
     with pytest.raises(SpecError, match="duplicate key"):
-        _ = load_agent_spec(path)
-
-
-def test_rejects_unresolvable_agent_reference(tmp_path: Path) -> None:
-    suite_path = tmp_path / "suite.json"
-    _ = suite_path.write_text(
-        json.dumps(_suite_payload(candidate="missing.json")),
-        encoding="utf-8",
-    )
-
-    with pytest.raises(SpecError, match="cannot resolve agent reference"):
-        _ = load_suite_spec(suite_path)
+        _ = load_agent_catalog(path)

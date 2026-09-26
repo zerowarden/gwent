@@ -4,7 +4,7 @@ RUFF := uv run ruff
 MYPY := uv run mypy
 BASEDPYRIGHT := uv run basedpyright
 
-.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play service service-sqlite
+.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play ai-eval-smoke ai-eval-core service service-sqlite
 
 ## Sync workspace environment
 sync:
@@ -62,7 +62,7 @@ pytest: test
 ## Run full unit test suite with coverage
 test\:cov:
 	@mkdir -p .cache/coverage
-	$(PYTEST) --cov=gwent_engine --cov=gwent_service --cov=gwent_shared --cov-report=term-missing --cov-report=xml
+	$(PYTEST) --cov=gwent_engine --cov=gwent_evaluation --cov=gwent_service --cov=gwent_shared --cov-report=term-missing --cov-report=xml
 
 ## Run ruff checks
 ruff:
@@ -76,7 +76,7 @@ fix:
 
 ## Run mypy
 mypy:
-	$(MYPY) packages/engine/src/gwent_engine packages/service/src/gwent_service packages/shared/src/gwent_shared
+	$(MYPY) packages/engine/src/gwent_engine packages/evaluation/src/gwent_evaluation packages/service/src/gwent_service packages/shared/src/gwent_shared
 
 ## Run basedpyright
 basedpyright:
@@ -88,6 +88,14 @@ check: test ruff mypy basedpyright
 ## Run interactive AI match. Set AI_PLAY=default for fixed reference run
 ai-play:
 	$(PYTHON) -m gwent_engine.cli.main --mode bot-match
+
+## Run the smoke evaluation suite into .output/experiments
+ai-eval-smoke:
+	$(PYTHON) -m gwent_evaluation run --suite smoke-v1
+
+## Run the core optimization benchmark suite
+ai-eval-core:
+	$(PYTHON) -m gwent_evaluation run --suite core-optimize-v1
 
 ## Run HTTP service
 service:

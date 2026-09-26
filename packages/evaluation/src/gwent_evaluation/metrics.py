@@ -250,14 +250,7 @@ def bootstrap_interval(
     """Percentile bootstrap over independent block means."""
 
     if len(units) < config.minimum_blocks:
-        return ScoreInterval(
-            method=IntervalMethod.INSUFFICIENT_SAMPLE,
-            confidence_level=config.confidence_level,
-            lower=None,
-            upper=None,
-            blocks=len(units),
-            resamples=None,
-        )
+        return insufficient_sample_interval(blocks=len(units), config=config)
     rng = random.Random(config.seed)
     size = len(units)
     resampled = sorted(fsum(rng.choices(units, k=size)) / size for _ in range(config.resamples))

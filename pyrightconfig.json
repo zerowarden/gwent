@@ -5,6 +5,7 @@
       "root": ".",
       "extraPaths": [
         "packages/engine/src",
+        "packages/evaluation/src",
         "packages/service/src",
         "packages/shared/src"
       ]

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "agents": [
+    {
+      "schema_version": 1,
+      "agent_id": "random",
+      "family": "random"
+    },
+    {
+      "schema_version": 1,
+      "agent_id": "greedy",
+      "family": "greedy"
+    },
+    {
+      "schema_version": 1,
+      "agent_id": "heuristic-neutral",
+      "family": "heuristic",
+      "profile": "neutral"
+    },
+    {
+      "schema_version": 1,
+      "agent_id": "heuristic-conservative",
+      "family": "heuristic",
+      "profile": "conservative"
+    },
+    {
+      "schema_version": 1,
+      "agent_id": "heuristic-aggressive",
+      "family": "heuristic",
+      "profile": "aggressive"
+    },
+    {
+      "schema_version": 1,
+      "agent_id": "search-neutral",
+      "family": "search",
+      "profile": "neutral"
+    }
+  ]
+}

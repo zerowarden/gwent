@@ -9,3 +9,4 @@ tests/coverage.xml
 .venv
 wheels/
 docs/
+*.coverage

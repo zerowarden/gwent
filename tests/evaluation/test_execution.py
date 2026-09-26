@@ -26,12 +26,10 @@ from gwent_evaluation import execution as execution_module
 
 from tests.engine.ai.bots import ThrowingBot
 from tests.evaluation.support import (
-    DECK_A,
-    DECK_B,
-    execute_suite,
+    evaluation_suite,
+    execute_evaluation_suite,
     greedy_agent,
     read_json_object,
-    suite_spec,
     write_json_object,
 )
 
@@ -41,12 +39,7 @@ def _suite(
     candidate: AgentSpec | None = None,
     opponents: tuple[AgentSpec, ...] | None = None,
 ) -> SuiteSpec:
-    return suite_spec(
-        suite_id="execution-test",
-        candidate=candidate,
-        opponents=opponents,
-        deck_pairs=((DECK_A, DECK_B),),
-    )
+    return evaluation_suite("execution-test", candidate=candidate, opponents=opponents)
 
 
 def _execute(
@@ -56,7 +49,7 @@ def _execute(
     run_id: str = "run",
     evidence_policy: EvidencePolicy = EvidencePolicy.FAILURES,
 ) -> RunExecution:
-    return execute_suite(
+    return execute_evaluation_suite(
         output_root,
         suite=suite or _suite(),
         run_id=run_id,

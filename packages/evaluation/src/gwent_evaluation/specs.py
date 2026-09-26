@@ -45,22 +45,59 @@ _SUITE_SPEC_FIELDS = frozenset(
         "action_budget",
     }
 )
+_AGENT_CATALOG_FIELDS = frozenset({"schema_version", "agents"})
+_SUITE_CATALOG_FIELDS = frozenset({"schema_version", "suites"})
 
 
 class SpecError(ValueError):
     """Raised when an evaluation spec document is malformed or unsupported."""
 
 
-def load_agent_spec(path: Path) -> AgentSpec:
-    return parse_agent_spec(_load_document(path), context=str(path))
+def load_agent_catalog(path: Path) -> dict[str, AgentSpec]:
+    """Load all named benchmark participants from one catalog document."""
+
+    document = _load_document(path)
+    _reject_unknown_fields(document, _AGENT_CATALOG_FIELDS, context=str(path))
+    _ = _require_schema_version(document, context=str(path))
+    catalog: dict[str, AgentSpec] = {}
+    for index, entry in enumerate(
+        require_sequence_field(document, "agents", context=str(path), error_factory=SpecError)
+    ):
+        spec = parse_agent_spec(entry, context=f"{path}.agents[{index}]")
+        if spec.agent_id in catalog:
+            raise SpecError(f"{path} contains duplicate agent id {spec.agent_id!r}.")
+        catalog[spec.agent_id] = spec
+    if not catalog:
+        raise SpecError(f"{path} must declare at least one agent.")
+    return catalog
 
 
-def load_suite_spec(path: Path) -> SuiteSpec:
-    return parse_suite_spec(
-        _load_document(path),
-        resolve_agent=_relative_agent_resolver(path.parent),
-        context=str(path),
-    )
+def load_suite_catalog(
+    path: Path,
+    *,
+    agents: Mapping[str, AgentSpec],
+) -> dict[str, SuiteSpec]:
+    """Load all suites from one catalog, resolving agents by catalog id."""
+
+    document = _load_document(path)
+    _reject_unknown_fields(document, _SUITE_CATALOG_FIELDS, context=str(path))
+    _ = _require_schema_version(document, context=str(path))
+    resolve_agent = _catalog_agent_resolver(agents)
+    catalog: dict[str, SuiteSpec] = {}
+    for index, entry in enumerate(
+        require_sequence_field(document, "suites", context=str(path), error_factory=SpecError)
+    ):
+        suite = parse_suite_spec(
+            entry,
+            resolve_agent=resolve_agent,
+            context=f"{path}.suites[{index}]",
+        )
+        if suite.suite_id in catalog:
+            raise SpecError(f"{path} contains duplicate suite id {suite.suite_id!r}.")
+        catalog[suite.suite_id] = suite
+    if not catalog:
+        raise SpecError(f"{path} must declare at least one suite.")
+    return catalog
 
 
 def parse_agent_spec(payload: object, *, context: str = "<agent spec>") -> AgentSpec:
@@ -117,9 +154,12 @@ def _load_document(path: Path) -> Mapping[str, object]:
     return load_json_mapping(text, context=str(path), error_factory=SpecError)
 
 
-def _relative_agent_resolver(base_dir: Path) -> AgentResolver:
-    def resolve(reference: str) -> AgentSpec:
-        return load_agent_spec(base_dir / reference)
+def _catalog_agent_resolver(agents: Mapping[str, AgentSpec]) -> AgentResolver:
+    def resolve(agent_id: str) -> AgentSpec:
+        try:
+            return agents[agent_id]
+        except KeyError as error:
+            raise SpecError(f"Unknown agent id: {agent_id!r}.") from error
 
     return resolve
 

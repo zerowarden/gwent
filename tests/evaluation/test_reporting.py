@@ -11,7 +11,6 @@ from gwent_evaluation import (
     AgentSpec,
     BootstrapConfig,
     CorruptRecordError,
-    EvidencePolicy,
     IntervalMethod,
     LoadedRun,
     ReportError,
@@ -31,12 +30,12 @@ from tests.engine.ai.bots import ThrowingBot
 from tests.evaluation.support import (
     DECK_A,
     DECK_B,
-    execute_suite,
+    evaluation_suite,
+    execute_evaluation_suite,
     greedy_agent,
     heuristic_agent,
     int_field,
     read_json_object,
-    suite_spec,
     write_json_object,
 )
 
@@ -48,8 +47,8 @@ def _suite(
     seeds: tuple[int, ...] = (3,),
     deck_pairs: tuple[tuple[str, str], ...] = ((DECK_A, DECK_B),),
 ) -> SuiteSpec:
-    return suite_spec(
-        suite_id=suite_id,
+    return evaluation_suite(
+        suite_id,
         candidate=candidate,
         seeds=seeds,
         deck_pairs=deck_pairs,
@@ -62,12 +61,7 @@ def _execute(
     suite: SuiteSpec | None = None,
     run_id: str = "run",
 ) -> RunExecution:
-    return execute_suite(
-        output_root,
-        suite=suite or _suite(),
-        run_id=run_id,
-        evidence_policy=EvidencePolicy.FAILURES,
-    )
+    return execute_evaluation_suite(output_root, suite=suite or _suite(), run_id=run_id)
 
 
 def test_execute_run_writes_json_and_markdown_reports(tmp_path: Path) -> None:

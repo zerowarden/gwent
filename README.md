@@ -55,6 +55,21 @@ Run an interactive AI match:
 make ai-play
 ```
 
+## Evaluation
+
+Run reproducible agent benchmarks:
+
+```bash
+uv run python -m gwent_evaluation run --suite smoke-v1
+uv run python -m gwent_evaluation report .output/experiments/<run-id>
+uv run python -m gwent_evaluation replay .output/experiments/<run-id> --case <case-id>
+uv run python -m gwent_evaluation compare <reference-run> <candidate-run>
+```
+
+`make ai-eval-smoke` and `make ai-eval-core` wrap the smoke and core suites.
+Benchmark inputs and suite partitions are documented in
+[experiments/README.md](experiments/README.md).
+
 Run the HTTP service:
 
 ```bash
@@ -74,3 +89,5 @@ make service-sqlite
 `service`: HTTP service, match lifecycles, player identity mappings, persistence, transports
 
 `shared`: low-level helpers that can be shared across modules
+
+`evaluation`: reproducible suite/spec definitions, match execution, and reports for AI evaluation

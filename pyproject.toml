@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Workspace for the Witcher 3 Gwent engine and service"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = ["gwent-engine", "gwent-service", "gwent-shared"]
+dependencies = ["gwent-engine", "gwent-evaluation", "gwent-service", "gwent-shared"]
 
 [dependency-groups]
 dev = [
@@ -25,10 +25,11 @@ dev = [
 default-groups = ["dev"]
 
 [tool.uv.workspace]
-members = ["packages/engine", "packages/service", "packages/shared"]
+members = ["packages/engine", "packages/evaluation", "packages/service", "packages/shared"]
 
 [tool.uv.sources]
 gwent-engine = { workspace = true }
+gwent-evaluation = { workspace = true }
 gwent-service = { workspace = true }
 gwent-shared = { workspace = true }
 
@@ -38,11 +39,12 @@ packages = []
 [tool.pytest.ini_options]
 addopts = "-ra"
 cache_dir = ".cache/pytest"
+pythonpath = ["."]
 testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true
-source = ["gwent_engine", "gwent_service", "gwent_shared"]
+source = ["gwent_engine", "gwent_evaluation", "gwent_service", "gwent_shared"]
 data_file = ".cache/coverage/.coverage"
 
 [tool.coverage.xml]
@@ -64,7 +66,7 @@ select = ["B", "E", "F", "I", "N", "RUF", "UP"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["gwent_engine", "gwent_service", "gwent_shared"]
+packages = ["gwent_engine", "gwent_evaluation", "gwent_service", "gwent_shared"]
 cache_dir = ".cache/mypy"
 
 [[tool.mypy.overrides]]

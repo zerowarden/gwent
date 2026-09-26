@@ -1,26 +1,23 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 from gwent_evaluation import (
     AgentSpec,
+    BotFamily,
     ScheduleError,
     SeedNamespace,
     SuiteSpec,
     derive_seed,
-    load_suite_spec,
     schedule_suite,
 )
 
 from tests.evaluation.support import (
     DECK_A,
     DECK_B,
+    agent_spec,
     heuristic_agent,
     suite_spec,
 )
-
-VALID_SUITE_PATH = Path(__file__).parent / "fixtures" / "specs" / "suites" / "smoke-valid.json"
 
 
 def _agent(agent_id: str, *, profile: str | None = "neutral") -> AgentSpec:
@@ -121,8 +118,12 @@ def test_seed_namespaces_are_independent() -> None:
     )
 
 
-def test_smoke_fixture_schedules_balanced_legs() -> None:
-    suite = load_suite_spec(VALID_SUITE_PATH)
+def test_smoke_shaped_suite_schedules_balanced_legs() -> None:
+    opponents = (
+        agent_spec("random", family=BotFamily.RANDOM),
+        agent_spec("greedy", family=BotFamily.GREEDY),
+    )
+    suite = _suite(opponents=opponents, seeds=(3, 11))
 
     matches = schedule_suite(suite)
 

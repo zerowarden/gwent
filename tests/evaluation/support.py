@@ -175,6 +175,39 @@ def execute_suite(
     )
 
 
+def evaluation_suite(
+    suite_id: str,
+    *,
+    candidate: AgentSpec | None = None,
+    opponents: tuple[AgentSpec, ...] | None = None,
+    deck_pairs: tuple[tuple[str, str], ...] = ((DECK_A, DECK_B),),
+    seeds: tuple[int, ...] = (3,),
+) -> SuiteSpec:
+    return suite_spec(
+        suite_id=suite_id,
+        candidate=candidate,
+        opponents=opponents,
+        deck_pairs=deck_pairs,
+        seeds=seeds,
+    )
+
+
+def execute_evaluation_suite(
+    output_root: Path,
+    *,
+    suite: SuiteSpec | None = None,
+    suite_id: str = "evaluation-test",
+    run_id: str = "run",
+    evidence_policy: EvidencePolicy = EvidencePolicy.FAILURES,
+) -> RunExecution:
+    return execute_suite(
+        output_root,
+        suite=suite or suite_spec(suite_id=suite_id),
+        run_id=run_id,
+        evidence_policy=evidence_policy,
+    )
+
+
 def read_json_object(path: Path) -> Mapping[str, object]:
     payload = cast(object, json.loads(path.read_text(encoding="utf-8")))
     return expect_mapping(payload, context=str(path), error_factory=ValueError)

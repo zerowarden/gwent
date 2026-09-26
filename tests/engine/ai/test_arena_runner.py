@@ -17,7 +17,6 @@ from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.errors import GwentEngineError
 from gwent_engine.core.ids import GameId, LeaderId
 from gwent_engine.core.randomness import SeededRandom
-from gwent_engine.decks import load_sample_decks
 
 from tests.engine.ai.bots import (
     CountingBot,
@@ -27,18 +26,13 @@ from tests.engine.ai.bots import (
 )
 from tests.engine.support import (
     CARD_REGISTRY,
-    DATA_DIR,
     LEADER_REGISTRY,
     PLAYER_ONE_ID,
+    sample_deck_map,
 )
 
 _STARTING_DECK_IDS = ("monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict")
 _DESTROYER_LEADER_ID = LeaderId("monsters_eredin_destroyer_of_worlds")
-
-
-def _sample_decks() -> dict[str, DeckDefinition]:
-    decks = load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
-    return {str(deck.deck_id): deck for deck in decks}
 
 
 def _execute(
@@ -50,7 +44,7 @@ def _execute(
     action_budget: int = 512,
     seed: int = 7,
 ) -> MatchExecution:
-    decks = _sample_decks()
+    decks = sample_deck_map()
     return execute_match(
         game_id=GameId("arena_runner_test"),
         player_one_bot=player_one_bot or create_bot("heuristic", bot_id="p1_bot"),
@@ -68,7 +62,7 @@ def _execute(
 
 def _leader_deck() -> DeckDefinition:
     return replace(
-        _sample_decks()["monsters_muster_swarm_strict"],
+        sample_deck_map()["monsters_muster_swarm_strict"],
         leader_id=_DESTROYER_LEADER_ID,
     )
 

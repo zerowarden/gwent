@@ -88,8 +88,8 @@ from gwent_evaluation.schedule import (
 from gwent_evaluation.specs import (
     AgentResolver,
     SpecError,
-    load_agent_spec,
-    load_suite_spec,
+    load_agent_catalog,
+    load_suite_catalog,
     parse_agent_spec,
     parse_suite_spec,
 )
@@ -162,9 +162,9 @@ __all__ = [
     "compute_run_metrics",
     "derive_seed",
     "execute_run",
-    "load_agent_spec",
+    "load_agent_catalog",
     "load_run",
-    "load_suite_spec",
+    "load_suite_catalog",
     "parse_agent_spec",
     "parse_suite_spec",
     "persist_run_report",

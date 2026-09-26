@@ -3,14 +3,12 @@ from gwent_engine.ai.arena import create_bot, execute_match
 from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.ids import GameId, PlayerId
 from gwent_engine.core.randomness import SeededRandom
-from gwent_engine.decks import load_sample_decks
 
-from tests.engine.support import CARD_REGISTRY, DATA_DIR, LEADER_REGISTRY
+from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY, sample_deck_map
 
 
 def test_execute_match_completes_seeded_game() -> None:
-    decks = load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
-    deck_by_id = {str(deck.deck_id): deck for deck in decks}
+    deck_by_id = sample_deck_map()
 
     execution = execute_match(
         game_id=GameId("arena_test_game"),
@@ -80,39 +78,8 @@ def test_create_bot_rejects_unknown_family() -> None:
         _ = create_bot("mystery", bot_id="bot")
 
 
-def test_heuristic_bot_outperforms_random_in_seeded_series() -> None:
-    decks = load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
-    deck_by_id = {str(deck.deck_id): deck for deck in decks}
-
-    heuristic_points = 0.0
-    random_points = 0.0
-    for seed in (3, 11, 29, 41):
-        execution = execute_match(
-            game_id=GameId(f"heuristic_vs_random_{seed}"),
-            player_one_bot=create_bot("heuristic", bot_id=f"heuristic_{seed}"),
-            player_two_bot=create_bot("random", bot_id=f"random_{seed}", seed=seed),
-            player_one_deck=deck_by_id["monsters_muster_swarm_strict"],
-            player_two_deck=deck_by_id["monsters_muster_swarm_strict"],
-            starting_player=PlayerId("p1"),
-            card_registry=CARD_REGISTRY,
-            leader_registry=LEADER_REGISTRY,
-            rng=SeededRandom(seed),
-            action_budget=512,
-        )
-        if execution.match_winner == PlayerId("p1"):
-            heuristic_points += 1.0
-        elif execution.match_winner == PlayerId("p2"):
-            random_points += 1.0
-        else:
-            heuristic_points += 0.5
-            random_points += 0.5
-
-    assert heuristic_points > random_points
-
-
 def test_heuristic_bot_completes_seeded_series_against_greedy() -> None:
-    decks = load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
-    deck_by_id = {str(deck.deck_id): deck for deck in decks}
+    deck_by_id = sample_deck_map()
 
     for seed in (5, 17, 37):
         execution = execute_match(
@@ -135,8 +102,7 @@ def test_heuristic_bot_completes_seeded_series_against_greedy() -> None:
 
 
 def test_search_bot_completes_seeded_game() -> None:
-    decks = load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
-    deck_by_id = {str(deck.deck_id): deck for deck in decks}
+    deck_by_id = sample_deck_map()
 
     execution = execute_match(
         game_id=GameId("search_vs_random_seeded"),

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "suites": [
+    {
+      "schema_version": 1,
+      "suite_id": "smoke-v1",
+      "purpose": "smoke",
+      "candidate": "heuristic-neutral",
+      "opponents": ["random", "greedy"],
+      "deck_pairs": [["monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"]],
+      "seeds": [3, 11],
+      "scheduling": "balanced",
+      "action_budget": 512
+    },
+    {
+      "schema_version": 1,
+      "suite_id": "core-optimize-v1",
+      "purpose": "optimize",
+      "candidate": "heuristic-neutral",
+      "opponents": ["random", "greedy", "heuristic-conservative"],
+      "deck_pairs": [
+        ["monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"],
+        ["scoiatael_high_stakes", "northern_realms_spy_siege_bond_strict"]
+      ],
+      "seeds": [101, 202],
+      "scheduling": "balanced",
+      "action_budget": 512
+    },
+    {
+      "schema_version": 1,
+      "suite_id": "core-validation-v1",
+      "purpose": "validation",
+      "candidate": "heuristic-neutral",
+      "opponents": ["random", "greedy", "heuristic-conservative"],
+      "deck_pairs": [
+        ["monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"],
+        ["scoiatael_high_stakes", "northern_realms_spy_siege_bond_strict"]
+      ],
+      "seeds": [303, 404],
+      "scheduling": "balanced",
+      "action_budget": 512
+    },
+    {
+      "schema_version": 1,
+      "suite_id": "core-test-v1",
+      "purpose": "test",
+      "candidate": "heuristic-neutral",
+      "opponents": ["random", "greedy", "heuristic-conservative"],
+      "deck_pairs": [
+        ["monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict"],
+        ["scoiatael_high_stakes", "northern_realms_spy_siege_bond_strict"]
+      ],
+      "seeds": [606, 707, 808],
+      "scheduling": "balanced",
+      "action_budget": 512
+    },
+    {
+      "schema_version": 1,
+      "suite_id": "search-diagnostic-v1",
+      "purpose": "diagnostic",
+      "candidate": "search-neutral",
+      "opponents": ["greedy"],
+      "deck_pairs": [["monsters_muster_swarm_strict", "monsters_muster_swarm_strict"]],
+      "seeds": [17, 23],
+      "scheduling": "balanced",
+      "action_budget": 512
+    }
+  ]
+}

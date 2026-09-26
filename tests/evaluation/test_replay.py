@@ -23,10 +23,10 @@ from tests.evaluation.support import (
     DECK_A,
     DECK_B,
     agent_spec,
-    execute_suite,
+    evaluation_suite,
+    execute_evaluation_suite,
     heuristic_agent,
     read_json_object,
-    suite_spec,
     write_json_object,
 )
 
@@ -37,8 +37,8 @@ def _suite(
     opponents: tuple[AgentSpec, ...] | None = None,
     deck_pairs: tuple[tuple[str, str], ...] = ((DECK_A, DECK_B),),
 ) -> SuiteSpec:
-    return suite_spec(
-        suite_id="replay-test",
+    return evaluation_suite(
+        "replay-test",
         candidate=candidate,
         opponents=opponents,
         deck_pairs=deck_pairs,
@@ -52,7 +52,7 @@ def _execute(
     run_id: str = "run",
     evidence_policy: EvidencePolicy = EvidencePolicy.ALL,
 ) -> RunExecution:
-    return execute_suite(
+    return execute_evaluation_suite(
         output_root,
         suite=suite or _suite(),
         run_id=run_id,

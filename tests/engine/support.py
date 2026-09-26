@@ -3,6 +3,12 @@ from dataclasses import replace
 from gwent_engine.ai.action_legality import is_legal_action
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.agents import BotAgent
+from gwent_engine.ai.arena import (
+    MatchExecution,
+    MatchRecorder,
+    create_bot,
+    execute_match,
+)
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.cards.loaders import load_card_definitions
 from gwent_engine.cards.models import DeckDefinition
@@ -31,7 +37,7 @@ from gwent_engine.core.ids import (
     LeaderId,
     PlayerId,
 )
-from gwent_engine.core.randomness import SupportsRandom
+from gwent_engine.core.randomness import SeededRandom, SupportsRandom
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import (
     CardInstance,
@@ -92,9 +98,11 @@ __all__ = (
     "IdentityShuffle",
     "IndexedRandom",
     "battlefield_card",
+    "execute_recorded_match",
     "first_hand_unit_for_row",
     "make_card_instance",
     "sample_deck_id_for",
+    "sample_deck_map",
     "weather_card",
 )
 
@@ -172,6 +180,35 @@ LEADER_REGISTRY = LeaderRegistry.from_definitions(
 SAMPLE_DECKS = tuple(
     load_sample_decks(DATA_DIR / "sample_decks.yaml", CARD_REGISTRY, LEADER_REGISTRY)
 )
+
+
+def sample_deck_map() -> dict[str, DeckDefinition]:
+    return {str(deck.deck_id): deck for deck in SAMPLE_DECKS}
+
+
+def execute_recorded_match(
+    *,
+    game_id: str,
+    recorder: MatchRecorder | None,
+    seed: int = 7,
+) -> MatchExecution:
+    """Run the shared heuristic-vs-greedy fixture match for recording tests."""
+
+    decks = sample_deck_map()
+    return execute_match(
+        game_id=GameId(game_id),
+        player_one_bot=create_bot("heuristic", bot_id="p1_bot"),
+        player_two_bot=create_bot("greedy", bot_id="p2_bot"),
+        player_one_deck=decks[str(MONSTERS_DECK_ID)],
+        player_two_deck=decks[str(NILFGAARD_DECK_ID)],
+        starting_player=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+        rng=SeededRandom(seed),
+        action_budget=512,
+        environment_seed=seed,
+        recorder=recorder,
+    )
 
 
 def sample_deck_id_for(
