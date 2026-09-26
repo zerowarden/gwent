@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 import pytest
-from gwent_evaluation import (
-    AgentSpec,
-    BotFamily,
-    ScheduleError,
-    SeedNamespace,
-    SuiteSpec,
-    derive_seed,
-    schedule_suite,
-)
+from gwent_evaluation import AgentSpec, SuiteSpec
+from gwent_evaluation.models import BotFamily
+from gwent_evaluation.provenance import derive_seed
+from gwent_evaluation.schedule import SeedNamespace, schedule_suite
 
 from tests.evaluation.support import (
     DECK_A,
@@ -102,7 +97,7 @@ def test_changing_root_seed_changes_streams() -> None:
 def test_duplicate_cases_are_rejected() -> None:
     duplicated = _agent("opponent")
 
-    with pytest.raises(ScheduleError, match="Duplicate scheduled case id"):
+    with pytest.raises(ValueError, match="opponents must not contain duplicates"):
         _ = schedule_suite(_suite(opponents=(duplicated, duplicated)))
 
 

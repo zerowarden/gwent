@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import cast
 
 import pytest
-from gwent_evaluation import (
+from gwent_evaluation.metrics import (
     DEFAULT_BOOTSTRAP,
     BootstrapConfig,
     CaseStatus,
@@ -11,8 +11,8 @@ from gwent_evaluation import (
     ScoredCase,
     compare_block_scores,
     compute_run_metrics,
+    summarize_scores,
 )
-from gwent_evaluation.metrics import summarize_scores
 
 from tests.evaluation.support import (
     bool_field,

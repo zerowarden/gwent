@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from gwent_evaluation import (
-    AgentResolutionError,
-    BotFamily,
-    resolve_agent,
-)
+from gwent_evaluation.agents import resolve_agent
+from gwent_evaluation.models import BotFamily
 
 from tests.evaluation.support import agent_spec
 
@@ -50,10 +47,29 @@ def test_agent_digest_distinguishes_families() -> None:
 
 @pytest.mark.parametrize("family", [BotFamily.RANDOM, BotFamily.GREEDY])
 def test_resolve_agent_rejects_profile_for_profileless_family(family: BotFamily) -> None:
-    with pytest.raises(AgentResolutionError, match="does not accept a profile"):
+    with pytest.raises(ValueError, match="does not support a profile"):
         _ = resolve_agent(agent_spec(family=family, profile="neutral"))
 
 
 def test_resolve_agent_rejects_unrecognized_profile() -> None:
-    with pytest.raises(AgentResolutionError, match="not recognized"):
+    with pytest.raises(ValueError, match="not a recognized profile"):
         _ = resolve_agent(agent_spec(family=BotFamily.HEURISTIC, profile="mystery"))
+
+
+@pytest.mark.parametrize("family", [BotFamily.HEURISTIC, BotFamily.SEARCH])
+def test_build_uses_the_resolved_trial_profile(family: BotFamily) -> None:
+    from dataclasses import replace
+
+    resolved = resolve_agent(agent_spec(family=family))
+    assert resolved.profile is not None
+    trial = replace(
+        resolved.profile,
+        profile_id="unnamed-trial",
+        weights=replace(resolved.profile.weights, immediate_points=123.0),
+    )
+    candidate = replace(resolved, profile=trial)
+    assert candidate.digest() != resolved.digest()
+    # An unregistered profile cannot be looked up by name. Both constructors
+    # must accept the exact resolved object that contributed to the digest.
+    bot = candidate.build(bot_id="trial")
+    assert "unnamed-trial" in bot.display_name

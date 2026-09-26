@@ -7,18 +7,13 @@ from pathlib import Path
 from typing import cast
 
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
-from gwent_evaluation import (
+from gwent_evaluation import AgentSpec, EvidencePolicy, SuitePurpose, SuiteSpec, execute_run
+from gwent_evaluation.metrics import CaseStatus, ScoredCase
+from gwent_evaluation.models import (
     SUPPORTED_SCHEMA_VERSION,
-    AgentSpec,
     BotFamily,
-    CaseStatus,
-    EvidencePolicy,
     RunExecution,
     SchedulingPolicy,
-    ScoredCase,
-    SuitePurpose,
-    SuiteSpec,
-    execute_run,
 )
 from gwent_shared.extract import expect_mapping, expect_sequence, expect_str
 

@@ -94,7 +94,8 @@ A run directory contains `manifest.json`, `schedule.jsonl`, `matches/`,
   derivation version, and the fully materialized schedule.
 - Persistent identities use canonical JSON plus SHA-256; never process-salted
   hashes or `repr()`. File layout is not part of any case id or digest.
-- Authoritative benchmark runs require a clean tree unless a complete source
-  bundle is captured.
+- Optimization, validation, and test runs require a clean Git checkout and a
+  lockfile. Smoke and diagnostic runs permit local edits, fingerprint installed
+  source files, and are marked `optimization_evidence: false`.
 - `report.json` only claims `valid_for_comparison` when every planned case
   completed; `compare` refuses to present an inferential interval otherwise.

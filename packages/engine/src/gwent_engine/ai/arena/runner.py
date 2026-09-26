@@ -4,9 +4,11 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from time import perf_counter
 
+from gwent_engine.ai.action_ids import action_to_id, mulligan_selection_id
 from gwent_engine.ai.actions import enumerate_legal_actions, enumerate_mulligan_selections
 from gwent_engine.ai.agents import BotAgent
 from gwent_engine.ai.arena.models import (
+    FailedDecisionAttempt,
     MatchDecision,
     MatchDecisionKind,
     MatchExecution,
@@ -23,6 +25,7 @@ from gwent_engine.cards import CardRegistry, DeckDefinition
 from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.actions import (
     GameAction,
+    MulliganSelection,
     ResolveMulligansAction,
     StartGameAction,
 )
@@ -39,7 +42,6 @@ from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 class _Decision:
     action: GameAction
     actor: PlayerId | None
-    records: tuple[MatchDecision, ...]
 
 
 class _MatchHaltError(Exception):
@@ -128,6 +130,11 @@ def execute_match(
     decision_count = 0
     pending_choice_occurred = state.pending_choice is not None
 
+    def record_attempt(decision: MatchDecision) -> None:
+        nonlocal decision_count
+        decision_count += 1
+        _record_decision(recorder, decision, state=state)
+
     try:
         _record_transition(
             recorder,
@@ -167,10 +174,8 @@ def execute_match(
                 card_registry=card_registry,
                 leader_registry=leader_registry,
                 rng=rng,
+                record=record_attempt,
             )
-            decision_count += len(decision.records)
-            for record in decision.records:
-                _record_decision(recorder, record, state=state)
 
             state_before = state
             try:
@@ -237,55 +242,95 @@ def _choose_decision(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry,
     rng: SupportsRandom,
+    record: Callable[[MatchDecision], None],
 ) -> _Decision:
     if state.phase == Phase.MULLIGAN:
-        return _choose_mulligans(
-            state,
-            bots=bots,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
+        selections = tuple(
+            _choose_mulligan_decision(
+                state,
+                player_id=player.player_id,
+                bots=bots,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                record=record,
+            )
+            for player in state.players
         )
-    if state.pending_choice is not None:
-        return _choose_pending_choice(
+        return _Decision(action=ResolveMulligansAction(selections=selections), actor=None)
+    pending = state.pending_choice
+    kind = MatchDecisionKind.PENDING_CHOICE if pending is not None else MatchDecisionKind.ACTION
+    actor = pending.player_id if pending is not None else state.current_player
+    if actor is None:
+        raise _MatchHaltError(
+            TerminationReason.ENGINE_ERROR,
+            MatchFailure(
+                _decision_failure_stage(kind),
+                None,
+                "EngineStateError",
+                "In-round state has no current player.",
+            ),
             state,
-            bots=bots,
+        )
+    observation = _engine_call(
+        MatchFailureStage.OBSERVE,
+        actor,
+        state,
+        lambda: build_player_observation(state, actor, leader_registry),
+    )
+    actions = _engine_call(
+        MatchFailureStage.ENUMERATE_ACTIONS,
+        actor,
+        state,
+        lambda: enumerate_legal_actions(
+            state,
+            player_id=actor,
             card_registry=card_registry,
             leader_registry=leader_registry,
             rng=rng,
-        )
-    return _choose_turn(
-        state,
-        bots=bots,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        rng=rng,
-    )
-
-
-def _choose_mulligans(
-    state: GameState,
-    *,
-    bots: Mapping[PlayerId, BotAgent],
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry,
-) -> _Decision:
-    records = tuple(
-        _choose_mulligan_decision(
-            state,
-            player_id=player.player_id,
-            bots=bots,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
-        )
-        for player in state.players
-    )
-    return _Decision(
-        action=ResolveMulligansAction(
-            selections=tuple(record.selection for record in records),
         ),
-        actor=None,
-        records=records,
     )
+    bot = bots[actor]
+    choose = bot.choose_pending_choice if pending is not None else bot.choose_action
+    action, duration = _agent_call(
+        kind,
+        actor,
+        state,
+        lambda: choose(
+            observation, actions, card_registry=card_registry, leader_registry=leader_registry
+        ),
+        on_failure=lambda failure, elapsed: record(
+            FailedDecisionAttempt(
+                kind,
+                actor,
+                observation,
+                tuple(action_to_id(a) for a in actions),
+                None,
+                elapsed,
+                failure,
+            )
+        ),
+    )
+    if action not in actions:
+        failure = MatchFailure(
+            _decision_failure_stage(kind),
+            actor,
+            "IllegalActionError",
+            f"{bot.display_name} emitted an illegal action.",
+        )
+        record(
+            FailedDecisionAttempt(
+                kind,
+                actor,
+                observation,
+                tuple(action_to_id(a) for a in actions),
+                _returned_action_id(action),
+                duration,
+                failure,
+            )
+        )
+        raise _MatchHaltError(TerminationReason.ILLEGAL_ACTION, failure, state)
+    record(TurnDecision(kind, actor, observation, actions, action, duration))
+    return _Decision(action=action, actor=actor)
 
 
 def _choose_mulligan_decision(
@@ -295,9 +340,10 @@ def _choose_mulligan_decision(
     bots: Mapping[PlayerId, BotAgent],
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry,
-) -> MulliganDecision:
+    record: Callable[[MatchDecision], None],
+) -> MulliganSelection:
     kind = MatchDecisionKind.MULLIGAN
-    legal_selections = _engine_call(
+    selections = _engine_call(
         MatchFailureStage.ENUMERATE_ACTIONS,
         player_id,
         state,
@@ -310,182 +356,54 @@ def _choose_mulligan_decision(
         lambda: build_player_observation(state, player_id, leader_registry),
     )
     bot = bots[player_id]
-    selection, duration_seconds = _agent_call(
+    selection, duration = _agent_call(
         kind,
         player_id,
         state,
         lambda: bot.choose_mulligan(
-            observation,
-            legal_selections,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
+            observation, selections, card_registry=card_registry, leader_registry=leader_registry
         ),
-    )
-    if selection not in legal_selections:
-        raise _MatchHaltError(
-            TerminationReason.ILLEGAL_ACTION,
-            MatchFailure(
-                _decision_failure_stage(kind),
+        on_failure=lambda failure, elapsed: record(
+            FailedDecisionAttempt(
+                kind,
                 player_id,
-                "IllegalActionError",
-                f"{bot.display_name} emitted an illegal mulligan selection.",
-            ),
-            state,
-        )
-    return MulliganDecision(
-        actor=player_id,
-        observation=observation,
-        legal_selections=legal_selections,
-        selection=selection,
-        duration_seconds=duration_seconds,
-    )
-
-
-def _choose_pending_choice(
-    state: GameState,
-    *,
-    bots: Mapping[PlayerId, BotAgent],
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry,
-    rng: SupportsRandom,
-) -> _Decision:
-    kind = MatchDecisionKind.PENDING_CHOICE
-    pending_choice = state.pending_choice
-    assert pending_choice is not None
-    player_id = pending_choice.player_id
-    legal_actions = _engine_call(
-        MatchFailureStage.ENUMERATE_ACTIONS,
-        player_id,
-        state,
-        lambda: enumerate_legal_actions(
-            state,
-            player_id=player_id,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
-            rng=rng,
-        ),
-    )
-    observation = _engine_call(
-        MatchFailureStage.OBSERVE,
-        player_id,
-        state,
-        lambda: build_player_observation(state, player_id, leader_registry),
-    )
-    bot = bots[player_id]
-    action, duration_seconds = _agent_call(
-        kind,
-        player_id,
-        state,
-        lambda: bot.choose_pending_choice(
-            observation,
-            legal_actions,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
-        ),
-    )
-    if action not in legal_actions:
-        raise _MatchHaltError(
-            TerminationReason.ILLEGAL_ACTION,
-            MatchFailure(
-                _decision_failure_stage(kind),
-                player_id,
-                "IllegalActionError",
-                f"{bot.display_name} emitted an illegal pending-choice action.",
-            ),
-            state,
-        )
-    return _Decision(
-        action=action,
-        actor=player_id,
-        records=(
-            TurnDecision(
-                kind=kind,
-                actor=player_id,
-                observation=observation,
-                legal_actions=legal_actions,
-                action=action,
-                duration_seconds=duration_seconds,
-            ),
-        ),
-    )
-
-
-def _choose_turn(
-    state: GameState,
-    *,
-    bots: Mapping[PlayerId, BotAgent],
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry,
-    rng: SupportsRandom,
-) -> _Decision:
-    kind = MatchDecisionKind.ACTION
-    current_player = state.current_player
-    if current_player is None:
-        raise _MatchHaltError(
-            TerminationReason.ENGINE_ERROR,
-            MatchFailure(
-                _decision_failure_stage(kind),
+                observation,
+                tuple(mulligan_selection_id(s) for s in selections),
                 None,
-                "EngineStateError",
-                "In-round state has no current player.",
-            ),
-            state,
+                elapsed,
+                failure,
+            )
+        ),
+    )
+    if selection not in selections:
+        failure = MatchFailure(
+            _decision_failure_stage(kind),
+            player_id,
+            "IllegalActionError",
+            f"{bot.display_name} emitted an illegal mulligan selection.",
         )
-    legal_actions = _engine_call(
-        MatchFailureStage.ENUMERATE_ACTIONS,
-        current_player,
-        state,
-        lambda: enumerate_legal_actions(
-            state,
-            player_id=current_player,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
-            rng=rng,
-        ),
-    )
-    observation = _engine_call(
-        MatchFailureStage.OBSERVE,
-        current_player,
-        state,
-        lambda: build_player_observation(state, current_player, leader_registry),
-    )
-    bot = bots[current_player]
-    action, duration_seconds = _agent_call(
-        kind,
-        current_player,
-        state,
-        lambda: bot.choose_action(
-            observation,
-            legal_actions,
-            card_registry=card_registry,
-            leader_registry=leader_registry,
-        ),
-    )
-    if action not in legal_actions:
-        raise _MatchHaltError(
-            TerminationReason.ILLEGAL_ACTION,
-            MatchFailure(
-                _decision_failure_stage(kind),
-                current_player,
-                "IllegalActionError",
-                f"{bot.display_name} emitted an illegal turn action.",
-            ),
-            state,
+        chosen = _returned_mulligan_id(selection)
+        record(
+            FailedDecisionAttempt(
+                kind,
+                player_id,
+                observation,
+                tuple(mulligan_selection_id(s) for s in selections),
+                chosen,
+                duration,
+                failure,
+            )
         )
-    return _Decision(
-        action=action,
-        actor=current_player,
-        records=(
-            TurnDecision(
-                kind=kind,
-                actor=current_player,
-                observation=observation,
-                legal_actions=legal_actions,
-                action=action,
-                duration_seconds=duration_seconds,
-            ),
-        ),
-    )
+        raise _MatchHaltError(TerminationReason.ILLEGAL_ACTION, failure, state)
+    record(MulliganDecision(player_id, observation, selections, selection, duration))
+    return selection
+
+
+def _returned_action_id(action: GameAction) -> str:
+    try:
+        return action_to_id(action)
+    except (TypeError, ValueError, AttributeError):
+        return repr(action)
 
 
 def _engine_call[T](
@@ -509,23 +427,22 @@ def _agent_call[T](
     actor: PlayerId,
     state: GameState,
     operation: Callable[[], T],
+    *,
+    on_failure: Callable[[MatchFailure, float], None],
 ) -> tuple[T, float]:
     stage = _decision_failure_stage(kind)
     started = perf_counter()
     try:
         result = operation()
-    except GwentEngineError as error:
-        raise _MatchHaltError(
-            TerminationReason.ENGINE_ERROR,
-            _describe_failure(stage, actor, error),
-            state,
-        ) from error
     except Exception as error:
-        raise _MatchHaltError(
-            TerminationReason.AGENT_ERROR,
-            _describe_failure(stage, actor, error),
-            state,
-        ) from error
+        failure = _describe_failure(stage, actor, error)
+        on_failure(failure, perf_counter() - started)
+        reason = (
+            TerminationReason.ENGINE_ERROR
+            if isinstance(error, GwentEngineError)
+            else TerminationReason.AGENT_ERROR
+        )
+        raise _MatchHaltError(reason, failure, state) from error
     return result, perf_counter() - started
 
 
@@ -603,4 +520,12 @@ def _failed_execution(
         pending_choice_occurred=pending_choice_occurred,
         environment_seed=environment_seed,
         failure=failure,
+    )
+
+
+def _returned_mulligan_id(selection: object) -> str:
+    return (
+        mulligan_selection_id(selection)
+        if isinstance(selection, MulliganSelection)
+        else repr(selection)
     )

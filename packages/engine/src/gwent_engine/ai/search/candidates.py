@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline import build_assessment, build_candidate_pool
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
@@ -48,4 +49,15 @@ def generate_search_candidates(
             reason=candidate.reason,
         )
         for candidate in pool.retained_candidates[: config.max_candidate_actions]
+    )
+
+
+def order_search_candidates(
+    candidates: tuple[SearchCandidate, ...],
+) -> tuple[SearchCandidate, ...]:
+    return tuple(
+        sorted(
+            candidates,
+            key=lambda candidate: (-candidate.ordering_score, action_to_id(candidate.action)),
+        )
     )

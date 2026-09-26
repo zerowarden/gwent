@@ -12,17 +12,12 @@ from gwent_engine.ai.arena.models import (
     MatchFailureStage,
     TerminationReason,
 )
-from gwent_evaluation import (
-    AgentSpec,
-    CorruptRecordError,
-    EvidencePolicy,
-    MatchResult,
-    ResolvedAgent,
-    RunConflictError,
-    RunExecution,
-    SuiteSpec,
-)
+from gwent_evaluation import AgentSpec, EvidencePolicy, SuiteSpec
 from gwent_evaluation import execution as execution_module
+from gwent_evaluation.agents import ResolvedAgent
+from gwent_evaluation.models import MatchResult, RunExecution
+from gwent_evaluation.records import CorruptRecordError
+from gwent_evaluation.storage import RunConflictError
 
 from tests.engine.ai.bots import ThrowingBot
 from tests.evaluation.support import (
@@ -90,6 +85,7 @@ def test_run_persists_manifest_schedule_results_and_samples(tmp_path: Path) -> N
         assert result.termination is TerminationReason.COMPLETED
         assert result.candidate_score in {0.0, 0.5, 1.0}
         assert result.evidence.trajectory_path is None
+        assert result.evidence.samples_path is not None
         assert (root / result.evidence.samples_path).is_file()
     assert len(list((root / "matches").glob("*.json"))) == 8
 

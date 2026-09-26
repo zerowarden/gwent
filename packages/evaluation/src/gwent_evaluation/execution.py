@@ -8,7 +8,7 @@ from time import perf_counter
 from gwent_engine.ai.arena import MatchExecution, execute_match
 from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
-from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, PlayerId
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 from gwent_engine.core.randomness import SeededRandom
 from gwent_shared.extract import stringify_optional
 
@@ -25,6 +25,7 @@ from gwent_evaluation.models import (
     RunManifest,
     ScheduledMatch,
     SuiteSpec,
+    candidate_score_for_outcome,
 )
 from gwent_evaluation.provenance import (
     SEED_DERIVATION_VERSION,
@@ -32,10 +33,11 @@ from gwent_evaluation.provenance import (
     read_repository_provenance,
     read_runtime_provenance,
 )
-from gwent_evaluation.recording import ExperimentRecorder
+from gwent_evaluation.recording import ExperimentRecorder, SummaryRecorder
 from gwent_evaluation.reporting import LoadedRun, persist_run_report
 from gwent_evaluation.schedule import CASE_ID_VERSION, other_seat, schedule_suite
-from gwent_evaluation.storage import RunStore
+from gwent_evaluation.storage import RunConflictError, RunStore
+from gwent_evaluation.validation import execution_identity, validate_result_against_execution
 
 
 class EvidencePolicy(StrEnum):
@@ -88,14 +90,17 @@ def execute_run(
         assets=assets,
         repository_root=repository_root,
     )
+    if suite.purpose.requires_clean_checkout and not manifest.repository.is_clean_checkout:
+        raise RunConflictError(
+            "Optimization, validation and test runs require a clean checkout with a lockfile."
+        )
     store = RunStore(output_root=output_root, run_id=run_id)
-    store.prepare(manifest, matches=matches)
-
+    persisted = store.prepare(manifest, matches=matches).results
     results: list[MatchResult] = []
     executed_case_ids: list[str] = []
     resumed_case_ids: list[str] = []
     for match in matches:
-        existing = store.read_result(match.case_id)
+        existing = persisted.get(match.case_id)
         if existing is not None:
             results.append(existing)
             resumed_case_ids.append(match.case_id)
@@ -105,14 +110,19 @@ def execute_run(
             candidate=candidate,
             opponent=opponents[match.opponent_agent],
             assets=assets,
+            collect_evidence=evidence_policy is not EvidencePolicy.NONE,
         )
         include_trajectory = evidence_policy.persists_trajectory(completed=case.execution.completed)
-        evidence_refs = store.write_evidence(
-            match.case_id,
-            case.evidence,
-            include_trajectory=include_trajectory,
-        )
-        result = _build_result(match, case, evidence=evidence_refs)
+        evidence_refs = EvidenceRefs()
+        if evidence_policy is not EvidencePolicy.NONE:
+            evidence_refs = store.write_evidence(
+                match.case_id,
+                case.evidence,
+                include_trajectory=include_trajectory,
+                execution_identity=execution_identity(manifest),
+            )
+        result = _build_result(match, case, evidence=evidence_refs, manifest=manifest)
+        validate_result_against_execution(result, match, manifest)
         store.write_result(result)
         results.append(result)
         executed_case_ids.append(match.case_id)
@@ -179,6 +189,7 @@ def execute_case(
     candidate: ResolvedAgent,
     opponent: ResolvedAgent,
     assets: ResolvedAssets,
+    collect_evidence: bool = True,
 ) -> CaseExecution:
     opponent_seat = other_seat(match.candidate_seat)
     bots = {
@@ -195,7 +206,7 @@ def execute_case(
         match.candidate_seat: assets.deck(match.candidate_deck_id),
         opponent_seat: assets.deck(match.opponent_deck_id),
     }
-    recorder = ExperimentRecorder()
+    recorder = ExperimentRecorder() if collect_evidence else SummaryRecorder()
     started = perf_counter()
     execution = execute_match(
         game_id=match.game_id,
@@ -217,7 +228,7 @@ def execute_case(
         execution=execution,
         evidence=evidence,
         execution_seconds=execution_seconds,
-        decision_seconds=sum(sample.duration_seconds for sample in evidence.samples),
+        decision_seconds=recorder.decision_seconds,
     )
 
 
@@ -226,12 +237,14 @@ def _build_result(
     case: CaseExecution,
     *,
     evidence: EvidenceRefs,
+    manifest: RunManifest,
 ) -> MatchResult:
     execution = case.execution
     final_state = execution.final_state
     winner = execution.match_winner
     return MatchResult(
         schema_version=RECORD_SCHEMA_VERSION,
+        execution_identity=execution_identity(manifest),
         case_id=match.case_id,
         termination=execution.termination,
         candidate_agent_id=match.candidate_agent.agent_id,
@@ -240,7 +253,7 @@ def _build_result(
         requested_starting_player=match.requested_starting_player,
         actual_starting_player=(None if final_state is None else final_state.starting_player),
         winner=winner,
-        candidate_score=_candidate_score(
+        candidate_score=candidate_score_for_outcome(
             winner=winner,
             candidate_seat=match.candidate_seat,
             completed=execution.completed,
@@ -249,6 +262,7 @@ def _build_result(
         decision_count=execution.decision_count,
         pending_choice_occurred=execution.pending_choice_occurred,
         observation_contract_version=OBSERVATION_CONTRACT_VERSION,
+        final_state_digest=None if final_state is None else state_fingerprint(final_state),
         semantic_digest=semantic_digest(execution, case.evidence),
         decision_seconds=case.decision_seconds,
         execution_seconds=case.execution_seconds,
@@ -258,26 +272,14 @@ def _build_result(
     )
 
 
-def _candidate_score(
-    *,
-    winner: PlayerId | None,
-    candidate_seat: PlayerId,
-    completed: bool,
-) -> float | None:
-    if not completed:
-        return None
-    if winner is None:
-        return 0.5
-    return 1.0 if winner == candidate_seat else 0.0
-
-
 def semantic_digest(execution: MatchExecution, evidence: MatchEvidence) -> str:
     return canonical_digest(
         {
             "termination": execution.termination.value,
             "winner": stringify_optional(execution.match_winner),
-            "actions": tuple(sample.chosen_option_id for sample in evidence.samples),
-            "states": tuple(state_fingerprint(step.state_after) for step in evidence.trajectory),
-            "events": tuple(step.event_fingerprints for step in evidence.trajectory),
+            "trace": evidence.trace_digest,
+            "final_state": (
+                None if execution.final_state is None else state_fingerprint(execution.final_state)
+            ),
         }
     )

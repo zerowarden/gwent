@@ -42,10 +42,10 @@ class ResolvedAgent:
     def build(self, *, bot_id: str, seed: int | None = None) -> BotAgent:
         """Build the engine bot, applying the seed only when the family supports one."""
 
-        return self.family.build_seeded(
+        return self.family.build_resolved(
             bot_id=bot_id,
-            profile_id=self.profile_id,
-            seed=seed,
+            profile=self.profile,
+            seed=seed if self.accepts_seed else None,
         )
 
     def configuration(self) -> dict[str, object]:

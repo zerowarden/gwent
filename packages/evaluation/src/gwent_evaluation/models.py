@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from math import isfinite
 from pathlib import Path
 
 from gwent_engine.ai.arena import BotFamily as BotFamily
+from gwent_engine.ai.arena import bot_family
 from gwent_engine.ai.arena.models import (
     MatchDecisionKind,
     MatchFailure,
@@ -13,14 +15,19 @@ from gwent_engine.ai.arena.models import (
 from gwent_engine.ai.arena.models import (
     TerminationReason as TerminationReason,
 )
-from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.core.ids import GameId, PlayerId
+from gwent_engine.ai.baseline import get_base_profile_definition
+from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION, PlayerObservation
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, GameId, PlayerId
 from gwent_engine.core.state import GameState
 
 from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance
 
 SUPPORTED_SCHEMA_VERSION = 1
-RECORD_SCHEMA_VERSION = 1
+RECORD_SCHEMA_VERSION = 2
+
+
+class SpecError(ValueError):
+    """An evaluation specification violates its domain contract."""
 
 
 class SuitePurpose(Enum):
@@ -29,6 +36,10 @@ class SuitePurpose(Enum):
     VALIDATION = "validation"
     TEST = "test"
     DIAGNOSTIC = "diagnostic"
+
+    @property
+    def requires_clean_checkout(self) -> bool:
+        return self in (SuitePurpose.OPTIMIZE, SuitePurpose.VALIDATION, SuitePurpose.TEST)
 
 
 class SchedulingPolicy(Enum):
@@ -41,6 +52,20 @@ class AgentSpec:
     agent_id: str
     family: BotFamily
     profile: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != SUPPORTED_SCHEMA_VERSION or not self.agent_id.strip():
+            raise SpecError("Agent requires a supported schema_version and nonempty agent_id.")
+        if self.profile is not None:
+            if not bot_family(self.family).accepts_profile:
+                raise SpecError(
+                    f"family {self.family.value!r} does not support a profile override."
+                )
+            try:
+                profile = get_base_profile_definition(self.profile).profile_id
+            except ValueError as error:
+                raise SpecError(f"profile {self.profile!r} is not a recognized profile.") from error
+            object.__setattr__(self, "profile", profile)
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,6 +80,35 @@ class SuiteSpec:
     scheduling: SchedulingPolicy
     action_budget: int
     observation_contract_version: int
+
+    def __post_init__(self) -> None:
+        if self.schema_version != SUPPORTED_SCHEMA_VERSION:
+            raise SpecError(f"schema_version must be {SUPPORTED_SCHEMA_VERSION}.")
+        if not self.suite_id.strip():
+            raise SpecError("suite_id must not be empty.")
+        if self.observation_contract_version != OBSERVATION_CONTRACT_VERSION:
+            raise SpecError("Unsupported observation contract version.")
+        if self.scheduling is not SchedulingPolicy.BALANCED:
+            raise SpecError("Unsupported scheduling policy.")
+        if type(self.purpose) is not SuitePurpose:
+            raise SpecError("Unsupported suite purpose.")
+        if type(self.action_budget) is not int or self.action_budget <= 0:
+            raise SpecError("action_budget must be positive.")
+        for name, values in (
+            ("opponents", tuple(agent.agent_id for agent in self.opponents)),
+            ("deck_pairs", self.deck_pairs),
+            ("seeds", self.seeds),
+        ):
+            if not values:
+                raise SpecError(f"{name} must not be empty.")
+            if len(set(values)) != len(values):
+                raise SpecError(f"{name} must not contain duplicates.")
+        if any(type(seed) is not int for seed in self.seeds):
+            raise SpecError("seeds must be integers.")
+        if any(
+            len(pair) != 2 or any(not deck.strip() for deck in pair) for pair in self.deck_pairs
+        ):
+            raise SpecError("deck_pairs must contain pairs of nonempty deck ids.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,8 +142,9 @@ class DecisionSample:
     actor: PlayerId
     observation: PlayerObservation
     legal_option_ids: tuple[str, ...]
-    chosen_option_id: str
+    chosen_option_id: str | None
     duration_seconds: float
+    failure: MatchFailure | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,14 +167,17 @@ class TrajectoryStep:
 class MatchEvidence:
     samples: tuple[DecisionSample, ...]
     trajectory: tuple[TrajectoryStep, ...]
+    trace_digest: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class EvidenceRefs:
     """Run-root-relative paths to persisted evidence."""
 
-    samples_path: str
+    samples_path: str | None = None
     trajectory_path: str | None = None
+    samples_digest: str | None = None
+    trajectory_digest: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +207,55 @@ class MatchResult:
     execution_seconds: float
     environment_seed: int
     evidence: EvidenceRefs
+    execution_identity: str
+    final_state_digest: str | None
     failure: MatchFailure | None = None
+
+    def __post_init__(self) -> None:
+        if self.schema_version != RECORD_SCHEMA_VERSION:
+            raise ValueError("Unsupported result schema_version.")
+        for seat in (
+            self.candidate_seat,
+            self.requested_starting_player,
+            self.actual_starting_player,
+            self.winner,
+        ):
+            if seat is not None and seat not in (PLAYER_ONE, PLAYER_TWO):
+                raise ValueError("Result contains an unknown player seat.")
+        if self.observation_contract_version != OBSERVATION_CONTRACT_VERSION:
+            raise ValueError("Unsupported result observation contract.")
+        if (
+            self.termination
+            in (
+                TerminationReason.AGENT_ERROR,
+                TerminationReason.ENGINE_ERROR,
+                TerminationReason.ILLEGAL_ACTION,
+            )
+            and self.failure is None
+        ):
+            raise ValueError("Failed result requires failure details.")
+        if self.termination is TerminationReason.ACTION_LIMIT and self.failure is not None:
+            raise ValueError("Action limit result cannot contain an exception.")
+        for count in (self.accepted_transitions, self.decision_count):
+            if type(count) is not int or count < 0:
+                raise ValueError("Result counts must be nonnegative integers.")
+        for duration in (self.decision_seconds, self.execution_seconds):
+            if not isfinite(duration) or duration < 0:
+                raise ValueError("Result durations must be finite and nonnegative.")
+        if self.termination is TerminationReason.COMPLETED:
+            expected = candidate_score_for_outcome(
+                winner=self.winner,
+                candidate_seat=self.candidate_seat,
+                completed=True,
+            )
+            if self.candidate_score != expected or self.failure is not None:
+                raise ValueError("Completed result score/failure is inconsistent with its winner.")
+            if self.actual_starting_player is None:
+                raise ValueError("Completed result requires an actual starting player.")
+            if self.final_state_digest is None or self.accepted_transitions < 1:
+                raise ValueError("Completed result requires a final state and transitions.")
+        elif self.candidate_score is not None or self.winner is not None:
+            raise ValueError("Non-completed results cannot contain a normal match score/winner.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,3 +295,16 @@ class RunExecution:
     results: tuple[MatchResult, ...]
     executed_case_ids: tuple[str, ...]
     resumed_case_ids: tuple[str, ...]
+
+
+def candidate_score_for_outcome(
+    *,
+    winner: PlayerId | None,
+    candidate_seat: PlayerId,
+    completed: bool,
+) -> float | None:
+    if not completed:
+        return None
+    if winner is None:
+        return 0.5
+    return float(winner == candidate_seat)

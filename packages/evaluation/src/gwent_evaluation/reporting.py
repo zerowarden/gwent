@@ -37,9 +37,11 @@ from gwent_evaluation.models import (
     RunManifest,
     ScheduledMatch,
 )
-from gwent_evaluation.records import CorruptRecordError, record_to_dict
+from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.schedule import ScheduleBlock, schedule_blocks
 from gwent_evaluation.storage import RunStore
+from gwent_evaluation.validation import LoadedRun as LoadedRun
+from gwent_evaluation.validation import benchmark_identity, validate_loaded_run
 
 
 class ReportError(ValueError):
@@ -77,23 +79,16 @@ class RunReport:
     interval: ScoreInterval
     strata: tuple[StratumMetrics, ...]
     latency: LatencySummary
+    optimization_evidence: bool
     valid_for_comparison: bool
     validity_reasons: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class LoadedRun:
-    """One run's immutable inputs and any results persisted so far."""
-
-    manifest: RunManifest
-    matches: tuple[ScheduledMatch, ...]
-    results: Mapping[str, MatchResult]
 
 
 @dataclass(frozen=True, slots=True)
 class RunComparison:
     """Candidate-minus-reference comparison over paired complete blocks."""
 
+    optimization_evidence: bool
     compatible: bool
     valid: bool
     reasons: tuple[str, ...]
@@ -109,16 +104,7 @@ class RunComparison:
 
 
 def load_run(run_root: Path) -> LoadedRun:
-    store = RunStore.from_root(run_root)
-    manifest = store.read_manifest()
-    matches = store.read_schedule()
-    _verify_schedule_identity(manifest, matches)
-    results: dict[str, MatchResult] = {}
-    for match in matches:
-        result = store.read_result(match.case_id)
-        if result is not None:
-            results[match.case_id] = result
-    return LoadedRun(manifest=manifest, matches=matches, results=results)
+    return RunStore.from_root(run_root).load()
 
 
 def build_run_report(
@@ -126,6 +112,7 @@ def build_run_report(
     *,
     bootstrap: BootstrapConfig = DEFAULT_BOOTSTRAP,
 ) -> RunReport:
+    validate_loaded_run(loaded)
     blocks = schedule_blocks(loaded.manifest.suite)
     metrics = compute_run_metrics(
         scored_cases(blocks, loaded.results),
@@ -150,6 +137,7 @@ def build_run_report(
         interval=metrics.interval,
         strata=metrics.strata,
         latency=_latency_summary(loaded.results.values()),
+        optimization_evidence=metrics.valid and _optimization_provenance(loaded.manifest),
         valid_for_comparison=metrics.valid,
         validity_reasons=metrics.validity_reasons,
     )
@@ -183,6 +171,8 @@ def build_run_comparison(
     *,
     bootstrap: BootstrapConfig = DEFAULT_BOOTSTRAP,
 ) -> RunComparison:
+    validate_loaded_run(reference)
+    validate_loaded_run(candidate)
     structural_reasons = _compatibility_reasons(reference, candidate)
     if structural_reasons:
         return _diagnostic_comparison(reference, candidate, structural_reasons, bootstrap=bootstrap)
@@ -205,6 +195,9 @@ def build_run_comparison(
     valid = not reasons
     paired = compare_block_scores(reference_cases, candidate_cases, bootstrap=bootstrap)
     return RunComparison(
+        optimization_evidence=valid
+        and _optimization_provenance(reference.manifest)
+        and _optimization_provenance(candidate.manifest),
         compatible=True,
         valid=valid,
         reasons=reasons,
@@ -232,6 +225,7 @@ def _diagnostic_comparison(
     bootstrap: BootstrapConfig,
 ) -> RunComparison:
     return RunComparison(
+        optimization_evidence=False,
         compatible=False,
         valid=False,
         reasons=reasons,
@@ -280,6 +274,7 @@ def render_report_markdown(report: RunReport) -> str:
         "",
         f"- Suite: {report.suite_id} ({report.purpose})",
         f"- Observation contract: v{report.observation_contract_version}",
+        f"- Optimization evidence: {_yes_no(report.optimization_evidence)}",
         "",
         "## Coverage",
         "",
@@ -386,6 +381,7 @@ def render_comparison_markdown(comparison: RunComparison) -> str:
         f"# Run comparison: {comparison.reference_run_id} -> {comparison.candidate_run_id}",
         "",
         f"- Compatible: {_yes_no(comparison.compatible)}",
+        f"- Optimization evidence: {_yes_no(comparison.optimization_evidence)}",
         f"- Valid for comparison: {_yes_no(comparison.valid)}",
         f"- Reference agent: {comparison.reference_agent_id}",
         f"- Candidate agent: {comparison.candidate_agent_id}",
@@ -465,27 +461,6 @@ def _latency_summary(results: Iterable[MatchResult]) -> LatencySummary:
     )
 
 
-def _verify_schedule_identity(
-    manifest: RunManifest,
-    matches: Sequence[ScheduledMatch],
-) -> None:
-    expected = {
-        match.case_id: match for block in schedule_blocks(manifest.suite) for match in block.matches
-    }
-    scheduled = tuple(match.case_id for match in matches)
-    if len(set(scheduled)) != len(scheduled):
-        raise CorruptRecordError("The persisted schedule contains duplicate case ids.")
-    if set(scheduled) != set(manifest.planned_case_ids):
-        raise CorruptRecordError(
-            f"The persisted schedule of run {manifest.run_id!r} does not match its manifest."
-        )
-    for match in matches:
-        if expected.get(match.case_id) != match:
-            raise CorruptRecordError(
-                f"Scheduled match {match.case_id!r} does not match its manifest."
-            )
-
-
 def _compatibility_reasons(reference: LoadedRun, candidate: LoadedRun) -> tuple[str, ...]:
     reference_manifest = reference.manifest
     candidate_manifest = candidate.manifest
@@ -525,6 +500,10 @@ def _compatibility_reasons(reference: LoadedRun, candidate: LoadedRun) -> tuple[
         reasons.append("lockfile digests differ")
     if reference_manifest.runtime != candidate_manifest.runtime:
         reasons.append("runtime identities differ")
+    if reference_manifest.opponents != candidate_manifest.opponents:
+        reasons.append("resolved opponent configurations differ")
+    if benchmark_identity(reference_manifest) != benchmark_identity(candidate_manifest):
+        reasons.append("benchmark identities differ")
     return tuple(reasons)
 
 
@@ -556,3 +535,7 @@ __all__ = [
     "report_run",
     "scored_cases",
 ]
+
+
+def _optimization_provenance(manifest: RunManifest) -> bool:
+    return manifest.suite.purpose.requires_clean_checkout and manifest.repository.is_clean_checkout

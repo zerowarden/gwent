@@ -117,7 +117,18 @@ class TurnDecision:
     duration_seconds: float
 
 
-type MatchDecision = MulliganDecision | TurnDecision
+@dataclass(frozen=True, slots=True)
+class FailedDecisionAttempt:
+    kind: MatchDecisionKind
+    actor: PlayerId
+    observation: PlayerObservation
+    legal_option_ids: tuple[str, ...]
+    chosen_option_id: str | None
+    duration_seconds: float
+    failure: MatchFailure
+
+
+type MatchDecision = MulliganDecision | TurnDecision | FailedDecisionAttempt
 
 
 class MatchRecorder(Protocol):

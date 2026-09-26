@@ -282,6 +282,7 @@ class SearchConfig:
     elimination-round passes while plausible continuation lines remain.
     """
 
+    deck_world_samples: int = 3
     max_candidate_actions: int = 12
     max_opponent_replies: int = 3
     reply_search_score_gap_threshold: int = 12

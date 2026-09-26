@@ -4,7 +4,8 @@ import platform
 import subprocess
 import sys
 from dataclasses import dataclass
-from importlib.metadata import PackageNotFoundError, version
+from importlib.metadata import distributions
+from importlib.util import find_spec
 from pathlib import Path
 
 from gwent_shared.digests import (
@@ -19,7 +20,6 @@ from gwent_shared.json_payloads import canonical_json as canonical_json
 DIGEST_PREFIX = "sha256:"
 SEED_DERIVATION_VERSION = 1
 
-_RELEVANT_DISTRIBUTIONS = ("gwent-engine", "gwent-evaluation")
 _LOCKFILE_NAME = "uv.lock"
 
 
@@ -28,6 +28,16 @@ class RepositoryProvenance:
     commit: str | None
     dirty: bool | None
     lockfile_digest: str | None
+    implementation_digest: str | None = None
+
+    @property
+    def is_clean_checkout(self) -> bool:
+        return (
+            self.dirty is False
+            and self.commit is not None
+            and self.lockfile_digest is not None
+            and self.implementation_digest is not None
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +68,7 @@ def read_repository_provenance(repository_root: Path) -> RepositoryProvenance:
         commit=_git_stdout(repository_root, "rev-parse", "HEAD"),
         dirty=None if status is None else bool(status.stdout.strip()),
         lockfile_digest=file_digest(repository_root / _LOCKFILE_NAME),
+        implementation_digest=implementation_digest(),
     )
 
 
@@ -66,8 +77,10 @@ def read_runtime_provenance() -> RuntimeProvenance:
         python_implementation=sys.implementation.name,
         python_version=platform.python_version(),
         packages=tuple(
-            (distribution, _distribution_version(distribution))
-            for distribution in _RELEVANT_DISTRIBUTIONS
+            sorted(
+                (distribution.metadata["Name"].lower(), distribution.version)
+                for distribution in distributions()
+            )
         ),
     )
 
@@ -80,11 +93,23 @@ def file_digest(path: Path) -> str | None:
     return DIGEST_PREFIX + sha256_bytes_hexdigest(content)
 
 
-def _distribution_version(distribution: str) -> str | None:
-    try:
-        return version(distribution)
-    except PackageNotFoundError:
-        return None
+def implementation_digest() -> str:
+    """Fingerprint installed first-party source, including diagnostic local edits.
+
+    Resolve the code actually imported, rather than assuming repository_root is
+    the checkout used by the interpreter. No hidden game state enters this hash.
+    """
+    files: list[tuple[str, str | None]] = []
+    for package in ("gwent_engine", "gwent_evaluation", "gwent_shared"):
+        spec = find_spec(package)
+        if spec is None or spec.origin is None:
+            raise ValueError(f"Cannot identify implementation for {package}.")
+        root = Path(spec.origin).parent
+        files.extend(
+            (f"{package}/{path.relative_to(root)}", file_digest(path))
+            for path in sorted(root.rglob("*.py"))
+        )
+    return canonical_digest(files)
 
 
 def _git_stdout(repository_root: Path, *args: str) -> str | None:

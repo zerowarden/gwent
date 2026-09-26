@@ -16,6 +16,7 @@ from gwent_engine.cards import CardRegistry
 from gwent_shared.extract import require_sequence_field, require_str_field
 from gwent_shared.json_payloads import dump_pretty_json
 
+from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.models import (
     EvidenceRefs,
     MatchEvidence,
@@ -24,7 +25,7 @@ from gwent_evaluation.models import (
     ScheduledMatch,
     TrajectoryStep,
 )
-from gwent_evaluation.provenance import canonical_digest, canonical_json
+from gwent_evaluation.provenance import canonical_digest, canonical_json, file_digest
 from gwent_evaluation.records import (
     CorruptRecordError,
     StorageError,
@@ -37,6 +38,7 @@ from gwent_evaluation.records import (
     trajectory_step_from_dict,
     trajectory_step_to_dict,
 )
+from gwent_evaluation.validation import LoadedRun, validate_loaded_run, validate_trajectory
 
 
 class RunConflictError(StorageError):
@@ -91,22 +93,16 @@ class RunStore:
     def trajectory_path(self, case_id: str) -> Path:
         return self.evidence_dir / f"{case_id}.trajectory.json"
 
-    def evidence_refs(self, case_id: str, *, include_trajectory: bool) -> EvidenceRefs:
-        return EvidenceRefs(
-            samples_path=self._relative(self.samples_path(case_id)),
-            trajectory_path=(
-                self._relative(self.trajectory_path(case_id)) if include_trajectory else None
-            ),
-        )
-
-    def prepare(self, manifest: RunManifest, *, matches: tuple[ScheduledMatch, ...]) -> None:
+    def prepare(self, manifest: RunManifest, *, matches: tuple[ScheduledMatch, ...]) -> LoadedRun:
         identity = run_manifest_identity(manifest)
         if self.root.exists():
-            if self._read_manifest_identity() != identity:
+            loaded = self.load()
+            if run_manifest_identity(loaded.manifest) != identity or loaded.matches != matches:
                 raise RunConflictError(
                     f"Run {self.run_id!r} already exists with a different manifest."
                 )
-            return
+            return loaded
+        validate_loaded_run(LoadedRun(manifest, matches, {}))
         self.matches_dir.mkdir(parents=True, exist_ok=True)
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         _atomic_write_text(
@@ -117,6 +113,8 @@ class RunStore:
             self.schedule_path,
             "".join(canonical_json(record_to_dict(match)) + "\n" for match in matches),
         )
+
+        return LoadedRun(manifest, matches, {})
 
     def read_manifest(self) -> RunManifest:
         if not self.manifest_path.exists():
@@ -129,12 +127,18 @@ class RunStore:
             error_factory=StorageError,
         )
         payload = {key: value for key, value in document.items() if key != "manifest_identity"}
-        manifest = run_manifest_from_dict(payload)
+        try:
+            manifest = run_manifest_from_dict(payload)
+        except ValueError as error:
+            raise CorruptRecordError(str(error)) from error
         if run_manifest_identity(manifest) != identity:
             raise CorruptRecordError(f"Manifest identity mismatch for {self.manifest_path}.")
         return manifest
 
     def read_result(self, case_id: str) -> MatchResult | None:
+        return self.load().results.get(case_id)
+
+    def _read_result(self, case_id: str) -> MatchResult | None:
         path = self.result_path(case_id)
         if not path.exists():
             return None
@@ -148,7 +152,10 @@ class RunStore:
         payload = {key: value for key, value in document.items() if key != "record_digest"}
         if canonical_digest(payload) != digest:
             raise CorruptRecordError(f"Record digest mismatch for {path}.")
-        result = match_result_from_dict(payload)
+        try:
+            result = match_result_from_dict(payload)
+        except ValueError as error:
+            raise CorruptRecordError(str(error)) from error
         if result.case_id != case_id:
             raise CorruptRecordError(f"Record case id mismatch for {path}: {result.case_id!r}.")
         return result
@@ -177,10 +184,23 @@ class RunStore:
         *,
         card_registry: CardRegistry | None = None,
     ) -> tuple[TrajectoryStep, ...] | None:
+        loaded = self.load(trajectory_cases=(case_id,), card_registry=card_registry)
+        if case_id not in loaded.results:
+            raise CorruptRecordError("Trajectory has no bound result.")
+        return loaded.trajectories.get(case_id)
+
+    def _read_trajectory(
+        self,
+        result: MatchResult,
+        match: ScheduledMatch,
+        *,
+        card_registry: CardRegistry | None,
+    ) -> tuple[TrajectoryStep, ...]:
+        case_id = match.case_id
         path = self.trajectory_path(case_id)
-        if not path.exists():
-            return None
         document = _read_record_mapping(path)
+        if document.get("execution_identity") != result.execution_identity:
+            raise CorruptRecordError("Trajectory belongs to another execution.")
         recorded_case_id = require_str_field(
             document,
             "case_id",
@@ -197,7 +217,11 @@ class RunStore:
             context=str(path),
             error_factory=CorruptRecordError,
         )
-        return tuple(trajectory_step_from_dict(step, card_registry=card_registry) for step in steps)
+        trajectory = tuple(
+            trajectory_step_from_dict(step, card_registry=card_registry) for step in steps
+        )
+        validate_trajectory(trajectory, result, match)
+        return trajectory
 
     def write_result(self, result: MatchResult) -> None:
         payload = record_to_dict(result)
@@ -214,6 +238,7 @@ class RunStore:
         evidence: MatchEvidence,
         *,
         include_trajectory: bool,
+        execution_identity: str,
     ) -> EvidenceRefs:
         samples_text = "".join(
             canonical_json(decision_sample_to_dict(sample)) + "\n" for sample in evidence.samples
@@ -222,44 +247,77 @@ class RunStore:
         trajectory_path = self.trajectory_path(case_id)
         if include_trajectory:
             trajectory_payload = {
+                "execution_identity": execution_identity,
                 "case_id": case_id,
                 "steps": [trajectory_step_to_dict(step) for step in evidence.trajectory],
             }
             _atomic_write_text(trajectory_path, canonical_json(trajectory_payload))
         elif trajectory_path.exists():
             trajectory_path.unlink()
-        return self.evidence_refs(case_id, include_trajectory=include_trajectory)
-
-    def _read_manifest_identity(self) -> str:
-        if not self.manifest_path.exists():
-            raise RunConflictError(f"Run directory {self.root} exists without a manifest.")
-        document = _read_record_mapping(self.manifest_path)
-        return require_str_field(
-            document,
-            "manifest_identity",
-            context=str(self.manifest_path),
-            error_factory=StorageError,
+        return EvidenceRefs(
+            samples_path=self._relative(self.samples_path(case_id)),
+            samples_digest=file_digest(self.samples_path(case_id)),
+            trajectory_path=self._relative(trajectory_path) if include_trajectory else None,
+            trajectory_digest=file_digest(trajectory_path) if include_trajectory else None,
         )
+
+    def load(
+        self, *, trajectory_cases: tuple[str, ...] = (), card_registry: CardRegistry | None = None
+    ) -> LoadedRun:
+        if trajectory_cases and card_registry is None:
+            card_registry = resolve_assets().card_registry
+        manifest = self.read_manifest()
+        matches = self.read_schedule()
+        results: dict[str, MatchResult] = {}
+        for match in matches:
+            result = self._read_result(match.case_id)
+            if result is not None:
+                results[match.case_id] = result
+        loaded = LoadedRun(manifest, matches, results)
+        validate_loaded_run(loaded)
+        trajectories: dict[str, tuple[TrajectoryStep, ...]] = {}
+        for match in matches:
+            result = results.get(match.case_id)
+            if result is None:
+                continue
+            self._verify_evidence(result)
+            if match.case_id in trajectory_cases and result.evidence.trajectory_path is not None:
+                trajectories[match.case_id] = self._read_trajectory(
+                    result,
+                    match,
+                    card_registry=card_registry,
+                )
+        return LoadedRun(manifest, matches, results, trajectories)
+
+    def _verify_evidence(self, result: MatchResult) -> None:
+        for recorded_path, digest, expected_path in (
+            (
+                result.evidence.samples_path,
+                result.evidence.samples_digest,
+                self.samples_path(result.case_id),
+            ),
+            (
+                result.evidence.trajectory_path,
+                result.evidence.trajectory_digest,
+                self.trajectory_path(result.case_id),
+            ),
+        ):
+            if recorded_path is None:
+                if digest is not None:
+                    raise CorruptRecordError("Evidence digest without a path.")
+                continue
+            if recorded_path != self._relative(expected_path):
+                raise CorruptRecordError("Unexpected evidence path.")
+            if digest is None or file_digest(expected_path) != digest:
+                raise CorruptRecordError(f"Evidence digest mismatch for {expected_path}.")
 
     def _relative(self, path: Path) -> str:
         return path.relative_to(self.root).as_posix()
 
 
 def run_manifest_identity(manifest: RunManifest) -> str:
-    """Stable identity of a run's immutable inputs, excluding machine provenance."""
-
-    return canonical_digest(
-        {
-            "run_id": manifest.run_id,
-            "suite": manifest.suite,
-            "planned_case_ids": manifest.planned_case_ids,
-            "seed_derivation_version": manifest.seed_derivation_version,
-            "case_id_version": manifest.case_id_version,
-            "candidate": manifest.candidate,
-            "opponents": manifest.opponents,
-            "assets": manifest.assets,
-        }
-    )
+    """Checksum all persisted manifest inputs, including execution provenance."""
+    return canonical_digest(manifest)
 
 
 def _read_record_mapping(path: Path) -> Mapping[str, object]:

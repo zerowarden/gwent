@@ -27,6 +27,7 @@ from gwent_evaluation.execution import CaseExecution, execute_case, semantic_dig
 from gwent_evaluation.models import MatchResult, ScheduledMatch, TrajectoryStep
 from gwent_evaluation.schedule import other_seat
 from gwent_evaluation.storage import RunStore
+from gwent_evaluation.validation import LoadedRun
 
 
 class ReplayError(ValueError):
@@ -60,6 +61,7 @@ class ReplayOutcome:
     case_id: str
     termination: TerminationReason
     reproduced: bool
+    prefix_verified: bool
     replayed_steps: int
     total_steps: int
     divergences: tuple[Divergence, ...]
@@ -75,9 +77,9 @@ def reproduce_case(run_root: Path, case_id: str) -> ReproductionOutcome:
     """Re-execute one recorded case with its declared agents, assets, and seeds."""
 
     store = _store(run_root)
-    match = _require_match(store, case_id)
-    result = _require_result(store, case_id)
     assets = resolve_assets()
+    loaded = store.load(trajectory_cases=(case_id,), card_registry=assets.card_registry)
+    match, result = _require_case(loaded, case_id)
     case = execute_case(
         match,
         candidate=resolve_agent(match.candidate_agent),
@@ -85,7 +87,7 @@ def reproduce_case(run_root: Path, case_id: str) -> ReproductionOutcome:
         assets=assets,
     )
     divergences = _compare_execution(result, case)
-    recorded_steps = store.read_trajectory(case_id, card_registry=assets.card_registry)
+    recorded_steps = loaded.trajectories.get(case_id)
     if divergences and recorded_steps is not None:
         step_divergences = _compare_steps(recorded_steps, case.evidence.trajectory)
         if step_divergences:
@@ -102,17 +104,18 @@ def replay_case(run_root: Path, case_id: str) -> ReplayOutcome:
     """Drive the reducer from recorded actions, without calling policy code."""
 
     store = _store(run_root)
-    match = _require_match(store, case_id)
-    result = _require_result(store, case_id)
     assets = resolve_assets()
-    steps = store.read_trajectory(case_id, card_registry=assets.card_registry)
+    loaded = store.load(trajectory_cases=(case_id,), card_registry=assets.card_registry)
+    match, result = _require_case(loaded, case_id)
+    steps = loaded.trajectories.get(case_id)
     if steps is None:
         raise ReplayError(f"Case {case_id!r} has no persisted trajectory evidence to replay.")
     divergences = _drive(match, steps, assets=assets)
     return ReplayOutcome(
         case_id=case_id,
         termination=result.termination,
-        reproduced=not divergences,
+        reproduced=not divergences and result.termination is TerminationReason.COMPLETED,
+        prefix_verified=not divergences,
         replayed_steps=_replayed_steps(divergences, total=len(steps)),
         total_steps=len(steps),
         divergences=divergences,
@@ -137,6 +140,15 @@ def _drive(
     )
     rng = SeededRandom(match.environment_seed)
     for step in steps:
+        if state != step.state_before:
+            return (
+                Divergence(
+                    step.index,
+                    "state_before",
+                    state_fingerprint(step.state_before),
+                    state_fingerprint(state),
+                ),
+            )
         try:
             action = action_from_id(step.action_id)
         except SerializationError as error:
@@ -260,15 +272,13 @@ def _store(run_root: Path) -> RunStore:
     return RunStore.from_root(run_root)
 
 
-def _require_match(store: RunStore, case_id: str) -> ScheduledMatch:
-    for match in store.read_schedule():
-        if match.case_id == case_id:
-            return match
-    raise ReplayError(f"Case {case_id!r} is not part of run {store.run_id!r}.")
-
-
-def _require_result(store: RunStore, case_id: str) -> MatchResult:
-    result = store.read_result(case_id)
+def _require_case(loaded: LoadedRun, case_id: str) -> tuple[ScheduledMatch, MatchResult]:
+    match = next((match for match in loaded.matches if match.case_id == case_id), None)
+    if match is None:
+        raise ReplayError(f"Case {case_id!r} is not part of run {loaded.manifest.run_id!r}.")
+    result = loaded.results.get(case_id)
     if result is None:
-        raise ReplayError(f"Case {case_id!r} has no persisted result in run {store.run_id!r}.")
-    return result
+        raise ReplayError(
+            f"Case {case_id!r} has no persisted result in run {loaded.manifest.run_id!r}."
+        )
+    return match, result

@@ -9,10 +9,9 @@ from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline import BaseProfileDefinition
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.policy import SearchConfig
-from gwent_engine.ai.search.candidate_generation import generate_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
 from gwent_engine.ai.search.depth_policy import should_search_opponent_reply
 from gwent_engine.ai.search.evaluator import evaluate_search_state
-from gwent_engine.ai.search.move_ordering import order_search_candidates
 from gwent_engine.ai.search.opponent_model import (
     OpponentReplyCandidate,
     generate_opponent_reply_candidates,

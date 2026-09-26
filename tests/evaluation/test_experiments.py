@@ -2,11 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gwent_evaluation import (
-    load_agent_catalog,
-    load_suite_catalog,
-    schedule_suite,
-)
+from gwent_evaluation import load_agent_catalog, load_suite_catalog
+from gwent_evaluation.schedule import schedule_suite
 
 from tests.evaluation.support import REPOSITORY_ROOT
 

@@ -7,24 +7,18 @@ from typing import cast
 
 import pytest
 from gwent_engine.ai.agents import BotAgent
-from gwent_evaluation import (
-    AgentSpec,
-    BootstrapConfig,
-    CorruptRecordError,
-    IntervalMethod,
-    LoadedRun,
-    ReportError,
-    ResolvedAgent,
-    RunExecution,
-    RunStore,
-    SuiteSpec,
+from gwent_evaluation import AgentSpec, SuiteSpec, compare_runs, report_run
+from gwent_evaluation.agents import ResolvedAgent
+from gwent_evaluation.metrics import BootstrapConfig, IntervalMethod
+from gwent_evaluation.models import RunExecution
+from gwent_evaluation.records import CorruptRecordError
+from gwent_evaluation.reporting import (
     build_run_report,
-    compare_runs,
     load_run,
     render_comparison_markdown,
     render_report_markdown,
-    report_run,
 )
+from gwent_evaluation.storage import RunStore
 
 from tests.engine.ai.bots import ThrowingBot
 from tests.evaluation.support import (
@@ -71,10 +65,10 @@ def test_execute_run_writes_json_and_markdown_reports(tmp_path: Path) -> None:
     assert (root / "report.json").is_file()
     assert (root / "report.md").is_file()
     payload = read_json_object(root / "report.json")
-    assert payload["schema_version"] == 1
+    assert payload["schema_version"] == 2
     assert payload["run_id"] == "run"
     assert payload["suite_id"] == "reporting-test"
-    assert payload["observation_contract_version"] == 1
+    assert payload["observation_contract_version"] == 2
     assert payload["planned_matches"] == len(execution.results)
     assert payload["completed_matches"] == len(execution.results)
     assert payload["failed_matches"] == 0
@@ -189,13 +183,8 @@ def test_completed_result_without_score_is_rejected(tmp_path: Path) -> None:
     execution = _execute(tmp_path)
     loaded = load_run(execution.root)
     case_id = loaded.manifest.planned_case_ids[0]
-    corrupted = dict(loaded.results)
-    corrupted[case_id] = replace(corrupted[case_id], candidate_score=None)
-
-    with pytest.raises(ReportError, match="no candidate score"):
-        _ = build_run_report(
-            LoadedRun(manifest=loaded.manifest, matches=loaded.matches, results=corrupted)
-        )
+    with pytest.raises(ValueError, match="inconsistent with its winner"):
+        _ = replace(loaded.results[case_id], candidate_score=None)
 
 
 def test_report_building_is_deterministic(tmp_path: Path) -> None:

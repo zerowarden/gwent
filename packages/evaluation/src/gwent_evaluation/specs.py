@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from enum import Enum
 from pathlib import Path
 
-from gwent_engine.ai.arena import bot_family
-from gwent_engine.ai.baseline.profile_catalog import get_base_profile_definition
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_shared.extract import (
     expect_int,
@@ -28,6 +26,7 @@ from gwent_evaluation.models import (
     SuitePurpose,
     SuiteSpec,
 )
+from gwent_evaluation.models import SpecError as SpecError
 
 type AgentResolver = Callable[[str], AgentSpec]
 
@@ -47,10 +46,6 @@ _SUITE_SPEC_FIELDS = frozenset(
 )
 _AGENT_CATALOG_FIELDS = frozenset({"schema_version", "agents"})
 _SUITE_CATALOG_FIELDS = frozenset({"schema_version", "suites"})
-
-
-class SpecError(ValueError):
-    """Raised when an evaluation spec document is malformed or unsupported."""
 
 
 def load_agent_catalog(path: Path) -> dict[str, AgentSpec]:
@@ -111,7 +106,7 @@ def parse_agent_spec(payload: object, *, context: str = "<agent spec>") -> Agent
         schema_version=schema_version,
         agent_id=agent_id,
         family=family,
-        profile=_resolve_agent_profile(family, profile, context=context),
+        profile=profile,
     )
 
 
@@ -129,7 +124,9 @@ def parse_suite_spec(
     deck_pairs = _require_deck_pairs(mapping, context=context)
     seeds = _require_seeds(mapping, context=context)
     scheduling = _require_enum_field(mapping, "scheduling", SchedulingPolicy, context=context)
-    action_budget = _require_positive_int(mapping, "action_budget", context=context)
+    action_budget = require_int_field(
+        mapping, "action_budget", context=context, error_factory=SpecError
+    )
     candidate = _resolve_agent_reference(mapping, "candidate", resolve_agent, context=context)
     opponents = _resolve_opponent_references(mapping, resolve_agent, context=context)
     return SuiteSpec(
@@ -201,22 +198,6 @@ def _require_enum_field[EnumType: Enum](
     return require_enum_field(mapping, field, enum_type, context=context, error_factory=SpecError)
 
 
-def _resolve_agent_profile(
-    family: BotFamily,
-    profile: str | None,
-    *,
-    context: str,
-) -> str | None:
-    if profile is None:
-        return None
-    if not bot_family(family).accepts_profile:
-        raise SpecError(f"{context} family {family.value!r} does not support a profile override.")
-    try:
-        return get_base_profile_definition(profile).profile_id
-    except ValueError as error:
-        raise SpecError(f"{context} profile {profile!r} is not a recognized profile.") from error
-
-
 def _resolve_agent_reference(
     mapping: Mapping[str, object],
     field: str,
@@ -235,7 +216,6 @@ def _resolve_opponent_references(
     context: str,
 ) -> tuple[AgentSpec, ...]:
     references = _require_nonempty_str_sequence(mapping, "opponents", context=context)
-    _reject_duplicates(references, field="opponents", context=context)
     return tuple(
         _resolve_agent(reference, resolve_agent, context=context) for reference in references
     )
@@ -281,8 +261,6 @@ def _require_deck_pairs(
         context=context,
         error_factory=SpecError,
     )
-    if not raw_pairs:
-        raise SpecError(f"{context} field 'deck_pairs' must not be empty.")
     pairs: list[tuple[str, str]] = []
     for index, raw_pair in enumerate(raw_pairs):
         pair_context = f"{context}.deck_pairs[{index}]"
@@ -296,7 +274,6 @@ def _require_deck_pairs(
             )
         )
     result = tuple(pairs)
-    _reject_duplicates(result, field="deck_pairs", context=context)
     return result
 
 
@@ -306,33 +283,8 @@ def _require_seeds(
     context: str,
 ) -> tuple[int, ...]:
     raw_seeds = require_sequence_field(mapping, "seeds", context=context, error_factory=SpecError)
-    if not raw_seeds:
-        raise SpecError(f"{context} field 'seeds' must not be empty.")
     seeds = tuple(
         expect_int(seed, context=f"{context}.seeds[{index}]", error_factory=SpecError)
         for index, seed in enumerate(raw_seeds)
     )
-    _reject_duplicates(seeds, field="seeds", context=context)
     return seeds
-
-
-def _require_positive_int(
-    mapping: Mapping[str, object],
-    field: str,
-    *,
-    context: str,
-) -> int:
-    value = require_int_field(mapping, field, context=context, error_factory=SpecError)
-    if value <= 0:
-        raise SpecError(f"{context} field {field!r} must be positive, found {value}.")
-    return value
-
-
-def _reject_duplicates(
-    values: Sequence[object],
-    *,
-    field: str,
-    context: str,
-) -> None:
-    if len(set(values)) != len(values):
-        raise SpecError(f"{context} field {field!r} must not contain duplicates.")

@@ -6,17 +6,10 @@ from typing import cast
 import pytest
 from gwent_engine.ai.agents import BotAgent, GreedyBot
 from gwent_engine.ai.arena.models import TerminationReason
-from gwent_evaluation import (
-    AgentSpec,
-    BotFamily,
-    EvidencePolicy,
-    ReplayError,
-    ResolvedAgent,
-    RunExecution,
-    SuiteSpec,
-    replay_case,
-    reproduce_case,
-)
+from gwent_evaluation import AgentSpec, EvidencePolicy, SuiteSpec, replay_case, reproduce_case
+from gwent_evaluation.agents import ResolvedAgent
+from gwent_evaluation.models import BotFamily, RunExecution
+from gwent_evaluation.replay import ReplayError
 
 from tests.engine.ai.bots import AlwaysPassBot, FailingAfterBot
 from tests.evaluation.support import (
@@ -112,14 +105,10 @@ def test_tampered_trajectory_is_detected(tmp_path: Path) -> None:
     case_id = execution.results[0].case_id
     _tamper_step_events(execution.root, case_id, index=3)
 
-    replay = replay_case(execution.root, case_id)
+    from gwent_evaluation.records import CorruptRecordError
 
-    assert replay.reproduced is False
-    assert replay.replayed_steps == 2
-    assert len(replay.divergences) == 1
-    divergence = replay.divergences[0]
-    assert divergence.index == 3
-    assert divergence.field == "event_fingerprints"
+    with pytest.raises(CorruptRecordError, match="Evidence digest mismatch"):
+        _ = replay_case(execution.root, case_id)
 
 
 def test_reproduction_detects_policy_divergence(
@@ -167,8 +156,9 @@ def test_failure_prefix_reproduces_and_replays(
     assert reproduction.reproduced is True
 
     replay = replay_case(execution.root, result.case_id)
-    assert replay.reproduced is True
+    assert replay.reproduced is False
     assert replay.prefix_only is True
+    assert replay.prefix_verified is True
     assert replay.replayed_steps == replay.total_steps
     assert replay.total_steps >= 3
 

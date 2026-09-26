@@ -6,19 +6,14 @@ from pathlib import Path
 import pytest
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_evaluation import (
-    SUPPORTED_SCHEMA_VERSION,
-    AgentResolver,
     AgentSpec,
-    BotFamily,
-    SchedulingPolicy,
-    SpecError,
     SuitePurpose,
     SuiteSpec,
     load_agent_catalog,
     load_suite_catalog,
-    parse_agent_spec,
-    parse_suite_spec,
 )
+from gwent_evaluation.models import SUPPORTED_SCHEMA_VERSION, BotFamily, SchedulingPolicy
+from gwent_evaluation.specs import AgentResolver, SpecError, parse_agent_spec, parse_suite_spec
 
 
 def _stub_resolver(reference: str) -> AgentSpec:

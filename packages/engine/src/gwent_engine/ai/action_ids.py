@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from gwent_engine.core.actions import GameAction
+from gwent_engine.core.actions import GameAction, MulliganSelection
 from gwent_engine.serialize.actions import (
     ActionPayload,
     ActionPayloadValue,
@@ -35,3 +35,8 @@ def action_sort_key(action: GameAction) -> tuple[object, ...]:
         ACTION_TYPE_ORDER[type_name],
         *(payload[key] for key in sorted(payload) if key != "type"),
     )
+
+
+def mulligan_selection_id(selection: MulliganSelection) -> str:
+    cards = ",".join(str(card_id) for card_id in selection.cards_to_replace)
+    return f"{selection.player_id}:{cards}"

@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from gwent_evaluation import canonical_digest, resolve_assets
+from gwent_evaluation.assets import resolve_assets
+from gwent_evaluation.provenance import canonical_digest
 
 
 def test_resolve_assets_rejects_unknown_deck() -> None:

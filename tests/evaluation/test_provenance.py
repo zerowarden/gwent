@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from pathlib import Path
 
 import pytest
-from gwent_evaluation import (
+from gwent_evaluation.provenance import (
     RepositoryProvenance,
     RuntimeProvenance,
     canonical_digest,
@@ -56,3 +57,23 @@ def test_runtime_provenance_records_python_and_packages() -> None:
     assert provenance.python_version
     assert packages["gwent-engine"] is not None
     assert packages["gwent-evaluation"] is not None
+
+
+def test_implementation_digest_identifies_local_source_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from importlib.machinery import ModuleSpec
+
+    from gwent_evaluation import provenance
+
+    for name in ("gwent_engine", "gwent_evaluation", "gwent_shared"):
+        (tmp_path / name).mkdir()
+        _ = (tmp_path / name / "__init__.py").write_text("VALUE = 1\n")
+
+    def spec(name: str) -> ModuleSpec:
+        return ModuleSpec(name, loader=None, origin=str(tmp_path / name / "__init__.py"))
+
+    monkeypatch.setattr(provenance, "find_spec", spec)
+    before = provenance.implementation_digest()
+    _ = (tmp_path / "gwent_engine" / "__init__.py").write_text("VALUE = 2\n")
+    assert provenance.implementation_digest() != before

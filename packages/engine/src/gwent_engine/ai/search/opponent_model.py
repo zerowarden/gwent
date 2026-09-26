@@ -19,8 +19,7 @@ from gwent_engine.ai.observations import (
     build_player_observation,
 )
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
-from gwent_engine.ai.search.candidate_generation import generate_search_candidates
-from gwent_engine.ai.search.move_ordering import order_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
 from gwent_engine.ai.search.types import (
     SearchReplyExplanation,
     SearchTraceFact,

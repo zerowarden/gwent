@@ -92,6 +92,12 @@ def _summon_from_pending(
     summoned_card_instance_id = CardInstanceId(
         f"generated_{summon.summoned_definition_id}_{next_generated_card_counter}"
     )
+    existing_ids = {card.instance_id for card in state.card_instances}
+    while summoned_card_instance_id in existing_ids:
+        next_generated_card_counter += 1
+        summoned_card_instance_id = CardInstanceId(
+            f"generated_{summon.summoned_definition_id}_{next_generated_card_counter}"
+        )
     summoned_card = CardInstance(
         instance_id=summoned_card_instance_id,
         definition_id=summon.summoned_definition_id,

@@ -2,16 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
+from math import fsum
+from random import Random
+
+from gwent_shared.digests import seed_from_text
 
 from gwent_engine.ai.baseline import BaseProfileDefinition, HeuristicBot, build_assessment
+from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import SearchConfig
-from gwent_engine.ai.search.candidate_generation import generate_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
 from gwent_engine.ai.search.explain import (
     SearchDecisionComparison,
     SearchDecisionExplanation,
 )
-from gwent_engine.ai.search.move_ordering import order_search_candidates
 from gwent_engine.ai.search.turn_resolution import TurnSearchResolver
 from gwent_engine.ai.search.types import (
     SearchCandidate,
@@ -251,11 +255,38 @@ class SearchEngine:
         *,
         resolver: TurnSearchResolver,
     ) -> tuple[SearchCandidateEvaluation, ...]:
+        worlds = sample_deck_worlds(simulation, count=self.config.deck_world_samples)
         evaluated_candidates: list[SearchCandidateEvaluation] = []
         for candidate in ordered_candidates:
-            line = self._resolve_candidate_line(simulation, candidate, resolver=resolver)
-            if line is None:
+            lines = tuple(
+                self._resolve_candidate_line(world, candidate, resolver=resolver)
+                for world in worlds
+            )
+            valid_lines = tuple(line for line in lines if line is not None)
+            if len(valid_lines) != len(worlds):
                 continue
+            representative = valid_lines[0]
+            mean_value = fsum(line.value for line in valid_lines) / len(valid_lines)
+            line = replace(
+                representative,
+                value=mean_value,
+                explanation=replace(
+                    representative.explanation,
+                    root_adjustments=(
+                        *representative.explanation.root_adjustments,
+                        SearchValueTerm(
+                            "sampled_deck_mean",
+                            mean_value - representative.value,
+                            "mean(world_values) - representative_world_value",
+                        ),
+                    ),
+                ),
+                notes=(
+                    *representative.notes,
+                    "representative_deck_world=0",
+                    f"deck_world_values={tuple(line.value for line in valid_lines)}",
+                ),
+            )
             evaluated_candidates.append(
                 SearchCandidateEvaluation(
                     action=candidate.action,
@@ -453,3 +484,19 @@ def build_search_engine(
             profile_definition=profile_definition,
         ),
     )
+
+
+def sample_deck_worlds(simulation: PlayerSimulation, *, count: int) -> tuple[PlayerSimulation, ...]:
+    """Shared root worlds, sampled without access to authoritative draw order."""
+    if count < 1:
+        raise ValueError("deck_world_samples must be positive.")
+    # Materialization always puts the viewer first, retaining the public player id.
+    viewer, opponent = simulation.state.players
+    identity = state_fingerprint(simulation.state)
+    worlds: list[PlayerSimulation] = []
+    for index in range(count):
+        deck = list(viewer.deck)
+        Random(seed_from_text(f"deck-world:{index}:{identity}")).shuffle(deck)
+        state = replace(simulation.state, players=(replace(viewer, deck=tuple(deck)), opponent))
+        worlds.append(replace(simulation, state=state))
+    return tuple(worlds)

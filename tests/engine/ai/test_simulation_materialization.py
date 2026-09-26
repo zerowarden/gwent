@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import build_player_observation
@@ -178,7 +179,10 @@ def test_materialization_is_deterministic() -> None:
     assert state_fingerprint(first) == state_fingerprint(second)
 
 
-def test_materialization_maps_deck_pending_choice_targets_to_synthetic_instances() -> None:
+@pytest.mark.parametrize("reconstruct", [False, True])
+def test_materialization_maps_deck_pending_choice_targets_to_synthetic_instances(
+    reconstruct: bool,
+) -> None:
     state = (
         scenario("materialize_leader_pending_choice")
         .player(
@@ -210,12 +214,22 @@ def test_materialization_maps_deck_pending_choice_targets_to_synthetic_instances
         .build()
     )
 
-    simulation = _materialize(state)
+    from gwent_engine.ai.observation_records import player_observation_from_dict
+    from gwent_engine.ai.observations import player_observation_to_dict
+
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    if reconstruct:
+        reconstructed = player_observation_from_dict(player_observation_to_dict(observation))
+        assert reconstructed == observation
+        observation = reconstructed
+    simulation = materialize_player_simulation(observation, card_registry=CARD_REGISTRY)
     materialized = simulation.state
     assert materialized.pending_choice is not None
 
-    for card_id in materialized.pending_choice.legal_target_card_instance_ids:
-        _ = materialized.card(card_id)
+    assert state.pending_choice is not None
+    for card_id in state.pending_choice.legal_target_card_instance_ids:
+        translated = simulation.deck_instance_map.get(card_id, card_id)
+        assert materialized.card(translated).definition_id == state.card(card_id).definition_id
 
     deck_targets = tuple(
         card_id
@@ -310,3 +324,161 @@ def test_materialization_only_uses_visible_pending_choice() -> None:
     materialized = _materialize(state).state
 
     assert materialized.pending_choice is None
+
+
+def test_active_weather_resolves_and_can_be_cleared_in_search() -> None:
+    from gwent_engine.ai.search import SearchBot
+    from gwent_engine.core.actions import PlayCardAction
+
+    state = (
+        scenario("active_weather")
+        .weather(
+            rows(
+                close=[card("frost", "neutral_biting_frost", owner="p1")],
+                ranged=[card("fog", "neutral_impenetrable_fog", owner="p1")],
+                siege=[card("rain", "neutral_torrential_rain", owner="p1")],
+            )
+        )
+        .player(
+            "p1",
+            hand=[card("clear", "neutral_clear_weather")],
+            board=rows(close=[card("unit", "scoiatael_mahakaman_defender")]),
+        )
+        .player("p2", hand=[card("enemy", "neutral_geralt")])
+        .build()
+    )
+    simulation = _materialize(state)
+    for card_id in ("frost", "fog", "rain"):
+        assert simulation.state.card(CardInstanceId(card_id)).zone is Zone.WEATHER
+    check_game_state_invariants(simulation.state, card_registry=simulation.card_registry)
+    actions = enumerate_legal_actions(
+        state, player_id=PLAYER_ONE_ID, card_registry=CARD_REGISTRY, leader_registry=LEADER_REGISTRY
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    chosen = SearchBot().choose_action(
+        observation, actions, card_registry=CARD_REGISTRY, leader_registry=LEADER_REGISTRY
+    )
+    assert chosen in actions
+    clear = next(
+        a for a in actions if isinstance(a, PlayCardAction) and a.card_instance_id == "clear"
+    )
+    cleared, _, _ = apply_action_with_intermediate_state(
+        simulation.state,
+        clear,
+        rng=SeededRandom(0),
+        card_registry=simulation.card_registry,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert cleared.weather.close == cleared.weather.ranged == cleared.weather.siege == ()
+
+
+def test_materialized_avenger_can_summon_after_an_existing_generated_card() -> None:
+    from gwent_engine.core.actions import PassAction, PlayCardAction, ResolveChoiceAction
+    from gwent_engine.core.reducer import apply_action
+
+    state = (
+        scenario("repeat_avenger")
+        .player(
+            "p1",
+            hand=[card("decoy1", "neutral_decoy"), card("decoy2", "neutral_decoy")],
+            board=rows(
+                ranged=[card("cow1", "neutral_avenger_cow"), card("cow2", "neutral_avenger_cow")]
+            ),
+        )
+        .player("p2", hand=[card("enemy", "neutral_geralt")])
+        .build()
+    )
+    state, _ = apply_action(
+        state,
+        PlayCardAction(player_id=PLAYER_ONE_ID, card_instance_id=CardInstanceId("decoy1")),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert state.pending_choice is not None
+    state, _ = apply_action(
+        state,
+        ResolveChoiceAction(
+            player_id=PLAYER_ONE_ID,
+            choice_id=state.pending_choice.choice_id,
+            selected_card_instance_ids=(CardInstanceId("cow1"),),
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    state, _ = apply_action(
+        state,
+        PassAction(player_id=PLAYER_TWO_ID),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert state.generated_card_counter == 1
+    simulation = _materialize(state)
+    assert simulation.state.generated_card_counter == 0
+    for current, registry in ((state, CARD_REGISTRY), (simulation.state, simulation.card_registry)):
+        after, _ = apply_action(
+            current,
+            PlayCardAction(player_id=PLAYER_ONE_ID, card_instance_id=CardInstanceId("decoy2")),
+            card_registry=registry,
+            leader_registry=LEADER_REGISTRY,
+        )
+        assert after.pending_choice is not None
+        after, _ = apply_action(
+            after,
+            ResolveChoiceAction(
+                player_id=PLAYER_ONE_ID,
+                choice_id=after.pending_choice.choice_id,
+                selected_card_instance_ids=(CardInstanceId("cow2"),),
+            ),
+            card_registry=registry,
+            leader_registry=LEADER_REGISTRY,
+        )
+        generated = [
+            c.instance_id
+            for c in after.card_instances
+            if c.definition_id == "neutral_bovine_defense_force"
+        ]
+        assert len(generated) == len(set(generated)) == 2
+        check_game_state_invariants(after, card_registry=registry)
+
+
+def test_serialized_deck_handles_reconstruct_every_legal_target() -> None:
+    import json
+    from typing import cast
+
+    from gwent_engine.ai.observation_records import player_observation_from_dict
+    from gwent_engine.ai.observations import player_observation_to_dict
+
+    state = (
+        scenario("deck_handles")
+        .player(
+            "p1",
+            faction="northern_realms",
+            leader_id="northern_realms_foltest_king_of_temeria",
+            deck=[
+                card("fog_handle", "neutral_impenetrable_fog"),
+                card("hero_handle", "neutral_geralt"),
+            ],
+        )
+        .build()
+    )
+    original = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    reconstructed = player_observation_from_dict(
+        cast(object, json.loads(json.dumps(player_observation_to_dict(original))))
+    )
+    assert reconstructed == original
+    simulation = materialize_player_simulation(reconstructed, card_registry=CARD_REGISTRY)
+    actions = enumerate_legal_actions(
+        state, player_id=PLAYER_ONE_ID, card_registry=CARD_REGISTRY, leader_registry=LEADER_REGISTRY
+    )
+    for action in actions:
+        if (
+            isinstance(action, UseLeaderAbilityAction)
+            and action.target_card_instance_id is not None
+        ):
+            translated = simulation.translate_action(action)
+            assert isinstance(translated, UseLeaderAbilityAction)
+            assert translated.target_card_instance_id is not None
+            assert (
+                simulation.state.card(translated.target_card_instance_id).definition_id
+                == state.card(action.target_card_instance_id).definition_id
+            )

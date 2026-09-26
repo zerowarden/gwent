@@ -4,9 +4,11 @@ from gwent_engine.ai.arena.catalog import (
     BotFamily,
     BotFamilyDefinition,
     bot_family,
+    create_bot,
+    create_seeded_bot,
+    parse_bot_spec,
     supported_bot_families,
 )
-from gwent_engine.ai.arena.factory import create_bot, create_seeded_bot, parse_bot_spec
 from gwent_engine.ai.arena.models import (
     MatchDecision,
     MatchDecisionKind,

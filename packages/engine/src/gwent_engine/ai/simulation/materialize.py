@@ -93,12 +93,14 @@ def materialize_player_simulation(
         rows=builder.observed_rows(opponent_public.rows, zone=Zone.BATTLEFIELD),
     )
 
+    weather = builder.observed_rows(public.battlefield_weather, zone=Zone.WEATHER)
+    card_instances = tuple(builder.instances)
     return PlayerSimulation(
         state=GameState(
             game_id=public.game_id,
             players=(viewer_state, opponent_state),
-            card_instances=tuple(builder.instances),
-            weather=builder.observed_rows(public.battlefield_weather, zone=Zone.WEATHER),
+            card_instances=card_instances,
+            weather=weather,
             pending_choice=_materialize_pending_choice(
                 observation.visible_pending_choice,
                 deck_instance_map=builder.deck_instance_map,

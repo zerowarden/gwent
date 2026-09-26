@@ -25,7 +25,7 @@ from gwent_engine.core.state import GameState, PendingChoice, PlayerState, RowSt
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.serialize.to_dict import pending_choice_fields_to_dict
 
-OBSERVATION_CONTRACT_VERSION = 1
+OBSERVATION_CONTRACT_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +211,7 @@ def observed_deck_entry_to_dict(entry: ObservedDeckEntry) -> dict[str, object]:
     return {
         "definition_id": str(entry.definition_id),
         "count": entry.count,
+        "instance_ids": sorted(str(instance_id) for instance_id in entry.instance_ids),
     }
 
 

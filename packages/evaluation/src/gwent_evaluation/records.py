@@ -13,7 +13,7 @@ from gwent_engine.ai.arena.models import (
 )
 from gwent_engine.ai.observations import player_observation_to_dict
 from gwent_engine.cards import CardRegistry
-from gwent_engine.core.errors import SerializationError
+from gwent_engine.core.errors import GwentEngineError
 from gwent_engine.core.ids import GameId, PlayerId, player_id
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import game_state_from_dict, game_state_to_dict
@@ -85,6 +85,7 @@ def decision_sample_to_dict(sample: DecisionSample) -> dict[str, object]:
         "legal_option_ids": list(sample.legal_option_ids),
         "chosen_option_id": sample.chosen_option_id,
         "duration_seconds": sample.duration_seconds,
+        "failure": None if sample.failure is None else record_to_dict(sample.failure),
     }
 
 
@@ -147,6 +148,9 @@ def match_result_from_dict(payload: object) -> MatchResult:
             context=context,
             error_factory=StorageError,
         ),
+        final_state_digest=optional_str_field(
+            mapping, "final_state_digest", context=context, error_factory=StorageError
+        ),
         semantic_digest=require_str_field(
             mapping, "semantic_digest", context=context, error_factory=StorageError
         ),
@@ -156,6 +160,9 @@ def match_result_from_dict(payload: object) -> MatchResult:
             mapping, "environment_seed", context=context, error_factory=StorageError
         ),
         evidence=_evidence_refs_from_dict(mapping, context=context),
+        execution_identity=require_str_field(
+            mapping, "execution_identity", context=context, error_factory=StorageError
+        ),
         failure=_failure_from_dict(mapping, context=context),
     )
 
@@ -343,6 +350,9 @@ def _repository_provenance_from_dict(payload: object, *, context: str) -> Reposi
     return RepositoryProvenance(
         commit=optional_str_field(mapping, "commit", context=context, error_factory=StorageError),
         dirty=optional_bool_field(mapping, "dirty", context=context, error_factory=StorageError),
+        implementation_digest=optional_str_field(
+            mapping, "implementation_digest", context=context, error_factory=StorageError
+        ),
         lockfile_digest=optional_str_field(
             mapping, "lockfile_digest", context=context, error_factory=StorageError
         ),
@@ -460,7 +470,7 @@ def _game_state_from_dict(
             expect_mapping(payload, context=context, error_factory=StorageError),
             card_registry=card_registry,
         )
-    except SerializationError as error:
+    except GwentEngineError as error:
         raise CorruptRecordError(f"{context}: {error}") from error
 
 
@@ -555,7 +565,13 @@ def _evidence_refs_from_dict(
         error_factory=StorageError,
     )
     return EvidenceRefs(
-        samples_path=require_str_field(
+        samples_digest=optional_str_field(
+            evidence, "samples_digest", context=evidence_context, error_factory=StorageError
+        ),
+        trajectory_digest=optional_str_field(
+            evidence, "trajectory_digest", context=evidence_context, error_factory=StorageError
+        ),
+        samples_path=optional_str_field(
             evidence,
             "samples_path",
             context=evidence_context,

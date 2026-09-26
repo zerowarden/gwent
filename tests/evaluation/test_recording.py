@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+import pytest
 from gwent_engine.ai.action_ids import action_to_id
+from gwent_engine.ai.agents import GreedyBot
 from gwent_engine.ai.arena import (
     MatchDecisionKind,
     MatchStepKind,
 )
+from gwent_engine.ai.baseline import HeuristicBot
 from gwent_engine.ai.hashing import state_fingerprint
+from gwent_engine.ai.observations import PlayerObservation
+from gwent_engine.cards import CardRegistry
 from gwent_engine.cli.recording import CliMatchRecorder
-from gwent_evaluation import DecisionSample, ExperimentRecorder
+from gwent_engine.core.actions import GameAction, MulliganSelection
+from gwent_engine.leaders import LeaderRegistry
+from gwent_evaluation.models import DecisionSample
+from gwent_evaluation.recording import ExperimentRecorder
 
 from tests.engine.support import (
     CARD_REGISTRY,
@@ -73,3 +83,76 @@ def test_experiment_and_rich_recordings_agree_on_semantics() -> None:
     assert tuple(state_fingerprint(step.state_after) for step in evidence.trajectory) == tuple(
         state_fingerprint(step.state_after) for step in rich.steps
     )
+
+
+def test_second_mulligan_failure_retains_both_decision_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gwent_engine.ai.agents import GreedyBot
+    from gwent_engine.ai.arena import TerminationReason
+
+    from tests.engine.support import PLAYER_TWO_ID
+
+    original = GreedyBot.choose_mulligan
+
+    def choose(
+        self: GreedyBot,
+        observation: PlayerObservation,
+        legal_selections: Sequence[MulliganSelection],
+        *,
+        card_registry: CardRegistry,
+        leader_registry: LeaderRegistry | None = None,
+    ) -> MulliganSelection:
+        if observation.viewer_player_id == PLAYER_TWO_ID:
+            raise RuntimeError("second mulligan failed")
+        return original(
+            self,
+            observation,
+            legal_selections,
+            card_registry=card_registry,
+            leader_registry=leader_registry,
+        )
+
+    monkeypatch.setattr(GreedyBot, "choose_mulligan", choose)
+    recorder = ExperimentRecorder()
+    execution = execute_recorded_match(game_id="failed_mulligan", recorder=recorder)
+    assert execution.termination is TerminationReason.AGENT_ERROR
+    assert execution.decision_count == 2
+    assert len(recorder.samples) == 2
+    assert recorder.samples[0].failure is None
+    assert recorder.samples[0].chosen_option_id is not None
+    assert recorder.samples[1].failure is not None
+    assert recorder.samples[1].observation.viewer_player_id == PLAYER_TWO_ID
+    assert recorder.samples[1].chosen_option_id is None
+    assert len(recorder.trajectory) == 1
+
+
+def test_illegal_returned_action_is_recorded_before_rejection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from gwent_engine.ai.arena import TerminationReason
+    from gwent_engine.ai.baseline import HeuristicBot
+    from gwent_engine.core.actions import PassAction
+
+    from tests.engine.support import PLAYER_TWO_ID
+
+    def choose(
+        self: HeuristicBot,
+        observation: PlayerObservation,
+        legal_actions: Sequence[GameAction],
+        *,
+        card_registry: CardRegistry,
+        leader_registry: LeaderRegistry | None = None,
+    ) -> GameAction:
+        del self, observation, legal_actions, card_registry, leader_registry
+        return PassAction(player_id=PLAYER_TWO_ID)
+
+    monkeypatch.setattr(HeuristicBot, "choose_action", choose)
+    recorder = ExperimentRecorder()
+    execution = execute_recorded_match(game_id="invalid_attempt", recorder=recorder)
+    assert execution.termination is TerminationReason.ILLEGAL_ACTION
+    attempt = recorder.samples[-1]
+    assert attempt.failure is not None
+    assert attempt.chosen_option_id == action_to_id(PassAction(player_id=PLAYER_TWO_ID))
+    assert attempt.chosen_option_id not in attempt.legal_option_ids
+    assert len(recorder.trajectory) == execution.accepted_transitions + 1
