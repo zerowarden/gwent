@@ -10,7 +10,8 @@ from gwent_engine.ai.baseline.pending_choice import choose_pending_choice_action
 from gwent_engine.ai.baseline.profile_catalog import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
-    get_base_profile_definition,
+    profile_bot_display_name,
+    resolve_base_profile,
 )
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig
@@ -33,21 +34,15 @@ class HeuristicBot:
         bot_id: str = "heuristic_bot",
     ) -> None:
         self.bot_id = bot_id
-        self.display_name = (
-            "HeuristicBot"
-            if profile_definition.profile_id == DEFAULT_BASE_PROFILE.profile_id
-            else f"HeuristicBot[{profile_definition.profile_id}]"
-        )
+        self.display_name = profile_bot_display_name("HeuristicBot", profile_definition)
         self._config = config
         self._profile_definition = profile_definition
 
     @staticmethod
     def from_profile_id(*, bot_id: str, profile_id: str | None) -> HeuristicBot:
-        if profile_id is None:
-            return HeuristicBot(bot_id=bot_id)
         return HeuristicBot(
             bot_id=bot_id,
-            profile_definition=get_base_profile_definition(profile_id),
+            profile_definition=resolve_base_profile(profile_id),
         )
 
     def choose_mulligan(

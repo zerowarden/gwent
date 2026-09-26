@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gwent-evaluation"
+version = "0.1.0"
+description = "Reproducible evaluation infrastructure for the Witcher 3 Gwent engine"
+requires-python = ">=3.12"
+dependencies = [
+    "gwent-engine",
+]
+
+[tool.uv.sources]
+gwent-engine = { workspace = true }
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gwent_evaluation*"]
+
+[tool.setuptools.package-data]
+gwent_evaluation = ["py.typed"]

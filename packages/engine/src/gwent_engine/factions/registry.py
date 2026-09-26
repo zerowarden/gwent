@@ -1,31 +1,23 @@
-from collections.abc import Iterable
-from dataclasses import dataclass
-from types import MappingProxyType
+from __future__ import annotations
 
-from gwent_shared.error_translation import translate_mapping_key
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import ClassVar
 
 from gwent_engine.core import FactionId
-from gwent_engine.core.errors import DuplicateDefinitionError, UnknownFactionError
-from gwent_engine.core.registry import MappingRegistry
+from gwent_engine.core.errors import UnknownFactionError
+from gwent_engine.core.registry import MappingRegistry, build_registry
 from gwent_engine.factions.models import FactionDefinition
 
 
 @dataclass(frozen=True, slots=True)
 class FactionRegistry(MappingRegistry[FactionId, FactionDefinition]):
-    @classmethod
-    def from_definitions(cls, definitions: Iterable[FactionDefinition]) -> "FactionRegistry":
-        materialized: dict[FactionId, FactionDefinition] = {}
-        for definition in definitions:
-            if definition.faction_id in materialized:
-                raise DuplicateDefinitionError(
-                    f"Duplicate faction definition id: {definition.faction_id!r}"
-                )
-            materialized[definition.faction_id] = definition
-        return cls(MappingProxyType(materialized))
+    _unknown_error: ClassVar[Callable[[object], Exception]] = UnknownFactionError
 
-    def get(self, faction_id: FactionId) -> FactionDefinition:
-        return translate_mapping_key(
-            self._definitions,
-            faction_id,
-            UnknownFactionError,
-        )
+    @classmethod
+    def from_definitions(cls, definitions: Iterable[FactionDefinition]) -> FactionRegistry:
+        return cls(build_registry(definitions, key=_faction_id, label="faction"))
+
+
+def _faction_id(definition: FactionDefinition) -> FactionId:
+    return definition.faction_id

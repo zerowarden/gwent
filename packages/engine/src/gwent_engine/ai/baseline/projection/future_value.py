@@ -110,9 +110,9 @@ def _projected_future_muster_bonus(
     ):
         return 0
     return sum(
-        card_registry.get(entry.definition_id).base_strength * entry.count
-        for entry in observation.viewer_deck_composition
-        if card_registry.get(entry.definition_id).muster_group == definition.resolved_musters_group
+        deck_definition.base_strength
+        for deck_definition in viewer_deck_definitions(observation, card_registry)
+        if deck_definition.muster_group == definition.resolved_musters_group
     )
 
 
@@ -124,21 +124,22 @@ def _projected_future_tight_bond_bonus(
 ) -> int:
     if AbilityKind.TIGHT_BOND not in definition.ability_kinds or definition.bond_group is None:
         return 0
+    visible_cards = (
+        *observation.viewer_hand,
+        *viewer_public(observation).discard,
+        *viewer_public(observation).rows.close,
+        *viewer_public(observation).rows.ranged,
+        *viewer_public(observation).rows.siege,
+    )
     visible_bond_matches = sum(
         1
-        for card in (
-            *observation.viewer_hand,
-            *viewer_public(observation).discard,
-            *viewer_public(observation).rows.close,
-            *viewer_public(observation).rows.ranged,
-            *viewer_public(observation).rows.siege,
-        )
+        for card in visible_cards
         if card_registry.get(card.definition_id).bond_group == definition.bond_group
     )
     visible_bond_matches += sum(
-        entry.count
-        for entry in observation.viewer_deck_composition
-        if card_registry.get(entry.definition_id).bond_group == definition.bond_group
+        1
+        for deck_definition in viewer_deck_definitions(observation, card_registry)
+        if deck_definition.bond_group == definition.bond_group
     )
     return max(0, visible_bond_matches - 1) * definition.base_strength
 

@@ -14,6 +14,8 @@ def is_non_hero_unit(definition: CardDefinition) -> bool:
 
 
 def viewer_deck_instance_ids(observation: PlayerObservation) -> tuple[CardInstanceId, ...]:
+    """Return the viewer's own remaining deck instance ids in canonical order."""
+
     return tuple(
         instance_id
         for entry in observation.viewer_deck_composition
@@ -22,6 +24,8 @@ def viewer_deck_instance_ids(observation: PlayerObservation) -> tuple[CardInstan
 
 
 def viewer_deck_count(observation: PlayerObservation) -> int:
+    """Return how many cards remain in the viewer's own deck."""
+
     return sum(entry.count for entry in observation.viewer_deck_composition)
 
 
@@ -29,11 +33,26 @@ def viewer_deck_definitions(
     observation: PlayerObservation,
     card_registry: CardRegistry,
 ) -> tuple[CardDefinition, ...]:
+    """Return one definition per remaining viewer deck card, preserving multiplicity."""
+
     return tuple(
         card_registry.get(entry.definition_id)
         for entry in observation.viewer_deck_composition
         for _ in entry.instance_ids
     )
+
+
+def viewer_deck_definition(
+    observation: PlayerObservation,
+    card_registry: CardRegistry,
+    card_instance_id: CardInstanceId,
+) -> CardDefinition | None:
+    """Return the definition of one viewer deck instance, or None if not in the deck."""
+
+    for entry in observation.viewer_deck_composition:
+        if card_instance_id in entry.instance_ids:
+            return card_registry.get(entry.definition_id)
+    return None
 
 
 def visible_definitions(

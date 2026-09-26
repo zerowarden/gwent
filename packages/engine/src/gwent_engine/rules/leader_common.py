@@ -161,7 +161,7 @@ def is_agile_battlefield_unit(
     card_id: CardInstanceId,
 ) -> bool:
     definition = card_registry.get(state.card(card_id).definition_id)
-    return definition.card_type == CardType.UNIT and AbilityKind.AGILE in definition.ability_kinds
+    return definition.is_unit_with(AbilityKind.AGILE)
 
 
 def move_battlefield_card_to_row(

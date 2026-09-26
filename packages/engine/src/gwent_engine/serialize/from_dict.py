@@ -4,15 +4,24 @@ from enum import StrEnum
 from typing import cast
 
 from gwent_shared.extract import (
+    expect_constructor_sequence,
+    expect_enum,
     expect_mapping,
+    expect_optional_constructor,
+    expect_optional_enum,
     expect_optional_int,
     expect_sequence,
     expect_str,
+    optional_constructor_field,
+    optional_enum_field,
     require_bool_field,
+    require_constructor_field,
+    require_enum_field,
     require_int_field,
     require_str_field,
 )
 
+from gwent_engine.cards import CardRegistry
 from gwent_engine.core import (
     AbilityKind,
     ChoiceKind,
@@ -61,6 +70,10 @@ from gwent_engine.core.ids import (
     GameId,
     LeaderId,
     PlayerId,
+    card_definition_id,
+    card_instance_id,
+    leader_id,
+    player_id,
 )
 from gwent_engine.core.invariants import check_game_state_invariants
 from gwent_engine.core.state import (
@@ -75,7 +88,11 @@ from gwent_engine.core.state import (
 from gwent_engine.serialize.to_dict import SCHEMA_VERSION
 
 
-def game_state_from_dict(data: Mapping[str, object]) -> GameState:
+def game_state_from_dict(
+    data: Mapping[str, object],
+    *,
+    card_registry: CardRegistry | None = None,
+) -> GameState:
     _validate_root(data, expected_type="game_state", context="game_state")
     with _translate_value_error("game_state"):
         state = GameState(
@@ -129,7 +146,7 @@ def game_state_from_dict(data: Mapping[str, object]) -> GameState:
             ),
             rng_seed=_parse_optional_int(data.get("rng_seed"), context="game_state.rng_seed"),
         )
-    check_game_state_invariants(state)
+    check_game_state_invariants(state, card_registry=card_registry)
     return state
 
 
@@ -493,7 +510,9 @@ def _parse_required_player_id(
     field: str,
     event_type: str,
 ) -> PlayerId:
-    return PlayerId(_require_str(data, field, context=event_type))
+    return require_constructor_field(
+        data, field, player_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_required_card_instance_id(
@@ -501,7 +520,9 @@ def _parse_required_card_instance_id(
     field: str,
     event_type: str,
 ) -> CardInstanceId:
-    return CardInstanceId(_require_str(data, field, context=event_type))
+    return require_constructor_field(
+        data, field, card_instance_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_required_card_definition_id(
@@ -509,7 +530,9 @@ def _parse_required_card_definition_id(
     field: str,
     event_type: str,
 ) -> CardDefinitionId:
-    return CardDefinitionId(_require_str(data, field, context=event_type))
+    return require_constructor_field(
+        data, field, card_definition_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_required_leader_id(
@@ -517,7 +540,9 @@ def _parse_required_leader_id(
     field: str,
     event_type: str,
 ) -> LeaderId:
-    return LeaderId(_require_str(data, field, context=event_type))
+    return require_constructor_field(
+        data, field, leader_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_required_enum_field[EnumT: StrEnum](
@@ -526,10 +551,8 @@ def _parse_required_enum_field[EnumT: StrEnum](
     field: str,
     event_type: str,
 ) -> EnumT:
-    return _parse_enum(
-        enum_type,
-        _require_str(data, field, context=event_type),
-        context=f"{event_type}.{field}",
+    return require_enum_field(
+        data, field, enum_type, context=event_type, error_factory=SerializationError
     )
 
 
@@ -539,10 +562,8 @@ def _parse_optional_enum_field[EnumT: StrEnum](
     field: str,
     event_type: str,
 ) -> EnumT | None:
-    return _parse_optional_enum(
-        enum_type,
-        data.get(field),
-        context=f"{event_type}.{field}",
+    return optional_enum_field(
+        data, field, enum_type, context=event_type, error_factory=SerializationError
     )
 
 
@@ -551,7 +572,9 @@ def _parse_optional_player_id_field(
     field: str,
     event_type: str,
 ) -> PlayerId | None:
-    return _parse_optional_player_id(data.get(field), context=f"{event_type}.{field}")
+    return optional_constructor_field(
+        data, field, player_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_optional_card_instance_id_field(
@@ -559,7 +582,9 @@ def _parse_optional_card_instance_id_field(
     field: str,
     event_type: str,
 ) -> CardInstanceId | None:
-    return _parse_optional_card_instance_id(data.get(field), context=f"{event_type}.{field}")
+    return optional_constructor_field(
+        data, field, card_instance_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_optional_leader_id_field(
@@ -567,7 +592,9 @@ def _parse_optional_leader_id_field(
     field: str,
     event_type: str,
 ) -> LeaderId | None:
-    return _parse_optional_leader_id(data.get(field), context=f"{event_type}.{field}")
+    return optional_constructor_field(
+        data, field, leader_id, context=event_type, error_factory=SerializationError
+    )
 
 
 def _parse_card_instance_ids_field(
@@ -575,7 +602,12 @@ def _parse_card_instance_ids_field(
     field: str,
     event_type: str,
 ) -> tuple[CardInstanceId, ...]:
-    return _parse_card_instance_ids(data.get(field), context=f"{event_type}.{field}")
+    return expect_constructor_sequence(
+        data.get(field),
+        card_instance_id,
+        context=f"{event_type}.{field}",
+        error_factory=SerializationError,
+    )
 
 
 def _parse_players(raw_value: object) -> tuple[PlayerState, PlayerState]:
@@ -786,12 +818,15 @@ def _parse_player_score(
 
 
 def _parse_card_instance_ids(raw_value: object, *, context: str) -> tuple[CardInstanceId, ...]:
-    entries = _require_sequence(raw_value, context=context)
-    return tuple(CardInstanceId(_require_str(entry, context=context)) for entry in entries)
+    return expect_constructor_sequence(
+        raw_value, card_instance_id, context=context, error_factory=SerializationError
+    )
 
 
 def _parse_optional_player_id(raw_value: object, *, context: str) -> PlayerId | None:
-    return _parse_optional_newtype(raw_value, constructor=PlayerId, context=context)
+    return expect_optional_constructor(
+        raw_value, player_id, context=context, error_factory=SerializationError
+    )
 
 
 def _parse_optional_card_instance_id(
@@ -799,22 +834,15 @@ def _parse_optional_card_instance_id(
     *,
     context: str,
 ) -> CardInstanceId | None:
-    return _parse_optional_newtype(raw_value, constructor=CardInstanceId, context=context)
+    return expect_optional_constructor(
+        raw_value, card_instance_id, context=context, error_factory=SerializationError
+    )
 
 
 def _parse_optional_leader_id(raw_value: object, *, context: str) -> LeaderId | None:
-    return _parse_optional_newtype(raw_value, constructor=LeaderId, context=context)
-
-
-def _parse_optional_newtype[T](
-    raw_value: object,
-    *,
-    constructor: Callable[[str], T],
-    context: str,
-) -> T | None:
-    if raw_value is None:
-        return None
-    return constructor(_require_str(raw_value, context=context))
+    return expect_optional_constructor(
+        raw_value, leader_id, context=context, error_factory=SerializationError
+    )
 
 
 def _parse_optional_enum[EnumT: StrEnum](
@@ -823,9 +851,9 @@ def _parse_optional_enum[EnumT: StrEnum](
     *,
     context: str,
 ) -> EnumT | None:
-    if raw_value is None:
-        return None
-    return _parse_enum(enum_type, _require_str(raw_value, context=context), context=context)
+    return expect_optional_enum(
+        raw_value, enum_type, context=context, error_factory=SerializationError
+    )
 
 
 def _parse_optional_int(raw_value: object, *, context: str) -> int | None:
@@ -833,10 +861,7 @@ def _parse_optional_int(raw_value: object, *, context: str) -> int | None:
 
 
 def _parse_enum[EnumT: StrEnum](enum_type: type[EnumT], raw_value: str, *, context: str) -> EnumT:
-    for member in enum_type:
-        if member.value == raw_value:
-            return member
-    raise SerializationError(f"Unknown {context} value: {raw_value!r}")
+    return expect_enum(raw_value, enum_type, context=context, error_factory=SerializationError)
 
 
 @contextmanager

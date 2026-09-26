@@ -15,9 +15,11 @@ from tests.support import write_yaml_fixture
 def test_load_default_base_profiles_contains_expected_profiles() -> None:
     profile_ids = available_base_profile_ids()
 
-    assert "baseline" in profile_ids
+    assert "neutral" in profile_ids
     assert "conservative" in profile_ids
-    assert "aggro" in profile_ids
+    assert "aggressive" in profile_ids
+    assert "baseline" not in profile_ids
+    assert "aggro" not in profile_ids
     assert "tempo" not in profile_ids
 
 
@@ -30,14 +32,16 @@ def test_get_base_profile_definition_returns_loaded_profile() -> None:
     assert profile.pass_overrides.safe_lead_margin == 5
 
 
-def test_get_base_profile_definition_accepts_legacy_tempo_alias() -> None:
-    profile = get_base_profile_definition("tempo")
+@pytest.mark.parametrize("legacy_profile_id", ["tempo", "baseline", "aggro"])
+def test_get_base_profile_definition_rejects_legacy_profile_ids(
+    legacy_profile_id: str,
+) -> None:
+    with pytest.raises(ValueError, match="Unknown profile id"):
+        _ = get_base_profile_definition(legacy_profile_id)
 
-    assert profile.profile_id == "aggro"
 
-
-def test_default_base_profile_matches_baseline_yaml_profile() -> None:
-    profile = get_base_profile_definition("baseline")
+def test_default_base_profile_matches_neutral_yaml_profile() -> None:
+    profile = get_base_profile_definition("neutral")
 
     assert profile == DEFAULT_BASE_PROFILE
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, replace
+
+from gwent_shared.digests import seed_from_text
 
 from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.actions import enumerate_legal_actions
@@ -368,5 +369,4 @@ class TurnSearchResolver:
 
 
 def _branch_seed(parent_seed: int, action: GameAction) -> int:
-    digest = hashlib.sha256(f"{parent_seed}:{action_to_id(action)}".encode()).digest()
-    return int.from_bytes(digest[:8], "big")
+    return seed_from_text(f"{parent_seed}:{action_to_id(action)}")

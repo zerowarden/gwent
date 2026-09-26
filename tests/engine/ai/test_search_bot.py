@@ -24,6 +24,7 @@ from gwent_engine.ai.search.opponent_model import generate_opponent_reply_candid
 from gwent_engine.ai.search.types import SearchResult
 from gwent_engine.ai.simulation import (
     SIMULATION_HIDDEN_CARD_DEFINITION,
+    PlayerSimulation,
     materialize_player_simulation,
 )
 from gwent_engine.cards import CardRegistry
@@ -49,7 +50,11 @@ from ..support import (
 )
 
 
-def _simulate(state: GameState, *, viewer_player_id: PlayerId = PLAYER_ONE_ID):
+def _simulate(
+    state: GameState,
+    *,
+    viewer_player_id: PlayerId = PLAYER_ONE_ID,
+) -> PlayerSimulation:
     observation = build_player_observation(state, viewer_player_id, LEADER_REGISTRY)
     return materialize_player_simulation(
         observation,
@@ -866,7 +871,7 @@ def test_search_engine_explanation_includes_evaluated_lines() -> None:
     explanation = engine.explain_result(result)
 
     assert isinstance(explanation, SearchDecisionExplanation)
-    assert explanation.profile_id == "baseline"
+    assert explanation.profile_id == "neutral"
     assert explanation.evaluations
     assert explanation.principal_line is not None
     assert explanation.principal_line.explanation.leaf_terms

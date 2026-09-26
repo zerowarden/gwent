@@ -14,6 +14,7 @@ from gwent_engine.cli.interactive import BotMatchSelection
 from gwent_engine.cli.main import main
 from gwent_engine.cli.models import CliRun
 from gwent_engine.cli.presenters import summarize_event
+from gwent_engine.cli.report.models import build_report_context
 from gwent_engine.core import AbilityKind
 from gwent_engine.core.events import SpecialCardResolvedEvent
 from gwent_engine.core.ids import CardInstanceId, PlayerId
@@ -74,6 +75,28 @@ def test_bot_match_cli_returns_structured_cli_run() -> None:
     assert run.final_state.status.value == "match_ended"
 
 
+def test_report_context_gates_sections_by_step_kind() -> None:
+    run = run_bot_match_cli(
+        player_one_bot_spec="greedy",
+        player_two_bot_spec="greedy",
+        seed=5,
+    )
+    context = build_report_context(
+        run,
+        player_one_bot_spec="greedy",
+        player_two_bot_spec="greedy",
+        seed=5,
+    )
+    steps = cast(tuple[dict[str, object], ...], context["steps"])
+
+    assert steps[0]["board_state"] is None
+    assert steps[0]["round_summary"] is None
+    assert steps[1]["mulligan_review"] is not None
+    assert steps[1]["board_state"] is None
+    assert any(step["board_state"] is not None for step in steps)
+    assert any(step["round_summary"] is not None for step in steps)
+
+
 def test_bot_match_cli_can_include_bot_explanations() -> None:
     run = run_bot_match_cli(
         player_one_bot_spec="heuristic",
@@ -87,7 +110,7 @@ def test_bot_match_cli_can_include_bot_explanations() -> None:
 
 def test_bot_match_cli_can_include_search_bot_explanations() -> None:
     run = run_bot_match_cli(
-        player_one_bot_spec="search:baseline",
+        player_one_bot_spec="search:neutral",
         player_two_bot_spec="random",
         seed=5,
         include_bot_explanations=True,
@@ -100,7 +123,7 @@ def test_bot_match_cli_can_include_search_bot_explanations() -> None:
     )
 
     assert isinstance(p1_step.bot_explanation, SearchDecisionExplanation)
-    assert p1_step.bot_explanation.profile_id == "baseline"
+    assert p1_step.bot_explanation.profile_id == "neutral"
     assert p1_step.bot_explanation.evaluations
 
 

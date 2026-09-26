@@ -5,6 +5,7 @@ from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.simulation import (
     SIMULATION_HIDDEN_CARD_DEFINITION,
+    PlayerSimulation,
     materialize_player_simulation,
 )
 from gwent_engine.core import ChoiceSourceKind, Row, Zone
@@ -20,7 +21,7 @@ from ..scenario_builder import card, rows, scenario
 from ..support import CARD_REGISTRY, LEADER_REGISTRY, PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
-def _materialize(state: GameState):
+def _materialize(state: GameState) -> PlayerSimulation:
     observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
     return materialize_player_simulation(
         observation,

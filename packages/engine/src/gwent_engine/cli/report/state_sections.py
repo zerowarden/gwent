@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from gwent_engine.ai.arena import MatchStepKind
 from gwent_engine.cli.models import CliRun, CliStep
 from gwent_engine.cli.presenters import round_ended_event, winner_text
 from gwent_engine.cli.report.common import formatted_summary
@@ -13,8 +14,7 @@ from gwent_engine.cli.view_formatters import (
     board_total,
     card_list_text,
 )
-from gwent_engine.core.events import GameEvent, MatchEndedEvent
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, CardInstanceId, PlayerId
 from gwent_engine.core.state import GameState
 
 
@@ -24,7 +24,7 @@ class StateSectionsPresenter:
     formatter: HTMLFormatter
 
     def round_summary_context(self, step: CliStep) -> dict[str, object] | None:
-        if step.round_summary_state is None and not self.has_match_end_event(step.events):
+        if step.kind not in {MatchStepKind.ROUND_ENDED, MatchStepKind.MATCH_ENDED}:
             return None
         state = step.round_summary_state or step.state_after
         round_end = round_ended_event(step.events)
@@ -134,10 +134,6 @@ class StateSectionsPresenter:
             board_total(strengths_by_instance_id, state.players[1].rows.all_cards()),
         )
 
-    @staticmethod
-    def has_match_end_event(events: tuple[GameEvent, ...]) -> bool:
-        return any(isinstance(event, MatchEndedEvent) for event in events)
-
     def _board_rows_context(
         self,
         state: GameState,
@@ -166,37 +162,37 @@ class StateSectionsPresenter:
                 board_row_label("p2 Siege", active=bool(state.weather.siege)),
                 board_total(strengths_by_instance_id, player_two.rows.siege),
                 self._board_card_list_text(player_two.rows.siege, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p2"), "siege"),
+                self._row_horn_active(state, PLAYER_TWO, "siege"),
             ),
             (
                 board_row_label("p2 Ranged", active=bool(state.weather.ranged)),
                 board_total(strengths_by_instance_id, player_two.rows.ranged),
                 self._board_card_list_text(player_two.rows.ranged, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p2"), "ranged"),
+                self._row_horn_active(state, PLAYER_TWO, "ranged"),
             ),
             (
                 board_row_label("p2 Close", active=bool(state.weather.close)),
                 board_total(strengths_by_instance_id, player_two.rows.close),
                 self._board_card_list_text(player_two.rows.close, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p2"), "close"),
+                self._row_horn_active(state, PLAYER_TWO, "close"),
             ),
             (
                 board_row_label("p1 Close", active=bool(state.weather.close)),
                 board_total(strengths_by_instance_id, player_one.rows.close),
                 self._board_card_list_text(player_one.rows.close, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p1"), "close"),
+                self._row_horn_active(state, PLAYER_ONE, "close"),
             ),
             (
                 board_row_label("p1 Ranged", active=bool(state.weather.ranged)),
                 board_total(strengths_by_instance_id, player_one.rows.ranged),
                 self._board_card_list_text(player_one.rows.ranged, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p1"), "ranged"),
+                self._row_horn_active(state, PLAYER_ONE, "ranged"),
             ),
             (
                 board_row_label("p1 Siege", active=bool(state.weather.siege)),
                 board_total(strengths_by_instance_id, player_one.rows.siege),
                 self._board_card_list_text(player_one.rows.siege, strengths_by_instance_id),
-                self._row_horn_active(state, PlayerId("p1"), "siege"),
+                self._row_horn_active(state, PLAYER_ONE, "siege"),
             ),
         )
 

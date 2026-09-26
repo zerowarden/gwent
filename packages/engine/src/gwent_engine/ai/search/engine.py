@@ -16,6 +16,7 @@ from gwent_engine.ai.search.turn_resolution import TurnSearchResolver
 from gwent_engine.ai.search.types import (
     SearchCandidate,
     SearchCandidateEvaluation,
+    SearchLine,
     SearchResult,
     SearchTraceFact,
     SearchValueTerm,
@@ -252,19 +253,9 @@ class SearchEngine:
     ) -> tuple[SearchCandidateEvaluation, ...]:
         evaluated_candidates: list[SearchCandidateEvaluation] = []
         for candidate in ordered_candidates:
-            simulated_action = simulation.translate_action(candidate.action)
-            try:
-                line = resolver.resolve_root_action_with_reply(
-                    simulation.state,
-                    simulated_action,
-                )
-            except IllegalActionError:
-                # Some enumerations (for example leader discard-and-choose
-                # combinations) pass shallow validation but cannot resolve.
-                # Search skips them rather than treating them as engine faults.
+            line = self._resolve_candidate_line(simulation, candidate, resolver=resolver)
+            if line is None:
                 continue
-            if simulated_action != candidate.action:
-                line = replace(line, actions=(candidate.action, *line.actions[1:]))
             evaluated_candidates.append(
                 SearchCandidateEvaluation(
                     action=candidate.action,
@@ -275,6 +266,32 @@ class SearchEngine:
                 )
             )
         return tuple(evaluated_candidates)
+
+    @staticmethod
+    def _resolve_candidate_line(
+        simulation: PlayerSimulation,
+        candidate: SearchCandidate,
+        *,
+        resolver: TurnSearchResolver,
+    ) -> SearchLine | None:
+        """Resolve one candidate on the simulation, keeping its original action.
+
+        Returns None when the candidate passes shallow validation but cannot
+        actually resolve (for example some leader discard-and-choose
+        combinations); search skips those instead of treating them as faults.
+        """
+
+        simulated_action = simulation.translate_action(candidate.action)
+        try:
+            line = resolver.resolve_root_action_with_reply(
+                simulation.state,
+                simulated_action,
+            )
+        except IllegalActionError:
+            return None
+        if simulated_action == candidate.action:
+            return line
+        return replace(line, actions=(candidate.action, *line.actions[1:]))
 
     def _best_evaluation(
         self,

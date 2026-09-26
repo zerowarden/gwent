@@ -71,6 +71,7 @@ def step_to_audit_dict(step: CliStep, *, index: int) -> dict[str, object]:
     return {
         "index": index,
         "action": action_to_dict(step.action),
+        "step_kind": step.kind.value,
         "events": [event_to_dict(event) for event in step.events],
         "state_before": game_state_to_dict(step.state_before),
         "state_after": game_state_to_dict(step.state_after),

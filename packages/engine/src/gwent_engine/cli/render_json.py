@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import cast
 
-from gwent_engine.ai.action_ids import ActionPayloadValue, action_payload
 from gwent_engine.cli.models import CliMetadata
 from gwent_engine.core.actions import GameAction
+from gwent_engine.serialize.actions import ActionPayloadValue, action_payload
 
 
 def metadata_to_dict(metadata: CliMetadata) -> dict[str, object]:
@@ -19,6 +19,7 @@ def metadata_to_dict(metadata: CliMetadata) -> dict[str, object]:
         "p1_leader_name": metadata.player_one_leader_name,
         "p2_leader_name": metadata.player_two_leader_name,
         "rng_name": metadata.rng_name,
+        "environment_seed": metadata.environment_seed,
         "pending_choice_encountered": metadata.pending_choice_encountered,
     }
     if metadata.player_one_actor is not None:

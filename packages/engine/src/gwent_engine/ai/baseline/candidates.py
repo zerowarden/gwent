@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from gwent_engine.ai.actions import action_to_id
@@ -104,15 +104,11 @@ def build_candidate_pool(
             key=lambda candidate: _candidate_sort_key(candidate),
         )
     )
-    always_keep = [candidate for candidate in scored_candidates if candidate.always_keep]
-    ranked = [candidate for candidate in scored_candidates if not candidate.always_keep]
+    always_keep, ranked = _partition_always_keep(scored_candidates)
     retained = always_keep + ranked[: max(0, assessment.legal_action_count)]
-    deduped: dict[str, CandidateAction] = {}
-    for candidate in retained:
-        _ = deduped.setdefault(action_to_id(candidate.action), candidate)
     trimmed = tuple(
         sorted(
-            deduped.values(),
+            _dedupe_by_action_id(retained, action=lambda candidate: candidate.action),
             key=lambda candidate: _candidate_sort_key(candidate),
         )[: config.candidates.max_candidates]
     )
@@ -129,16 +125,31 @@ def shortlist_actions(
 ) -> tuple[GameAction, ...]:
     if not candidates:
         return ()
-    always_keep = [candidate for candidate in candidates if candidate.always_keep]
-    ranked = sorted(
-        (candidate for candidate in candidates if not candidate.always_keep),
-        key=lambda candidate: (-candidate.coarse_score, action_to_id(candidate.action)),
-    )
-    retained = always_keep + ranked[: max(0, candidate_limit - len(always_keep))]
-    deduped: dict[str, GameAction] = {}
-    for candidate in retained:
-        _ = deduped.setdefault(action_to_id(candidate.action), candidate.action)
-    return tuple(sorted(deduped.values(), key=action_to_id))
+    always_keep, ranked = _partition_always_keep(candidates)
+    retained = (*always_keep, *ranked[: max(0, candidate_limit - len(always_keep))])
+    deduped = _dedupe_by_action_id(retained, action=lambda candidate: candidate.action)
+    return tuple(sorted((candidate.action for candidate in deduped), key=action_to_id))
+
+
+def _partition_always_keep(
+    candidates: Iterable[CandidateAction],
+) -> tuple[tuple[CandidateAction, ...], tuple[CandidateAction, ...]]:
+    always_keep: list[CandidateAction] = []
+    ranked: list[CandidateAction] = []
+    for candidate in candidates:
+        (always_keep if candidate.always_keep else ranked).append(candidate)
+    return tuple(always_keep), tuple(ranked)
+
+
+def _dedupe_by_action_id[ItemT](
+    items: Iterable[ItemT],
+    *,
+    action: Callable[[ItemT], GameAction],
+) -> tuple[ItemT, ...]:
+    deduped: dict[str, ItemT] = {}
+    for item in items:
+        _ = deduped.setdefault(action_to_id(action(item)), item)
+    return tuple(deduped.values())
 
 
 def _coarse_action_score(

@@ -1,6 +1,11 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from gwent_engine.ai.arena import (
+    MatchExecution,
+    MatchStepKind,
+    MatchTransition,
+)
 from gwent_engine.ai.debug import HeuristicDecisionExplanation
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.core.actions import GameAction
@@ -9,6 +14,16 @@ from gwent_engine.core.ids import CardInstanceId, DeckId, GameId, LeaderId, Play
 from gwent_engine.core.state import GameState
 
 type BotDecisionExplanation = HeuristicDecisionExplanation | SearchDecisionExplanation
+
+
+class CliMatchExecutionError(RuntimeError):
+    """Raised when a rich review run is requested for a non-completed match."""
+
+    execution: MatchExecution
+
+    def __init__(self, execution: MatchExecution) -> None:
+        super().__init__(f"Bot match did not complete: {execution.termination.value}.")
+        self.execution = execution
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,21 +39,44 @@ class CliMetadata:
     player_two_leader_name: str
     rng_name: str
     pending_choice_encountered: bool
+    environment_seed: int | None = None
     player_one_actor: str | None = None
     player_two_actor: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class CliStep:
-    action: GameAction
-    events: tuple[GameEvent, ...]
-    state_before: GameState
-    state_after: GameState
-    bot_explanation: BotDecisionExplanation | None
-    round_summary_state: GameState | None
+    """CLI-owned projection of one engine transition plus diagnostic richness."""
+
+    transition: MatchTransition
     effective_strengths_before: Mapping[CardInstanceId, int]
     effective_strengths_after: Mapping[CardInstanceId, int]
     round_summary_strengths: Mapping[CardInstanceId, int]
+    bot_explanation: BotDecisionExplanation | None = None
+
+    @property
+    def action(self) -> GameAction:
+        return self.transition.action
+
+    @property
+    def kind(self) -> MatchStepKind:
+        return self.transition.kind
+
+    @property
+    def events(self) -> tuple[GameEvent, ...]:
+        return self.transition.events
+
+    @property
+    def state_before(self) -> GameState:
+        return self.transition.state_before
+
+    @property
+    def state_after(self) -> GameState:
+        return self.transition.state_after
+
+    @property
+    def round_summary_state(self) -> GameState | None:
+        return self.transition.round_summary_state
 
 
 @dataclass(frozen=True, slots=True)

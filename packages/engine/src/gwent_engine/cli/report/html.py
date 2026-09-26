@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+from gwent_shared.json_payloads import dump_pretty_json
 
 from gwent_engine.cli.models import CliRun
 from gwent_engine.cli.report.audit import build_bot_match_audit_payload
@@ -44,18 +45,15 @@ def write_bot_match_review(
         generated_at=generated_at,
     )
     _ = (bundle_dir / "report.json").write_text(
-        json.dumps(
+        dump_pretty_json(
             build_bot_match_audit_payload(
                 run,
                 player_one_bot_spec=player_one_bot_spec,
                 player_two_bot_spec=player_two_bot_spec,
                 seed=seed,
                 generated_at=generated_at,
-            ),
-            sort_keys=True,
-            indent=2,
-        )
-        + "\n",
+            )
+        ),
         encoding="utf-8",
     )
     return report_path

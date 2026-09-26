@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
 from gwent_shared.error_translation import translate_mapping_key
 from gwent_shared.extract import (
-    expect_int,
     expect_mapping,
+    optional_int_field,
     require_mapping_field,
     require_str_field,
 )
@@ -23,9 +24,6 @@ from gwent_engine.core.yaml_parsing import load_yaml_document
 from gwent_engine.resources import bundled_data_path
 
 DEFAULT_BASE_PROFILES_PATH = bundled_data_path("heuristic_profiles.yaml")
-LEGACY_PROFILE_ALIASES = {
-    "tempo": "aggro",
-}
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +60,7 @@ class BaseProfileDefinition:
 
 
 DEFAULT_BASE_PROFILE = BaseProfileDefinition(
-    profile_id="baseline",
+    profile_id="neutral",
     policies=PolicySelection(
         scorch=OPPORTUNISTIC_SCORCH_POLICY_ID,
         leader=AGGRESSIVE_LEADER_POLICY_ID,
@@ -121,12 +119,27 @@ def available_base_profile_ids() -> tuple[str, ...]:
 
 
 def get_base_profile_definition(profile_id: str) -> BaseProfileDefinition:
-    canonical_profile_id = LEGACY_PROFILE_ALIASES.get(profile_id, profile_id)
     return translate_mapping_key(
         load_default_base_profiles(),
-        canonical_profile_id,
-        lambda _canonical_profile_id: ValueError(f"Unknown profile id: {profile_id!r}"),
+        profile_id,
+        lambda _profile_id: ValueError(f"Unknown profile id: {profile_id!r}"),
     )
+
+
+def resolve_base_profile(profile_id: str | None) -> BaseProfileDefinition:
+    """Resolve an optional profile override to the canonical default profile."""
+
+    if profile_id is None:
+        return DEFAULT_BASE_PROFILE
+    return get_base_profile_definition(profile_id)
+
+
+def profile_bot_display_name(base_name: str, profile: BaseProfileDefinition) -> str:
+    """Display names stay stable for the default profile and name overrides otherwise."""
+
+    if profile.profile_id == DEFAULT_BASE_PROFILE.profile_id:
+        return base_name
+    return f"{base_name}[{profile.profile_id}]"
 
 
 def _parse_required_policy_selection(
@@ -235,55 +248,40 @@ def _parse_pass_overrides(
         error_factory=DefinitionLoadError,
     )
     return ProfilePassOverrides(
-        safe_lead_margin=_optional_int_field(
+        safe_lead_margin=optional_int_field(
             pass_mapping,
             "safe_lead_margin",
             context=f"{context}.pass",
+            error_factory=DefinitionLoadError,
         ),
-        elimination_safe_lead_margin=_optional_int_field(
+        elimination_safe_lead_margin=optional_int_field(
             pass_mapping,
             "elimination_safe_lead_margin",
             context=f"{context}.pass",
+            error_factory=DefinitionLoadError,
         ),
-        estimated_opponent_tempo_per_card=_optional_int_field(
+        estimated_opponent_tempo_per_card=optional_int_field(
             pass_mapping,
             "estimated_opponent_tempo_per_card",
             context=f"{context}.pass",
+            error_factory=DefinitionLoadError,
         ),
-        elimination_estimated_opponent_tempo_per_card=_optional_int_field(
+        elimination_estimated_opponent_tempo_per_card=optional_int_field(
             pass_mapping,
             "elimination_estimated_opponent_tempo_per_card",
             context=f"{context}.pass",
+            error_factory=DefinitionLoadError,
         ),
-    )
-
-
-def _optional_int_field(
-    mapping: dict[str, object] | object,
-    field: str,
-    *,
-    context: str,
-) -> int | None:
-    parsed_mapping = expect_mapping(mapping, context=context, error_factory=DefinitionLoadError)
-    raw_value = parsed_mapping.get(field)
-    if raw_value is None:
-        return None
-    return expect_int(
-        raw_value,
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
     )
 
 
 def _optional_float_field(
-    mapping: dict[str, object] | object,
+    mapping: Mapping[str, object],
     field: str,
     *,
     context: str,
 ) -> float | None:
-    parsed_mapping = expect_mapping(mapping, context=context, error_factory=DefinitionLoadError)
-    raw_value = parsed_mapping.get(field)
+    raw_value = mapping.get(field)
     if raw_value is None:
         return None
     if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):

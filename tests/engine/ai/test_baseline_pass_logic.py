@@ -20,7 +20,7 @@ from gwent_engine.core.ids import CardInstanceId
 
 from ..scenario_builder import card, rows, scenario
 from ..support import CARD_REGISTRY, PLAYER_ONE_ID
-from .test_baseline_support import make_assessment, make_final_round_horned_gap_state
+from .support import make_assessment, make_final_round_horned_gap_state
 
 
 def test_should_pass_now_when_opponent_passed_and_viewer_is_ahead() -> None:

@@ -1,29 +1,17 @@
 from typing import cast
 
-from tests.api.support import api_client
+from tests.api.support import api_client, create_match_payload
 
 
 def test_play_card_flow_works_via_http() -> None:
     with api_client() as (client, _repository):
         _ = client.post(
             "/matches",
-            json={
-                "match_id": "api_play_card",
-                "viewer_player_id": "alice",
-                "participants": [
-                    {
-                        "service_player_id": "alice",
-                        "engine_player_id": "p1",
-                        "deck_id": "monsters_muster_swarm_strict",
-                    },
-                    {
-                        "service_player_id": "bob",
-                        "engine_player_id": "p2",
-                        "deck_id": "monsters_muster_swarm_strict",
-                    },
-                ],
-                "rng_seed": 7,
-            },
+            json=create_match_payload(
+                match_id="api_play_card",
+                player_one_deck="monsters_muster_swarm_strict",
+                player_two_deck="monsters_muster_swarm_strict",
+            ),
         )
         _ = client.post(
             "/matches/api_play_card/mulligan",
@@ -55,23 +43,11 @@ def test_illegal_action_surfaces_cleanly_over_http() -> None:
     with api_client() as (client, _repository):
         _ = client.post(
             "/matches",
-            json={
-                "match_id": "api_illegal_play",
-                "viewer_player_id": "alice",
-                "participants": [
-                    {
-                        "service_player_id": "alice",
-                        "engine_player_id": "p1",
-                        "deck_id": "scoiatael_high_stakes",
-                    },
-                    {
-                        "service_player_id": "bob",
-                        "engine_player_id": "p2",
-                        "deck_id": "scoiatael_high_stakes",
-                    },
-                ],
-                "rng_seed": 7,
-            },
+            json=create_match_payload(
+                match_id="api_illegal_play",
+                player_one_deck="scoiatael_high_stakes",
+                player_two_deck="scoiatael_high_stakes",
+            ),
         )
         response = client.post(
             "/matches/api_illegal_play/actions/play-card",

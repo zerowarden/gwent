@@ -1,5 +1,5 @@
 profiles:
-  baseline:
+  neutral:
     policies:
       scorch_policy: opportunistic_scorch
       leader_policy: aggressive
@@ -17,7 +17,7 @@ profiles:
     pass:
       safe_lead_margin: 5
 
-  aggro:
+  aggressive:
     policies:
       scorch_policy: opportunistic_scorch
       leader_policy: aggressive

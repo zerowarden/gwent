@@ -35,7 +35,7 @@ from tests.engine.support import (
 )
 
 from ..scenario_builder import card, rows, scenario
-from .test_baseline_support import (
+from .support import (
     make_mardroeme_transform_choice_state,
     make_steel_forged_noop_state,
 )

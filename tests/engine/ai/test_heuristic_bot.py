@@ -36,7 +36,7 @@ from ..support import (
     choose_bot_response,
     legal_actions_for,
 )
-from .test_baseline_support import (
+from .support import (
     make_clear_weather_leader_state,
     make_final_round_cow_setup_state,
     make_final_round_horned_gap_state,

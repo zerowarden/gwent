@@ -364,30 +364,6 @@ def make_unsafe_pass_winning_play_state() -> GameState:
     )
 
 
-def make_decoy_pending_choice_state() -> GameState:
-    return (
-        scenario("decoy_pending_choice_state")
-        .player(
-            "p1",
-            hand=[card("p1_decoy_source", "neutral_decoy")],
-            board=rows(
-                ranged=[
-                    card("p1_spy_target", "neutral_mysterious_elf", owner="p2"),
-                    card("p1_filler_target", "scoiatael_dol_blathanna_archer"),
-                ]
-            ),
-        )
-        .card_choice(
-            choice_id="decoy_pending_choice",
-            player_id="p1",
-            source_kind=ChoiceSourceKind.DECOY,
-            source_card_instance_id="p1_decoy_source",
-            legal_target_card_instance_ids=("p1_spy_target", "p1_filler_target"),
-        )
-        .build()
-    )
-
-
 def make_final_round_horned_gap_state() -> GameState:
     return (
         scenario("final_round_horned_gap_state")

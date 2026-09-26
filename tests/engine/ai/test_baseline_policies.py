@@ -13,7 +13,7 @@ from gwent_engine.core import Row
 from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 
-from .test_baseline_support import make_assessment, make_player_assessment
+from .support import make_assessment, make_player_assessment
 
 
 def test_compose_profile_uses_base_profile_policy_defaults() -> None:

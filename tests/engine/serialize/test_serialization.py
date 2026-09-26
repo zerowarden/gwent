@@ -1,5 +1,6 @@
 from dataclasses import replace
 
+import pytest
 from gwent_engine.core import (
     AbilityKind,
     EffectSourceCategory,
@@ -10,6 +11,7 @@ from gwent_engine.core import (
     Row,
 )
 from gwent_engine.core.actions import PlayCardAction
+from gwent_engine.core.errors import InvariantError
 from gwent_engine.core.events import (
     AvengerSummonedEvent,
     AvengerSummonQueuedEvent,
@@ -120,6 +122,50 @@ def test_game_state_serialization_roundtrip_with_battlefield_weather() -> None:
 
     assert roundtrip_state == weathered_state
     assert roundtrip_state.battlefield_weather == weathered_state.weather
+
+
+def test_game_state_serialization_roundtrip_with_opponent_side_spy() -> None:
+    spy_state = (
+        scenario("serialization_roundtrip_with_opponent_side_spy")
+        .player(
+            PLAYER_ONE_ID,
+            board=rows(
+                close=[
+                    card(
+                        "p2_spy",
+                        "nilfgaard_shilard_fitz_oesterlen",
+                        owner=PLAYER_TWO_ID,
+                    )
+                ]
+            ),
+        )
+        .build()
+    )
+    payload = game_state_to_dict(spy_state)
+
+    with pytest.raises(InvariantError, match="belongs to"):
+        _ = game_state_from_dict(payload)
+
+    roundtrip_state = game_state_from_dict(payload, card_registry=CARD_REGISTRY)
+
+    assert roundtrip_state == spy_state
+
+
+def test_game_state_serialization_rejects_opponent_side_non_spy() -> None:
+    intruder_state = (
+        scenario("serialization_rejects_opponent_side_non_spy")
+        .player(
+            PLAYER_ONE_ID,
+            board=rows(close=[card("p2_intruder", "nilfgaard_vreemde", owner=PLAYER_TWO_ID)]),
+        )
+        .build()
+    )
+
+    with pytest.raises(InvariantError, match="belongs to"):
+        _ = game_state_from_dict(
+            game_state_to_dict(intruder_state),
+            card_registry=CARD_REGISTRY,
+        )
 
 
 def test_event_serialization_roundtrip() -> None:

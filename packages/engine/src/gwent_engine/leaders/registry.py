@@ -1,31 +1,23 @@
-from collections.abc import Iterable
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from types import MappingProxyType
+from typing import ClassVar
 
-from gwent_shared.error_translation import translate_mapping_key
-
-from gwent_engine.core.errors import DuplicateDefinitionError, UnknownLeaderDefinitionError
+from gwent_engine.core.errors import UnknownLeaderDefinitionError
 from gwent_engine.core.ids import LeaderId
-from gwent_engine.core.registry import MappingRegistry
+from gwent_engine.core.registry import MappingRegistry, build_registry
 from gwent_engine.leaders.models import LeaderDefinition
 
 
 @dataclass(frozen=True, slots=True)
 class LeaderRegistry(MappingRegistry[LeaderId, LeaderDefinition]):
-    @classmethod
-    def from_definitions(cls, definitions: Iterable[LeaderDefinition]) -> "LeaderRegistry":
-        materialized: dict[LeaderId, LeaderDefinition] = {}
-        for definition in definitions:
-            if definition.leader_id in materialized:
-                raise DuplicateDefinitionError(
-                    f"Duplicate leader definition id: {definition.leader_id!r}"
-                )
-            materialized[definition.leader_id] = definition
-        return cls(MappingProxyType(materialized))
+    _unknown_error: ClassVar[Callable[[object], Exception]] = UnknownLeaderDefinitionError
 
-    def get(self, leader_id: LeaderId) -> LeaderDefinition:
-        return translate_mapping_key(
-            self._definitions,
-            leader_id,
-            UnknownLeaderDefinitionError,
-        )
+    @classmethod
+    def from_definitions(cls, definitions: Iterable[LeaderDefinition]) -> LeaderRegistry:
+        return cls(build_registry(definitions, key=_leader_id, label="leader"))
+
+
+def _leader_id(definition: LeaderDefinition) -> LeaderId:
+    return definition.leader_id

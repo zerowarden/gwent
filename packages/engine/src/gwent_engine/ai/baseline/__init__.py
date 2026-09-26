@@ -52,6 +52,8 @@ from gwent_engine.ai.baseline.profile_catalog import (
     get_base_profile_definition,
     load_base_profiles,
     load_default_base_profiles,
+    profile_bot_display_name,
+    resolve_base_profile,
 )
 from gwent_engine.ai.baseline.profiles import HeuristicProfile, WeightProvenance, compose_profile
 from gwent_engine.ai.policy import (
@@ -117,6 +119,8 @@ __all__ = [
     "load_base_profiles",
     "load_default_base_profiles",
     "minimum_commitment_finish",
+    "profile_bot_display_name",
+    "resolve_base_profile",
     "should_continue_contesting",
     "should_pass_now",
 ]

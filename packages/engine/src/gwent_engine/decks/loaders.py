@@ -1,3 +1,4 @@
+from collections import Counter
 from pathlib import Path
 
 from gwent_engine.cards import CardDefinition, CardRegistry, DeckDefinition
@@ -127,15 +128,14 @@ def _validate_deck_copy_limits(
     *,
     card_registry: CardRegistry,
 ) -> None:
-    counts: dict[CardDefinitionId, int] = {}
-    for definition_id in card_definition_ids:
-        counts[definition_id] = counts.get(definition_id, 0) + 1
+    counts = Counter(card_definition_ids)
     for definition_id, count in counts.items():
         definition = card_registry.get(definition_id)
-        if definition.max_copies_per_deck is not None and count > definition.max_copies_per_deck:
+        violation = definition.explicit_copy_limit_violation(count)
+        if violation is not None:
             raise DefinitionLoadError(
                 f"{context} contains {count} copies of {definition_id!r}, "
-                + f"exceeding the limit of {definition.max_copies_per_deck}."
+                + f"exceeding the limit of {violation}."
             )
 
 

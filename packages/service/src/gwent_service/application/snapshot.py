@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from gwent_engine.core.state import GameState
@@ -9,31 +9,54 @@ from gwent_service.domain.models import (
     StagedMulliganSubmission,
     StoredMatch,
     StoredPlayerSlot,
-    find_service_player_slot,
 )
 from gwent_service.engine.contracts import EngineAdapter
 
 
 @dataclass(frozen=True, slots=True)
 class MatchSnapshot:
-    match_id: str
+    """A persisted match record plus its deserialized engine state.
+
+    `stored` is the single source of truth for record fields; the snapshot
+    exposes them as pass-through properties so callers keep a flat surface.
+    """
+
+    stored: StoredMatch
     state: GameState
-    event_log_payloads: tuple[dict[str, object], ...]
-    player_slots: tuple[StoredPlayerSlot, StoredPlayerSlot]
-    staged_mulligans: tuple[StagedMulliganSubmission, ...]
-    version: int
-    created_at: datetime
-    updated_at: datetime
+
+    @property
+    def match_id(self) -> str:
+        return self.stored.match_id
+
+    @property
+    def event_log_payloads(self) -> tuple[dict[str, object], ...]:
+        return self.stored.event_log_payloads
+
+    @property
+    def player_slots(self) -> tuple[StoredPlayerSlot, StoredPlayerSlot]:
+        return self.stored.player_slots
+
+    @property
+    def staged_mulligans(self) -> tuple[StagedMulliganSubmission, ...]:
+        return self.stored.staged_mulligans
+
+    @property
+    def version(self) -> int:
+        return self.stored.version
+
+    @property
+    def created_at(self) -> datetime:
+        return self.stored.created_at
+
+    @property
+    def updated_at(self) -> datetime:
+        return self.stored.updated_at
 
     def slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
-        return find_service_player_slot(self.player_slots, service_player_id)
+        return self.stored.slot_for_service_player(service_player_id)
 
     def opponent_slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
-        viewer_slot = self.slot_for_service_player(service_player_id)
-        for slot in self.player_slots:
-            if slot.service_player_id != viewer_slot.service_player_id:
-                return slot
-        raise KeyError(service_player_id)
+        return self.stored.opponent_slot_for_service_player(service_player_id)
 
 
 def snapshot_from_stored_match(
@@ -42,14 +65,8 @@ def snapshot_from_stored_match(
     adapter: EngineAdapter,
 ) -> MatchSnapshot:
     return MatchSnapshot(
-        match_id=stored_match.match_id,
+        stored=stored_match,
         state=adapter.deserialize_state(stored_match.state_payload),
-        event_log_payloads=stored_match.event_log_payloads,
-        player_slots=stored_match.player_slots,
-        staged_mulligans=stored_match.staged_mulligans,
-        version=stored_match.version,
-        created_at=stored_match.created_at,
-        updated_at=stored_match.updated_at,
     )
 
 
@@ -58,13 +75,4 @@ def stored_match_from_snapshot(
     *,
     adapter: EngineAdapter,
 ) -> StoredMatch:
-    return StoredMatch(
-        match_id=snapshot.match_id,
-        state_payload=adapter.serialize_state(snapshot.state),
-        event_log_payloads=snapshot.event_log_payloads,
-        player_slots=snapshot.player_slots,
-        staged_mulligans=snapshot.staged_mulligans,
-        version=snapshot.version,
-        created_at=snapshot.created_at,
-        updated_at=snapshot.updated_at,
-    )
+    return replace(snapshot.stored, state_payload=adapter.serialize_state(snapshot.state))

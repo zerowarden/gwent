@@ -28,7 +28,7 @@ from gwent_engine.core.ids import (
     LeaderId,
     PlayerId,
 )
-from gwent_engine.core.randomness import SupportsRandom
+from gwent_engine.core.randomness import SeededRandom, SupportsRandom
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 from gwent_engine.core.validators import (
@@ -44,6 +44,7 @@ from gwent_engine.serialize import (
     game_state_to_dict,
 )
 from gwent_shared.error_translation import translate_mapping_key
+from gwent_shared.extract import expect_enum
 
 from gwent_service.application.errors import UnknownDeckError
 from gwent_service.config import ServiceConfig, default_service_config
@@ -55,7 +56,6 @@ from gwent_service.engine.contracts import (
     LeaderCatalogEntry,
     PlayerActionKind,
 )
-from gwent_service.engine.randomness import StdlibRandomAdapter
 
 
 class GwentEngineAdapter:
@@ -206,7 +206,7 @@ class GwentEngineAdapter:
         *,
         rng: SupportsRandom | None = None,
     ) -> EngineTransitionResult:
-        resolved_rng = rng if rng is not None else StdlibRandomAdapter()
+        resolved_rng = rng if rng is not None else SeededRandom()
         next_state, events = apply_action(
             state,
             action,
@@ -220,7 +220,7 @@ class GwentEngineAdapter:
         return game_state_to_dict(state)
 
     def deserialize_state(self, payload: Mapping[str, object]) -> GameState:
-        return game_state_from_dict(payload)
+        return game_state_from_dict(payload, card_registry=self._card_registry)
 
     def serialize_events(self, events: Sequence[GameEvent]) -> tuple[dict[str, object], ...]:
         return tuple(events_to_dict(events))
@@ -268,10 +268,7 @@ def _optional_card_instance_id(raw_value: str | None) -> CardInstanceId | None:
 
 
 def _row(raw_value: str) -> Row:
-    try:
-        return Row(raw_value)
-    except ValueError as exc:
-        raise IllegalActionError(f"Unknown row: {raw_value!r}") from exc
+    return expect_enum(raw_value, Row, context="action", error_factory=IllegalActionError)
 
 
 def _optional_row(raw_value: str | None) -> Row | None:

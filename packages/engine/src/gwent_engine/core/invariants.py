@@ -4,7 +4,6 @@ from gwent_engine.cards import CardRegistry
 from gwent_engine.core.enums import (
     ACTIVE_TURN_PHASES,
     AbilityKind,
-    CardType,
     GameStatus,
     Phase,
     Row,
@@ -335,4 +334,4 @@ def _card_can_be_on_opponent_battlefield_side(
     card_id: CardInstanceId,
 ) -> bool:
     definition = card_registry.get(state.card(card_id).definition_id)
-    return definition.card_type == CardType.UNIT and AbilityKind.SPY in definition.ability_kinds
+    return definition.is_unit_with(AbilityKind.SPY)

@@ -101,12 +101,12 @@ class ScoiataelPassive(FactionPassive):
         *,
         event_id_start: int,
     ) -> tuple[PlayerId, tuple[GameEvent, ...]]:
-        scoiatael_players = tuple(
-            player
-            for player in state.players
-            if passive_kind_for_player(player) == PassiveKind.SCOIATAEL_CHOOSES_STARTING_PLAYER
-        )
-        if len(scoiatael_players) != 1 or scoiatael_players[0].player_id != owner.player_id:
+        if not _owns_sole_passive(
+            state,
+            owner,
+            PassiveKind.SCOIATAEL_CHOOSES_STARTING_PLAYER,
+            require_unique=True,
+        ):
             return requested_starting_player, ()
         return requested_starting_player, (
             FactionPassiveTriggeredEvent(
@@ -131,12 +131,12 @@ class NilfgaardPassive(FactionPassive):
         if not outcome.is_draw:
             return outcome, ()
 
-        nilfgaard_players = tuple(
-            player
-            for player in state.players
-            if passive_kind_for_player(player) == PassiveKind.NILFGAARD_WINS_TIES
-        )
-        if len(nilfgaard_players) != 1 or nilfgaard_players[0].player_id != owner.player_id:
+        if not _owns_sole_passive(
+            state,
+            owner,
+            PassiveKind.NILFGAARD_WINS_TIES,
+            require_unique=True,
+        ):
             return outcome, ()
 
         loser = next(
@@ -163,12 +163,12 @@ class MonstersPassive(FactionPassive):
         rng: SupportsRandom | None,
         event_id_start: int,
     ) -> tuple[frozenset[CardInstanceId], tuple[GameEvent, ...]]:
-        monsters_players = tuple(
-            player
-            for player in state.players
-            if passive_kind_for_player(player) == PassiveKind.MONSTERS_KEEP_ONE_UNIT
-        )
-        if not monsters_players or monsters_players[0].player_id != owner.player_id:
+        if not _owns_sole_passive(
+            state,
+            owner,
+            PassiveKind.MONSTERS_KEEP_ONE_UNIT,
+            require_unique=False,
+        ):
             return frozenset(), ()
 
         eligible_unit_cards = tuple(
@@ -405,6 +405,28 @@ def resolve_round_start_passives(
         )
         events.extend(passive_events)
     return current_state, tuple(events)
+
+
+def _owns_sole_passive(
+    state: GameState,
+    owner: PlayerState,
+    passive_kind: PassiveKind,
+    *,
+    require_unique: bool,
+) -> bool:
+    """Whether `owner` is the player the passive applies to.
+
+    Mirror matches (both players sharing a faction) are asymmetric unless a
+    passive requires a unique owner; Monsters historically grants its keep-one
+    effect to the first matching player only.
+    """
+
+    matching_players = tuple(
+        player for player in state.players if passive_kind_for_player(player) == passive_kind
+    )
+    if not matching_players or matching_players[0].player_id != owner.player_id:
+        return False
+    return not require_unique or len(matching_players) == 1
 
 
 def passive_kind_for_player(player: PlayerState) -> PassiveKind | None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 
 from gwent_engine.ai.observations import (
@@ -53,46 +53,7 @@ class PlayerSimulation:
     def translate_action(self, action: GameAction) -> GameAction:
         """Remap viewer-deck references onto the simulation's synthetic ids."""
 
-        match action:
-            case PlayCardAction():
-                return replace(
-                    action,
-                    card_instance_id=self._translate_id(action.card_instance_id),
-                    target_card_instance_id=self._translate_optional(
-                        action.target_card_instance_id
-                    ),
-                    secondary_target_card_instance_id=self._translate_optional(
-                        action.secondary_target_card_instance_id
-                    ),
-                )
-            case UseLeaderAbilityAction():
-                return replace(
-                    action,
-                    target_card_instance_id=self._translate_optional(
-                        action.target_card_instance_id
-                    ),
-                    secondary_target_card_instance_id=self._translate_optional(
-                        action.secondary_target_card_instance_id
-                    ),
-                    selected_card_instance_ids=tuple(
-                        self._translate_id(card_id) for card_id in action.selected_card_instance_ids
-                    ),
-                )
-            case ResolveChoiceAction():
-                return replace(
-                    action,
-                    selected_card_instance_ids=tuple(
-                        self._translate_id(card_id) for card_id in action.selected_card_instance_ids
-                    ),
-                )
-            case _:
-                return action
-
-    def _translate_id(self, card_id: CardInstanceId) -> CardInstanceId:
-        return self.deck_instance_map.get(card_id, card_id)
-
-    def _translate_optional(self, card_id: CardInstanceId | None) -> CardInstanceId | None:
-        return None if card_id is None else self._translate_id(card_id)
+        return _translate_action(action, deck_instance_map=self.deck_instance_map)
 
 
 def materialize_player_simulation(
@@ -103,91 +64,44 @@ def materialize_player_simulation(
 ) -> PlayerSimulation:
     del leader_registry
     registry = provision_simulation_registry(card_registry)
-    viewer_id = observation.viewer_player_id
+    viewer_public, opponent_public = _resolve_player_views(observation)
     public = observation.public_state
-    player_views = {player.player_id: player for player in public.players}
-    if viewer_id not in player_views or len(player_views) != 2:
-        raise ValueError("PlayerObservation must describe exactly two known players.")
-    opponent_id = next(player_id for player_id in player_views if player_id != viewer_id)
-    viewer_public = player_views[viewer_id]
-    opponent_public = player_views[opponent_id]
+    builder = _SimulationBuilder()
 
-    instances: list[CardInstance] = []
-    viewer_hand_ids = _append_observed_zone_instances(
-        observation.viewer_hand,
-        zone=Zone.HAND,
-        instances=instances,
+    viewer_state = _player_state(
+        viewer_public,
+        hand=builder.observed_cards(observation.viewer_hand, zone=Zone.HAND),
+        deck=builder.viewer_deck(observation, owner=viewer_public.player_id),
+        discard=builder.observed_cards(viewer_public.discard, zone=Zone.DISCARD),
+        rows=builder.observed_rows(viewer_public.rows, zone=Zone.BATTLEFIELD),
     )
-    viewer_deck_ids, deck_instance_map = _append_viewer_deck_instances(
-        observation,
-        viewer_id=viewer_id,
-        instances=instances,
-    )
-    opponent_hand_ids = _append_hidden_zone_instances(
-        owner=opponent_id,
-        zone=Zone.HAND,
-        count=opponent_public.hand_count,
-        prefix="opponent_hidden_hand",
-        instances=instances,
-    )
-    opponent_deck_ids = _append_hidden_zone_instances(
-        owner=opponent_id,
-        zone=Zone.DECK,
-        count=opponent_public.deck_count,
-        prefix="opponent_hidden_deck",
-        instances=instances,
-    )
-
-    viewer_rows = _append_observed_rows(
-        viewer_public.rows,
-        zone=Zone.BATTLEFIELD,
-        instances=instances,
-    )
-    viewer_discard_ids = _append_observed_zone_instances(
-        viewer_public.discard,
-        zone=Zone.DISCARD,
-        instances=instances,
-    )
-    opponent_rows = _append_observed_rows(
-        opponent_public.rows,
-        zone=Zone.BATTLEFIELD,
-        instances=instances,
-    )
-    opponent_discard_ids = _append_observed_zone_instances(
-        opponent_public.discard,
-        zone=Zone.DISCARD,
-        instances=instances,
-    )
-    weather = _append_observed_rows(
-        public.battlefield_weather,
-        zone=Zone.WEATHER,
-        instances=instances,
+    opponent_state = _player_state(
+        opponent_public,
+        hand=builder.hidden_cards(
+            owner=opponent_public.player_id,
+            zone=Zone.HAND,
+            count=opponent_public.hand_count,
+            prefix="opponent_hidden_hand",
+        ),
+        deck=builder.hidden_cards(
+            owner=opponent_public.player_id,
+            zone=Zone.DECK,
+            count=opponent_public.deck_count,
+            prefix="opponent_hidden_deck",
+        ),
+        discard=builder.observed_cards(opponent_public.discard, zone=Zone.DISCARD),
+        rows=builder.observed_rows(opponent_public.rows, zone=Zone.BATTLEFIELD),
     )
 
     return PlayerSimulation(
         state=GameState(
             game_id=public.game_id,
-            players=(
-                _player_state(
-                    viewer_public,
-                    hand=viewer_hand_ids,
-                    deck=viewer_deck_ids,
-                    discard=viewer_discard_ids,
-                    rows=viewer_rows,
-                ),
-                _player_state(
-                    opponent_public,
-                    hand=opponent_hand_ids,
-                    deck=opponent_deck_ids,
-                    discard=opponent_discard_ids,
-                    rows=opponent_rows,
-                ),
-            ),
-            card_instances=tuple(instances),
-            weather=weather,
+            players=(viewer_state, opponent_state),
+            card_instances=tuple(builder.instances),
+            weather=builder.observed_rows(public.battlefield_weather, zone=Zone.WEATHER),
             pending_choice=_materialize_pending_choice(
                 observation.visible_pending_choice,
-                deck_instance_map=deck_instance_map,
+                deck_instance_map=builder.deck_instance_map,
             ),
             current_player=public.current_player,
             starting_player=public.starting_player,
@@ -198,95 +112,39 @@ def materialize_player_simulation(
             match_winner=public.match_winner,
         ),
         card_registry=registry,
-        deck_instance_map=MappingProxyType(deck_instance_map),
+        deck_instance_map=MappingProxyType(builder.deck_instance_map),
     )
 
 
-def _append_viewer_deck_instances(
+def _resolve_player_views(
     observation: PlayerObservation,
-    *,
-    viewer_id: PlayerId,
-    instances: list[CardInstance],
-) -> tuple[tuple[CardInstanceId, ...], dict[CardInstanceId, CardInstanceId]]:
-    deck_ids: list[CardInstanceId] = []
-    instance_map: dict[CardInstanceId, CardInstanceId] = {}
-    ordinal = 0
-    for entry in observation.viewer_deck_composition:
-        for authoritative_id in entry.instance_ids:
-            ordinal += 1
-            synthetic_id = CardInstanceId(f"viewer_unknown_deck_{ordinal:03d}")
-            instance_map[authoritative_id] = synthetic_id
-            deck_ids.append(synthetic_id)
-            instances.append(
-                CardInstance(
-                    instance_id=synthetic_id,
-                    definition_id=entry.definition_id,
-                    owner=viewer_id,
-                    zone=Zone.DECK,
-                )
-            )
-    return tuple(deck_ids), instance_map
+) -> tuple[PublicPlayerStateView, PublicPlayerStateView]:
+    viewer_id = observation.viewer_player_id
+    views = {player.player_id: player for player in observation.public_state.players}
+    if len(views) != 2 or viewer_id not in views:
+        raise ValueError("PlayerObservation must describe exactly two known players.")
+    opponent_id = next(player_id for player_id in views if player_id != viewer_id)
+    return views[viewer_id], views[opponent_id]
 
 
-def _append_hidden_zone_instances(
-    *,
-    owner: PlayerId,
-    zone: Zone,
-    count: int,
-    prefix: str,
-    instances: list[CardInstance],
-) -> tuple[CardInstanceId, ...]:
-    hidden_ids: list[CardInstanceId] = []
-    for ordinal in range(1, count + 1):
-        instance_id = CardInstanceId(f"{prefix}_{ordinal:03d}")
-        hidden_ids.append(instance_id)
-        instances.append(
-            CardInstance(
-                instance_id=instance_id,
-                definition_id=SIMULATION_HIDDEN_CARD_DEFINITION.definition_id,
-                owner=owner,
-                zone=zone,
-            )
-        )
-    return tuple(hidden_ids)
+@dataclass(slots=True)
+class _SimulationBuilder:
+    """Collect the card instances and viewer-deck mapping for one simulation."""
 
+    instances: list[CardInstance] = field(default_factory=list)
+    deck_instance_map: dict[CardInstanceId, CardInstanceId] = field(default_factory=dict)
 
-def _append_observed_zone_instances(
-    cards: tuple[ObservedCard, ...],
-    *,
-    zone: Zone,
-    instances: list[CardInstance],
-) -> tuple[CardInstanceId, ...]:
-    observed_ids: list[CardInstanceId] = []
-    for card in cards:
-        observed_ids.append(card.instance_id)
-        instances.append(
-            CardInstance(
-                instance_id=card.instance_id,
-                definition_id=card.definition_id,
-                owner=card.owner,
-                zone=zone,
-            )
-        )
-    return tuple(observed_ids)
-
-
-def _append_observed_rows(
-    observed_rows: ObservedRows,
-    *,
-    zone: Zone,
-    instances: list[CardInstance],
-) -> RowState:
-    row_ids: dict[Row, tuple[CardInstanceId, ...]] = {}
-    for row, cards in (
-        (Row.CLOSE, observed_rows.close),
-        (Row.RANGED, observed_rows.ranged),
-        (Row.SIEGE, observed_rows.siege),
-    ):
-        row_instance_ids: list[CardInstanceId] = []
+    def observed_cards(
+        self,
+        cards: tuple[ObservedCard, ...],
+        *,
+        zone: Zone,
+        row: Row | None = None,
+    ) -> tuple[CardInstanceId, ...]:
+        instance_ids: list[CardInstanceId] = []
         for card in cards:
-            row_instance_ids.append(card.instance_id)
-            instances.append(
+            instance_ids.append(card.instance_id)
+            self.instances.append(
                 CardInstance(
                     instance_id=card.instance_id,
                     definition_id=card.definition_id,
@@ -296,12 +154,58 @@ def _append_observed_rows(
                     battlefield_side=card.battlefield_side,
                 )
             )
-        row_ids[row] = tuple(row_instance_ids)
-    return RowState(
-        close=row_ids[Row.CLOSE],
-        ranged=row_ids[Row.RANGED],
-        siege=row_ids[Row.SIEGE],
-    )
+        return tuple(instance_ids)
+
+    def observed_rows(self, rows: ObservedRows, *, zone: Zone) -> RowState:
+        return RowState(
+            close=self.observed_cards(rows.close, zone=zone, row=Row.CLOSE),
+            ranged=self.observed_cards(rows.ranged, zone=zone, row=Row.RANGED),
+            siege=self.observed_cards(rows.siege, zone=zone, row=Row.SIEGE),
+        )
+
+    def hidden_cards(
+        self,
+        *,
+        owner: PlayerId,
+        zone: Zone,
+        count: int,
+        prefix: str,
+    ) -> tuple[CardInstanceId, ...]:
+        instance_ids: list[CardInstanceId] = []
+        for ordinal in range(1, count + 1):
+            instance_id = CardInstanceId(f"{prefix}_{ordinal:03d}")
+            instance_ids.append(instance_id)
+            self.instances.append(
+                CardInstance(
+                    instance_id=instance_id,
+                    definition_id=SIMULATION_HIDDEN_CARD_DEFINITION.definition_id,
+                    owner=owner,
+                    zone=zone,
+                )
+            )
+        return tuple(instance_ids)
+
+    def viewer_deck(
+        self,
+        observation: PlayerObservation,
+        *,
+        owner: PlayerId,
+    ) -> tuple[CardInstanceId, ...]:
+        instance_ids: list[CardInstanceId] = []
+        for entry in observation.viewer_deck_composition:
+            for authoritative_id in entry.instance_ids:
+                synthetic_id = CardInstanceId(f"viewer_unknown_deck_{len(instance_ids) + 1:03d}")
+                self.deck_instance_map[authoritative_id] = synthetic_id
+                instance_ids.append(synthetic_id)
+                self.instances.append(
+                    CardInstance(
+                        instance_id=synthetic_id,
+                        definition_id=entry.definition_id,
+                        owner=owner,
+                        zone=Zone.DECK,
+                    )
+                )
+        return tuple(instance_ids)
 
 
 def _player_state(
@@ -348,14 +252,74 @@ def _materialize_pending_choice(
             deck_instance_map=deck_instance_map,
         ),
         source_leader_id=visible.source_leader_id,
-        legal_target_card_instance_ids=tuple(
-            _translate_id(card_id, deck_instance_map=deck_instance_map)
-            for card_id in visible.legal_target_card_instance_ids
+        legal_target_card_instance_ids=_translate_ids(
+            visible.legal_target_card_instance_ids,
+            deck_instance_map=deck_instance_map,
         ),
         legal_rows=visible.legal_rows,
         min_selections=visible.min_selections,
         max_selections=visible.max_selections,
         source_row=visible.source_row,
+    )
+
+
+def _translate_action(
+    action: GameAction,
+    *,
+    deck_instance_map: Mapping[CardInstanceId, CardInstanceId],
+) -> GameAction:
+    match action:
+        case PlayCardAction():
+            return replace(
+                action,
+                card_instance_id=_translate_id(
+                    action.card_instance_id,
+                    deck_instance_map=deck_instance_map,
+                ),
+                target_card_instance_id=_translate_optional(
+                    action.target_card_instance_id,
+                    deck_instance_map=deck_instance_map,
+                ),
+                secondary_target_card_instance_id=_translate_optional(
+                    action.secondary_target_card_instance_id,
+                    deck_instance_map=deck_instance_map,
+                ),
+            )
+        case UseLeaderAbilityAction():
+            return replace(
+                action,
+                target_card_instance_id=_translate_optional(
+                    action.target_card_instance_id,
+                    deck_instance_map=deck_instance_map,
+                ),
+                secondary_target_card_instance_id=_translate_optional(
+                    action.secondary_target_card_instance_id,
+                    deck_instance_map=deck_instance_map,
+                ),
+                selected_card_instance_ids=_translate_ids(
+                    action.selected_card_instance_ids,
+                    deck_instance_map=deck_instance_map,
+                ),
+            )
+        case ResolveChoiceAction():
+            return replace(
+                action,
+                selected_card_instance_ids=_translate_ids(
+                    action.selected_card_instance_ids,
+                    deck_instance_map=deck_instance_map,
+                ),
+            )
+        case _:
+            return action
+
+
+def _translate_ids(
+    card_ids: Sequence[CardInstanceId],
+    *,
+    deck_instance_map: Mapping[CardInstanceId, CardInstanceId],
+) -> tuple[CardInstanceId, ...]:
+    return tuple(
+        _translate_id(card_id, deck_instance_map=deck_instance_map) for card_id in card_ids
     )
 
 

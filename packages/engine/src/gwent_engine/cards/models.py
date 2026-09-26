@@ -158,6 +158,11 @@ class CardDefinition:
         if value is not None:
             raise ValueError(forbidden_message)
 
+    def is_unit_with(self, ability_kind: AbilityKind) -> bool:
+        """Whether this definition is a unit carrying the given ability."""
+
+        return self.card_type == CardType.UNIT and self._has_ability(ability_kind)
+
     def _has_ability(self, ability_kind: AbilityKind) -> bool:
         return ability_kind in self.ability_kinds
 
@@ -197,7 +202,23 @@ class CardDefinition:
             raise ValueError(message)
 
     def effective_max_copies_per_deck(self) -> int:
+        """Official rule limit; a missing authored limit means one copy."""
+
         return 1 if self.max_copies_per_deck is None else self.max_copies_per_deck
+
+    def explicit_copy_limit_violation(self, count: int) -> int | None:
+        """Return the authored copy limit exceeded by `count`, if any.
+
+        Asset loading enforces only explicitly authored limits: bundled sample
+        decks intentionally ship more copies than the official rule permits and
+        must remain loadable. Deck validation instead applies
+        `effective_max_copies_per_deck`.
+        """
+
+        limit = self.max_copies_per_deck
+        if limit is None or count <= limit:
+            return None
+        return limit
 
     @property
     def resolved_musters_group(self) -> str | None:

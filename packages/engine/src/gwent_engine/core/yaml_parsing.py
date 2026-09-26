@@ -5,18 +5,17 @@ from typing import cast
 
 import yaml
 from gwent_shared.extract import (
-    expect_bool,
-    expect_int,
-    expect_optional_int,
-    expect_optional_str,
-    expect_str,
-    require_field,
-)
-from gwent_shared.extract import (
     expect_mapping as shared_expect_mapping,
 )
 from gwent_shared.extract import (
     expect_sequence as shared_expect_sequence,
+)
+from gwent_shared.extract import (
+    optional_bool_field,
+    optional_int_field,
+    optional_str_field,
+    require_int_field,
+    require_str_field,
 )
 
 from gwent_engine.core.enums import FactionId
@@ -47,51 +46,23 @@ def expect_sequence(value: object, *, context: str) -> Sequence[object]:
 
 
 def require_str(mapping: Mapping[str, object], field: str, *, context: str) -> str:
-    return expect_str(
-        require_field(mapping, field, context=context, error_factory=DefinitionLoadError),
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
-    )
+    return require_str_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 
 
 def require_int(mapping: Mapping[str, object], field: str, *, context: str) -> int:
-    return expect_int(
-        require_field(mapping, field, context=context, error_factory=DefinitionLoadError),
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
-    )
+    return require_int_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 
 
 def optional_str(mapping: Mapping[str, object], field: str, *, context: str) -> str | None:
-    return expect_optional_str(
-        mapping.get(field),
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
-    )
+    return optional_str_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 
 
 def optional_bool(mapping: Mapping[str, object], field: str, *, context: str) -> bool | None:
-    value = mapping.get(field)
-    if value is None:
-        return None
-    return expect_bool(
-        value,
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
-    )
+    return optional_bool_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 
 
 def optional_int(mapping: Mapping[str, object], field: str, *, context: str) -> int | None:
-    return expect_optional_int(
-        mapping.get(field),
-        context=context,
-        label=field,
-        error_factory=DefinitionLoadError,
-    )
+    return optional_int_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 
 
 def parse_enum[EnumT: Enum](

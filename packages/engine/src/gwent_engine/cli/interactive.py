@@ -6,9 +6,10 @@ from typing import cast
 import questionary
 from questionary import Choice
 
+from gwent_engine.ai.arena import bot_family, supported_bot_families
 from gwent_engine.ai.baseline import available_base_profile_ids
 from gwent_engine.cards import DeckDefinition
-from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, PlayerId
 from gwent_engine.leaders import LeaderDefinition
 
 
@@ -38,7 +39,7 @@ def prompt_bot_match_selection(
     )
     player_one_leader = _prompt_leader(
         "Bot 1 leader",
-        player_id=PlayerId("p1"),
+        player_id=PLAYER_ONE,
         deck=player_one_deck,
         leaders=leaders,
     )
@@ -52,7 +53,7 @@ def prompt_bot_match_selection(
     )
     player_two_leader = _prompt_leader(
         "Bot 2 leader",
-        player_id=PlayerId("p2"),
+        player_id=PLAYER_TWO,
         deck=player_two_deck,
         leaders=leaders,
     )
@@ -83,15 +84,14 @@ def _prompt_bot_spec(label: str) -> str:
         str,
         _prompt_select(
             f"{label}",
-            choices=(
-                Choice("Random", value="random"),
-                Choice("Greedy", value="greedy"),
-                Choice("Heuristic", value="heuristic"),
-                Choice("Search", value="search"),
+            choices=tuple(
+                Choice(family.replace("_", " ").title(), value=family)
+                for family in supported_bot_families()
             ),
         ),
     )
-    if family not in {"heuristic", "search"}:
+    definition = bot_family(family)
+    if not definition.accepts_profile:
         return family
     profile_id = cast(
         str,
@@ -99,14 +99,14 @@ def _prompt_bot_spec(label: str) -> str:
             f"{label} profile",
             choices=tuple(
                 Choice(
-                    "Baseline" if profile == "baseline" else profile.replace("_", " ").title(),
+                    profile.replace("_", " ").title(),
                     value=profile,
                 )
                 for profile in available_base_profile_ids()
             ),
         ),
     )
-    return family if profile_id == "baseline" else f"{family}:{profile_id}"
+    return family if profile_id == definition.default_profile_id else f"{family}:{profile_id}"
 
 
 def _prompt_deck(

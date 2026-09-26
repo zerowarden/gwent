@@ -18,7 +18,6 @@ from gwent_engine.ai.baseline.policies.scorch import (
 )
 from gwent_engine.ai.policy import (
     LEGACY_PRESERVE_LEADER_POLICY_ID,
-    LEGACY_TEMPO_LEADER_POLICY_ID,
     PolicySelection,
 )
 from gwent_engine.core.errors import DefinitionLoadError
@@ -80,7 +79,6 @@ LEADER_POLICIES: Mapping[str, LeaderPolicy] = MappingProxyType(
         CONSERVATIVE_LEADER_POLICY.name: CONSERVATIVE_LEADER_POLICY,
         AGGRESSIVE_LEADER_POLICY.name: AGGRESSIVE_LEADER_POLICY,
         LEGACY_PRESERVE_LEADER_POLICY_ID: CONSERVATIVE_LEADER_POLICY,
-        LEGACY_TEMPO_LEADER_POLICY_ID: AGGRESSIVE_LEADER_POLICY,
     }
 )
 

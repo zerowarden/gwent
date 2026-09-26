@@ -12,7 +12,7 @@ from gwent_engine.core import Row
 from gwent_engine.core.ids import CardDefinitionId
 
 from ..support import CARD_REGISTRY
-from .test_baseline_support import make_player_assessment
+from .support import make_player_assessment
 
 
 def test_projected_scorch_loss_sums_the_removed_strength() -> None:

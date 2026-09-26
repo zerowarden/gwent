@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "description": "Two blocks with failures and one missing result; only completed cases enter denominators.",
+  "cases": [
+    {"case_id": "c01", "block_id": "block-1", "status": "completed", "score": 1.0, "strata": {"opponent": "random", "candidate_seat": "p1", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c02", "block_id": "block-1", "status": "completed", "score": 0.0, "strata": {"opponent": "random", "candidate_seat": "p2", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c03", "block_id": "block-1", "status": "failed", "score": null, "strata": {"opponent": "random", "candidate_seat": "p1", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c04", "block_id": "block-1", "status": "missing", "score": null, "strata": {"opponent": "random", "candidate_seat": "p2", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c05", "block_id": "block-2", "status": "completed", "score": 0.5, "strata": {"opponent": "greedy", "candidate_seat": "p1", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c06", "block_id": "block-2", "status": "completed", "score": 0.5, "strata": {"opponent": "greedy", "candidate_seat": "p2", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c07", "block_id": "block-2", "status": "failed", "score": null, "strata": {"opponent": "greedy", "candidate_seat": "p1", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}},
+    {"case_id": "c08", "block_id": "block-2", "status": "failed", "score": null, "strata": {"opponent": "greedy", "candidate_seat": "p2", "requested_starting_player": "p1", "candidate_deck": "deck-a", "opponent_deck": "deck-b"}}
+  ],
+  "expected": {
+    "planned": 8,
+    "executed": 7,
+    "completed": 4,
+    "failed": 3,
+    "missing": 1,
+    "wins": 1,
+    "draws": 2,
+    "losses": 1,
+    "score": 0.5,
+    "balanced_score": null,
+    "complete_blocks": 0,
+    "total_blocks": 2,
+    "interval_method": "insufficient_sample",
+    "valid": false,
+    "validity_reasons": 2
+  }
+}

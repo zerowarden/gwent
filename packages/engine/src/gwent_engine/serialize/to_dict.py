@@ -4,7 +4,9 @@ from functools import singledispatch
 from gwent_shared.extract import stringify, stringify_list, stringify_optional
 
 from gwent_engine.core import events as event_models
+from gwent_engine.core.enums import ChoiceKind, ChoiceSourceKind, Row
 from gwent_engine.core.errors import SerializationError
+from gwent_engine.core.ids import CardInstanceId, ChoiceId, LeaderId, PlayerId
 from gwent_engine.core.state import (
     CardInstance,
     GameState,
@@ -99,18 +101,49 @@ def pending_avenger_summon_to_dict(summon: PendingAvengerSummon) -> dict[str, ob
 def pending_choice_to_dict(choice: PendingChoice | None) -> dict[str, object] | None:
     if choice is None:
         return None
+    return pending_choice_fields_to_dict(
+        choice_id=choice.choice_id,
+        player_id=choice.player_id,
+        kind=choice.kind,
+        source_kind=choice.source_kind,
+        source_card_instance_id=choice.source_card_instance_id,
+        source_leader_id=choice.source_leader_id,
+        legal_target_card_instance_ids=choice.legal_target_card_instance_ids,
+        legal_rows=choice.legal_rows,
+        min_selections=choice.min_selections,
+        max_selections=choice.max_selections,
+        source_row=choice.source_row,
+    )
+
+
+def pending_choice_fields_to_dict(
+    *,
+    choice_id: ChoiceId,
+    player_id: PlayerId,
+    kind: ChoiceKind,
+    source_kind: ChoiceSourceKind,
+    source_card_instance_id: CardInstanceId | None,
+    source_leader_id: LeaderId | None,
+    legal_target_card_instance_ids: Sequence[CardInstanceId],
+    legal_rows: Sequence[Row],
+    min_selections: int,
+    max_selections: int,
+    source_row: Row | None,
+) -> dict[str, object]:
+    """Shared wire payload for authoritative and player-visible pending choices."""
+
     return {
-        "choice_id": stringify(choice.choice_id),
-        "player_id": stringify(choice.player_id),
-        "kind": choice.kind.value,
-        "source_kind": choice.source_kind.value,
-        "source_card_instance_id": stringify_optional(choice.source_card_instance_id),
-        "source_leader_id": stringify_optional(choice.source_leader_id),
-        "legal_target_card_instance_ids": stringify_list(choice.legal_target_card_instance_ids),
-        "legal_rows": [row.value for row in choice.legal_rows],
-        "min_selections": choice.min_selections,
-        "max_selections": choice.max_selections,
-        "source_row": choice.source_row.value if choice.source_row is not None else None,
+        "choice_id": stringify(choice_id),
+        "player_id": stringify(player_id),
+        "kind": kind.value,
+        "source_kind": source_kind.value,
+        "source_card_instance_id": stringify_optional(source_card_instance_id),
+        "source_leader_id": stringify_optional(source_leader_id),
+        "legal_target_card_instance_ids": stringify_list(legal_target_card_instance_ids),
+        "legal_rows": [row.value for row in legal_rows],
+        "min_selections": min_selections,
+        "max_selections": max_selections,
+        "source_row": source_row.value if source_row is not None else None,
     }
 
 

@@ -4,7 +4,14 @@ import sqlite3
 from datetime import datetime
 from typing import cast
 
-from gwent_shared import dump_json, expect_int, expect_mapping, expect_sequence, expect_str
+from gwent_shared import (
+    dump_json,
+    expect_int,
+    expect_mapping,
+    expect_sequence,
+    expect_str,
+    require_str_field,
+)
 from gwent_shared.json_payloads import load_json_list, load_json_mapping, load_json_object_list
 
 from gwent_service.domain.models import (
@@ -90,43 +97,32 @@ def deserialize_stored_match(row: sqlite3.Row) -> StoredMatch:
 
 
 def deserialize_player_slot(payload: object) -> StoredPlayerSlot:
-    player_slot_payload = expect_mapping(payload, context="sqlite.player_slot")
+    context = "sqlite.player_slot"
+    player_slot_payload = expect_mapping(payload, context=context)
     return StoredPlayerSlot(
-        service_player_id=expect_str(
-            player_slot_payload.get("service_player_id"),
-            context="sqlite.player_slot",
-            label="service_player_id",
+        service_player_id=require_str_field(
+            player_slot_payload, "service_player_id", context=context
         ),
-        engine_player_id=expect_str(
-            player_slot_payload.get("engine_player_id"),
-            context="sqlite.player_slot",
-            label="engine_player_id",
+        engine_player_id=require_str_field(
+            player_slot_payload, "engine_player_id", context=context
         ),
-        deck_id=expect_str(
-            player_slot_payload.get("deck_id"),
-            context="sqlite.player_slot",
-            label="deck_id",
-        ),
+        deck_id=require_str_field(player_slot_payload, "deck_id", context=context),
     )
 
 
 def deserialize_staged_mulligan(payload: object) -> StagedMulliganSubmission:
-    staged_mulligan_payload = expect_mapping(payload, context="sqlite.staged_mulligan")
+    context = "sqlite.staged_mulligan"
+    staged_mulligan_payload = expect_mapping(payload, context=context)
     card_instance_ids = expect_sequence(
         staged_mulligan_payload.get("card_instance_ids", []),
-        context="sqlite.staged_mulligan.card_instance_ids",
+        context=f"{context}.card_instance_ids",
     )
     return StagedMulliganSubmission(
-        engine_player_id=expect_str(
-            staged_mulligan_payload.get("engine_player_id"),
-            context="sqlite.staged_mulligan",
-            label="engine_player_id",
+        engine_player_id=require_str_field(
+            staged_mulligan_payload, "engine_player_id", context=context
         ),
         card_instance_ids=tuple(
-            expect_str(
-                card_instance_id,
-                context="sqlite.staged_mulligan.card_instance_ids",
-            )
+            expect_str(card_instance_id, context=f"{context}.card_instance_ids")
             for card_instance_id in card_instance_ids
         ),
     )

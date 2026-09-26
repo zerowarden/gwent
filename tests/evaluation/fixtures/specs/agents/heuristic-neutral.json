@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "agent_id": "heuristic-neutral",
+  "family": "heuristic",
+  "profile": "neutral"
+}

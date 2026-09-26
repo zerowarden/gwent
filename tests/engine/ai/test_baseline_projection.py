@@ -24,7 +24,7 @@ from ..support import (
     PLAYER_ONE_ID,
     SCOIATAEL_RANGED_HORN_LEADER_ID,
 )
-from .test_baseline_support import (
+from .support import (
     make_clear_weather_leader_state,
     make_horn_own_row_leader_state,
     make_optimize_agile_rows_leader_state,

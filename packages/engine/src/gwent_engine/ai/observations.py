@@ -23,6 +23,9 @@ from gwent_engine.core.ids import (
 )
 from gwent_engine.core.state import GameState, PendingChoice, PlayerState, RowState
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.serialize.to_dict import pending_choice_fields_to_dict
+
+OBSERVATION_CONTRACT_VERSION = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -380,20 +383,16 @@ def _visible_pending_choice_to_dict(
 ) -> dict[str, object] | None:
     if pending_choice is None:
         return None
-    return {
-        "choice_id": str(pending_choice.choice_id),
-        "player_id": str(pending_choice.player_id),
-        "kind": pending_choice.kind.value,
-        "source_kind": pending_choice.source_kind.value,
-        "source_card_instance_id": stringify_optional(pending_choice.source_card_instance_id),
-        "source_leader_id": stringify_optional(pending_choice.source_leader_id),
-        "legal_target_card_instance_ids": [
-            str(card_id) for card_id in pending_choice.legal_target_card_instance_ids
-        ],
-        "legal_rows": [row.value for row in pending_choice.legal_rows],
-        "min_selections": pending_choice.min_selections,
-        "max_selections": pending_choice.max_selections,
-        "source_row": (
-            pending_choice.source_row.value if pending_choice.source_row is not None else None
-        ),
-    }
+    return pending_choice_fields_to_dict(
+        choice_id=pending_choice.choice_id,
+        player_id=pending_choice.player_id,
+        kind=pending_choice.kind,
+        source_kind=pending_choice.source_kind,
+        source_card_instance_id=pending_choice.source_card_instance_id,
+        source_leader_id=pending_choice.source_leader_id,
+        legal_target_card_instance_ids=pending_choice.legal_target_card_instance_ids,
+        legal_rows=pending_choice.legal_rows,
+        min_selections=pending_choice.min_selections,
+        max_selections=pending_choice.max_selections,
+        source_row=pending_choice.source_row,
+    )

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.assessment import DecisionAssessment, PlayerAssessment, RowSummary
 from gwent_engine.ai.baseline.context import DecisionContext, PressureMode, TacticalMode, TempoState
+from gwent_engine.ai.baseline.features import weather_row_delta
 from gwent_engine.ai.baseline.pending_choice import (
     UnsupportedPendingChoiceError,
     explain_pending_choice_score_components,
@@ -1326,15 +1327,11 @@ def _weather_action_value(
     for row in weather_rows_for(ability_kind):
         if row in assessment.active_weather_rows:
             continue
-        swing += _weather_row_delta(_player_row_summary(assessment.opponent, row))
-        swing -= _weather_row_delta(_player_row_summary(assessment.viewer, row))
+        swing += weather_row_delta(_player_row_summary(assessment.opponent, row))
+        swing -= weather_row_delta(_player_row_summary(assessment.viewer, row))
     if swing == 0:
         return profile.action_bonus.weather_no_swing_penalty
     return 0.0
-
-
-def _weather_row_delta(summary: RowSummary) -> int:
-    return max(0, summary.non_hero_unit_base_strength - summary.non_hero_unit_count)
 
 
 def _player_row_summary(

@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "description": "Four blocks paired between reference and candidate; exact differences.",
+  "reference": [
+    {"case_id": "r1", "block_id": "block-1", "status": "completed", "score": 1.0},
+    {"case_id": "r2", "block_id": "block-2", "status": "completed", "score": 0.0},
+    {"case_id": "r3", "block_id": "block-3", "status": "completed", "score": 0.5},
+    {"case_id": "r4", "block_id": "block-4", "status": "completed", "score": 1.0}
+  ],
+  "candidate": [
+    {"case_id": "n1", "block_id": "block-1", "status": "completed", "score": 0.5},
+    {"case_id": "n2", "block_id": "block-2", "status": "completed", "score": 0.5},
+    {"case_id": "n3", "block_id": "block-3", "status": "completed", "score": 1.0},
+    {"case_id": "n4", "block_id": "block-4", "status": "completed", "score": 1.0}
+  ],
+  "expected": {
+    "paired_blocks": 4,
+    "reference_score": 0.625,
+    "candidate_score": 0.75,
+    "mean_difference": 0.125,
+    "differences": [-0.5, 0.5, 0.5, 0.0],
+    "interval_method": "insufficient_sample"
+  }
+}

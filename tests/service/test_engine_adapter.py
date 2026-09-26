@@ -35,7 +35,7 @@ def test_engine_adapter_can_create_initial_match_state() -> None:
 def test_engine_adapter_rejects_unknown_row_value() -> None:
     adapter = GwentEngineAdapter()
 
-    with pytest.raises(IllegalActionError, match="Unknown row"):
+    with pytest.raises(IllegalActionError, match="must be one of"):
         _ = adapter.build_play_card_action(
             player_id="p1",
             card_instance_id="p1_card_1",

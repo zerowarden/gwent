@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 
+from gwent_engine.ai.arena import MatchStepKind
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.cli.models import CliRun, CliStep
 from gwent_engine.cli.presenters import (
@@ -36,10 +37,9 @@ from gwent_engine.core.actions import (
     LeaveAction,
     PassAction,
     ResolveMulligansAction,
-    StartGameAction,
 )
 from gwent_engine.core.events import FactionPassiveTriggeredEvent, GameEvent, RoundEndedEvent
-from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 
 
 def build_report_context(
@@ -55,6 +55,12 @@ def build_report_context(
         player_two_bot_spec=player_two_bot_spec,
         seed=seed,
     ).build_context()
+
+
+def _shows_board_state(step: CliStep) -> bool:
+    if step.kind is MatchStepKind.ACTION:
+        return True
+    return step.kind is MatchStepKind.ROUND_ENDED and not isinstance(step.action, PassAction)
 
 
 @dataclass(slots=True)
@@ -140,8 +146,8 @@ class MatchReportBuilder:
                 },
                 {
                     "metric": self.formatter.fmt("Actions"),
-                    "p1": str(action_counts.get(PlayerId("p1"), 0)),
-                    "p2": str(action_counts.get(PlayerId("p2"), 0)),
+                    "p1": str(action_counts.get(PLAYER_ONE, 0)),
+                    "p2": str(action_counts.get(PLAYER_TWO, 0)),
                 },
             ),
             "additional_stats": self._formatted_summary(
@@ -184,12 +190,7 @@ class MatchReportBuilder:
         *,
         round_start: dict[str, object] | None,
     ) -> dict[str, object]:
-        show_board_state = not isinstance(
-            step.action,
-            StartGameAction | ResolveMulligansAction,
-        ) and not self.state_sections.has_match_end_event(step.events)
-        if isinstance(step.action, PassAction) and step.round_summary_state is not None:
-            show_board_state = False
+        show_board_state = _shows_board_state(step)
         return {
             "index": index,
             "round_start": round_start,
@@ -229,7 +230,7 @@ class MatchReportBuilder:
         hand = self.state_sections.sorted_card_ids(step.state_before.player(actor).hand)
         return {
             "label": self.formatter.fmt(str(actor)),
-            "css_class": "p1" if actor == PlayerId("p1") else "p2",
+            "css_class": "p1" if actor == PLAYER_ONE else "p2",
             "popover_id": f"hand-popover-step-{index}-{actor}",
             "title": self.formatter.fmt(f"{actor} hand before step {index}"),
             "cards": self.formatter.fmt(self.state_sections.card_list_text(hand)),
@@ -393,7 +394,7 @@ class MatchReportBuilder:
             return ("actor=system",)
         actor = (
             self.run.metadata.player_one_actor
-            if player_id_value == PlayerId("p1")
+            if player_id_value == PLAYER_ONE
             else self.run.metadata.player_two_actor
         )
         if actor == "RandomBot":
@@ -441,12 +442,9 @@ class MatchReportBuilder:
         seen_rounds: set[int] = set()
         items: list[dict[str, object]] = []
         for step in self.run.steps:
-            if step.round_summary_state is not None:
-                round_number = step.round_summary_state.round_number
-            elif self.state_sections.has_match_end_event(step.events):
-                round_number = step.state_after.round_number
-            else:
+            if step.kind not in {MatchStepKind.ROUND_ENDED, MatchStepKind.MATCH_ENDED}:
                 continue
+            round_number = (step.round_summary_state or step.state_after).round_number
             if round_number in seen_rounds:
                 continue
             seen_rounds.add(round_number)
@@ -463,13 +461,13 @@ class MatchReportBuilder:
             return None
         winner = round_end.winner
         scores = dict(round_end.player_scores)
-        p1_score = scores.get(PlayerId("p1"), 0)
-        p2_score = scores.get(PlayerId("p2"), 0)
+        p1_score = scores.get(PLAYER_ONE, 0)
+        p2_score = scores.get(PLAYER_TWO, 0)
         match winner:
             case None:
                 return self.formatter.fmt(f"draw: p1 {p1_score} - p2 {p2_score}")
             case _:
-                loser = PlayerId("p2") if winner == PlayerId("p1") else PlayerId("p1")
+                loser = PLAYER_TWO if winner == PLAYER_ONE else PLAYER_ONE
                 return self.formatter.fmt(
                     f"winner={winner}, loser={loser}, points: p1 {p1_score} - p2 {p2_score}"
                 )

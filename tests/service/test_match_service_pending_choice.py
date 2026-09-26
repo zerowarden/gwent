@@ -1,14 +1,14 @@
-from gwent_engine.core import ChoiceSourceKind
-from gwent_engine.serialize import game_state_to_dict
 from gwent_service.application.commands import (
     ResolveChoiceCommand,
     SubmitMulliganCommand,
 )
-from gwent_service.domain.models import StoredMatch
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
-from tests.engine.scenario_builder import card, rows, scenario
-from tests.service.support import build_create_match_command, build_service
+from tests.service.support import (
+    build_create_match_command,
+    build_service,
+    pending_decoy_state,
+    replace_match_state,
+)
 
 
 def test_match_service_pending_choice_can_be_retrieved_and_resolved() -> None:
@@ -37,39 +37,8 @@ def test_match_service_pending_choice_can_be_retrieved_and_resolved() -> None:
     )
     stored_match = repository.get("pending_choice_match")
     assert stored_match is not None
-    pending_state = (
-        scenario("pending_choice_match")
-        .player(
-            PLAYER_ONE_ID,
-            hand=[card("p1_source_decoy", "neutral_decoy")],
-            board=rows(ranged=[card("p1_spy_target", "scoiatael_dol_blathanna_archer")]),
-        )
-        .player(
-            PLAYER_TWO_ID,
-            hand=[card("p2_reserve_unit", "scoiatael_dol_blathanna_archer")],
-        )
-        .card_choice(
-            choice_id="pending_choice_1",
-            player_id=PLAYER_ONE_ID,
-            source_kind=ChoiceSourceKind.DECOY,
-            source_card_instance_id="p1_source_decoy",
-            legal_target_card_instance_ids=("p1_spy_target",),
-        )
-        .build()
-    )
-    repository.update(
-        StoredMatch(
-            match_id=stored_match.match_id,
-            state_payload=game_state_to_dict(pending_state),
-            event_log_payloads=stored_match.event_log_payloads,
-            player_slots=stored_match.player_slots,
-            staged_mulligans=(),
-            version=stored_match.version + 1,
-            created_at=stored_match.created_at,
-            updated_at=stored_match.updated_at,
-        ),
-        expected_version=stored_match.version,
-    )
+    pending_state = pending_decoy_state("pending_choice_match")
+    _ = replace_match_state(repository, match_id="pending_choice_match", state=pending_state)
 
     pending_choice_view = service.get_match(
         "pending_choice_match", viewer_service_player_id="alice"

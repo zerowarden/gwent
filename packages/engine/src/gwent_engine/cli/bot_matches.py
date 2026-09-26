@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import cast
 
 from gwent_engine.ai.actions import enumerate_legal_actions
-from gwent_engine.ai.arena import create_bot, parse_bot_spec, run_bot_match
+from gwent_engine.ai.arena import create_seeded_bot, execute_match, parse_bot_spec
 from gwent_engine.ai.baseline import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
@@ -19,10 +20,16 @@ from gwent_engine.ai.search import (
 )
 from gwent_engine.cards import CardRegistry, DeckDefinition
 from gwent_engine.cli.card_metadata import build_card_metadata_maps
-from gwent_engine.cli.models import BotDecisionExplanation, CliMetadata, CliRun, CliStep
+from gwent_engine.cli.models import (
+    BotDecisionExplanation,
+    CliMatchExecutionError,
+    CliMetadata,
+    CliRun,
+)
+from gwent_engine.cli.recording import CliMatchRecorder
 from gwent_engine.core import Zone
 from gwent_engine.core.actions import GameAction
-from gwent_engine.core.ids import DeckId, GameId, PlayerId
+from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, DeckId, GameId, PlayerId
 from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
@@ -80,17 +87,14 @@ def run_bot_match_cli(
         leader_id=player_two_leader_id,
         leader_registry=leader_registry,
     )
-    player_one_bot = create_bot(
-        player_one_bot_spec,
-        bot_id="p1_bot",
-        seed=seed + 1,
+    player_one_bot = create_seeded_bot(player_one_bot_spec, bot_id="p1_bot", seed=seed + 1)
+    player_two_bot = create_seeded_bot(player_two_bot_spec, bot_id="p2_bot", seed=seed + 2)
+    match_rng = SeededRandom(seed)
+    recorder = CliMatchRecorder(
+        card_registry=card_registry,
+        leader_registry=leader_registry,
     )
-    player_two_bot = create_bot(
-        player_two_bot_spec,
-        bot_id="p2_bot",
-        seed=seed + 2,
-    )
-    match_run = run_bot_match(
+    execution = execute_match(
         game_id=GameId(f"bot_match_{seed}"),
         player_one_bot=player_one_bot,
         player_two_bot=player_two_bot,
@@ -99,9 +103,15 @@ def run_bot_match_cli(
         starting_player=PlayerId(starting_player),
         card_registry=card_registry,
         leader_registry=leader_registry,
-        rng=SeededRandom(seed),
+        rng=match_rng,
+        action_budget=512,
+        environment_seed=seed,
+        recorder=recorder,
     )
-    state = match_run.final_state
+    final_state = execution.final_state
+    if not execution.completed or final_state is None:
+        raise CliMatchExecutionError(execution)
+    state = final_state
     (
         card_names_by_instance_id,
         card_values_by_instance_id,
@@ -122,32 +132,30 @@ def run_bot_match_cli(
         if card.zone == Zone.BATTLEFIELD
     }
     bot_specs = {
-        PlayerId("p1"): player_one_bot_spec,
-        PlayerId("p2"): player_two_bot_spec,
+        PLAYER_ONE: player_one_bot_spec,
+        PLAYER_TWO: player_two_bot_spec,
     }
     return CliRun(
         scenario_name="bot_match",
         metadata=CliMetadata(
-            game_id=match_run.game_id,
-            player_one_id=match_run.player_one_id,
-            player_two_id=match_run.player_two_id,
-            player_one_deck_id=DeckId(match_run.player_one_deck_id),
-            player_two_deck_id=DeckId(match_run.player_two_deck_id),
+            game_id=execution.game_id,
+            player_one_id=state.players[0].player_id,
+            player_two_id=state.players[1].player_id,
+            player_one_deck_id=DeckId(str(player_one_deck.deck_id)),
+            player_two_deck_id=DeckId(str(player_two_deck.deck_id)),
             player_one_leader_id=player_one_deck.leader_id,
             player_two_leader_id=player_two_deck.leader_id,
             player_one_leader_name=leader_registry.get(player_one_deck.leader_id).name,
             player_two_leader_name=leader_registry.get(player_two_deck.leader_id).name,
-            rng_name=match_run.rng_name,
-            pending_choice_encountered=match_run.pending_choice_state is not None,
-            player_one_actor=match_run.player_one_bot_name,
-            player_two_actor=match_run.player_two_bot_name,
+            rng_name=type(match_rng).__name__,
+            pending_choice_encountered=execution.pending_choice_occurred,
+            environment_seed=execution.environment_seed,
+            player_one_actor=player_one_bot.display_name,
+            player_two_actor=player_two_bot.display_name,
         ),
         steps=tuple(
-            CliStep(
-                action=step.action,
-                events=step.events,
-                state_before=step.state_before,
-                state_after=step.state_after,
+            replace(
+                step,
                 bot_explanation=(
                     _bot_explanation_for_step(
                         step.state_before,
@@ -159,15 +167,11 @@ def run_bot_match_cli(
                     if include_bot_explanations
                     else None
                 ),
-                round_summary_state=step.round_summary_state,
-                effective_strengths_before=step.effective_strengths_before,
-                effective_strengths_after=step.effective_strengths_after,
-                round_summary_strengths=step.round_summary_strengths,
             )
-            for step in match_run.steps
+            for step in recorder.steps
         ),
-        pending_choice_state=match_run.pending_choice_state,
-        final_state=match_run.final_state,
+        pending_choice_state=recorder.pending_choice_state,
+        final_state=state,
         card_names_by_instance_id=card_names_by_instance_id,
         card_values_by_instance_id=card_values_by_instance_id,
         card_kinds_by_instance_id=card_kinds_by_instance_id,

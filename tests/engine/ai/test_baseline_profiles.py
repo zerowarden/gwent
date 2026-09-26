@@ -9,7 +9,7 @@ from gwent_engine.ai.baseline.profile_catalog import (
 from gwent_engine.ai.baseline.profiles import compose_profile
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, PolicySelection, ProfileTuningConfig
 
-from .test_baseline_support import make_assessment
+from .support import make_assessment
 
 
 def test_compose_profile_biases_opening_toward_card_advantage() -> None:

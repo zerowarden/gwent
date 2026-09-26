@@ -29,7 +29,14 @@ def api_client() -> Generator[tuple[TestClient, InMemoryMatchRepository], None, 
         app.dependency_overrides.clear()
 
 
-def create_match_payload(*, match_id: str, viewer_player_id: str = "alice") -> dict[str, object]:
+def create_match_payload(
+    *,
+    match_id: str,
+    viewer_player_id: str = "alice",
+    player_one_deck: str = "monsters_muster_swarm_strict",
+    player_two_deck: str = "nilfgaard_spy_medic_control_strict",
+    rng_seed: int = 7,
+) -> dict[str, object]:
     return {
         "match_id": match_id,
         "viewer_player_id": viewer_player_id,
@@ -37,13 +44,13 @@ def create_match_payload(*, match_id: str, viewer_player_id: str = "alice") -> d
             {
                 "service_player_id": "alice",
                 "engine_player_id": "p1",
-                "deck_id": "monsters_muster_swarm_strict",
+                "deck_id": player_one_deck,
             },
             {
                 "service_player_id": "bob",
                 "engine_player_id": "p2",
-                "deck_id": "nilfgaard_spy_medic_control_strict",
+                "deck_id": player_two_deck,
             },
         ],
-        "rng_seed": 7,
+        "rng_seed": rng_seed,
     }

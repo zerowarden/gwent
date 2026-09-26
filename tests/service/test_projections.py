@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from gwent_engine.core import ChoiceSourceKind
 from gwent_engine.core.actions import StartGameAction
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.serialize import game_state_to_dict
@@ -14,8 +13,7 @@ from gwent_service.domain.models import (
 from gwent_service.engine.adapter import GwentEngineAdapter
 from gwent_service.engine.contracts import CreateMatchStateSpec, EnginePlayerDeckSpec
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
-from tests.engine.scenario_builder import card, rows, scenario
+from tests.service.support import pending_decoy_state
 from tests.support import IdentityShuffle
 
 
@@ -86,26 +84,7 @@ def test_projection_hides_opponent_hand_contents_and_never_exposes_staged_mullig
 
 def test_projection_restricts_pending_choice_to_chooser() -> None:
     adapter = GwentEngineAdapter()
-    state = (
-        scenario("pending_choice_match")
-        .player(
-            PLAYER_ONE_ID,
-            hand=[card("p1_source_decoy", "neutral_decoy")],
-            board=rows(ranged=[card("p1_spy_target", "scoiatael_dol_blathanna_archer")]),
-        )
-        .player(
-            PLAYER_TWO_ID,
-            hand=[card("p2_reserve_unit", "scoiatael_dol_blathanna_archer")],
-        )
-        .card_choice(
-            choice_id="pending_choice_1",
-            player_id=PLAYER_ONE_ID,
-            source_kind=ChoiceSourceKind.DECOY,
-            source_card_instance_id="p1_source_decoy",
-            legal_target_card_instance_ids=("p1_spy_target",),
-        )
-        .build()
-    )
+    state = pending_decoy_state("pending_choice_match")
     stored_match = StoredMatch(
         match_id="pending_choice_match",
         state_payload=game_state_to_dict(state),

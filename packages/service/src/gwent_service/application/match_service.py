@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 from gwent_engine.core import Phase
 from gwent_engine.core.actions import GameAction
-from gwent_engine.core.randomness import SupportsRandom
+from gwent_engine.core.randomness import SeededRandom, SupportsRandom
 from gwent_engine.core.state import GameState
 
 from gwent_service.application.commands import (
@@ -35,7 +35,11 @@ from gwent_service.application.staging import (
     mulligans_are_complete,
     stage_mulligan_submission,
 )
-from gwent_service.domain.models import StagedMulliganSubmission, StoredPlayerSlot
+from gwent_service.domain.models import (
+    StagedMulliganSubmission,
+    StoredMatch,
+    StoredPlayerSlot,
+)
 from gwent_service.domain.repositories import MatchRepository
 from gwent_service.engine.contracts import (
     CreateMatchStateSpec,
@@ -95,25 +99,28 @@ class MatchService:
         )
         now = self._clock()
         snapshot = MatchSnapshot(
-            match_id=command.match_id,
-            state=start_transition.next_state,
-            event_log_payloads=self._adapter.serialize_events(start_transition.events),
-            player_slots=(
-                StoredPlayerSlot(
-                    service_player_id=first_participant.service_player_id,
-                    engine_player_id=first_participant.engine_player_id,
-                    deck_id=first_participant.deck_id,
+            stored=StoredMatch(
+                match_id=command.match_id,
+                state_payload=self._adapter.serialize_state(start_transition.next_state),
+                event_log_payloads=self._adapter.serialize_events(start_transition.events),
+                player_slots=(
+                    StoredPlayerSlot(
+                        service_player_id=first_participant.service_player_id,
+                        engine_player_id=first_participant.engine_player_id,
+                        deck_id=first_participant.deck_id,
+                    ),
+                    StoredPlayerSlot(
+                        service_player_id=second_participant.service_player_id,
+                        engine_player_id=second_participant.engine_player_id,
+                        deck_id=second_participant.deck_id,
+                    ),
                 ),
-                StoredPlayerSlot(
-                    service_player_id=second_participant.service_player_id,
-                    engine_player_id=second_participant.engine_player_id,
-                    deck_id=second_participant.deck_id,
-                ),
+                staged_mulligans=(),
+                version=1,
+                created_at=now,
+                updated_at=now,
             ),
-            staged_mulligans=(),
-            version=1,
-            created_at=now,
-            updated_at=now,
+            state=start_transition.next_state,
         )
         _ = self._require_player_slot(snapshot, viewer_service_player_id)
         self._repository.create(stored_match_from_snapshot(snapshot, adapter=self._adapter))
@@ -287,17 +294,19 @@ class MatchService:
         *,
         staged_mulligans: tuple[StagedMulliganSubmission, ...] | None = None,
     ) -> MatchSnapshot:
-        updated_snapshot = replace(
-            snapshot,
+        updated_snapshot = MatchSnapshot(
+            stored=replace(
+                snapshot.stored,
+                event_log_payloads=(
+                    snapshot.event_log_payloads + self._adapter.serialize_events(transition.events)
+                ),
+                staged_mulligans=(
+                    snapshot.staged_mulligans if staged_mulligans is None else staged_mulligans
+                ),
+                version=snapshot.version + 1,
+                updated_at=self._clock(),
+            ),
             state=transition.next_state,
-            event_log_payloads=(
-                snapshot.event_log_payloads + self._adapter.serialize_events(transition.events)
-            ),
-            staged_mulligans=(
-                snapshot.staged_mulligans if staged_mulligans is None else staged_mulligans
-            ),
-            version=snapshot.version + 1,
-            updated_at=self._clock(),
         )
         self._save(snapshot, updated_snapshot)
         return updated_snapshot
@@ -307,11 +316,14 @@ class MatchService:
         snapshot: MatchSnapshot,
         staged_mulligans: tuple[StagedMulliganSubmission, ...],
     ) -> MatchSnapshot:
-        return replace(
-            snapshot,
-            staged_mulligans=staged_mulligans,
-            version=snapshot.version + 1,
-            updated_at=self._clock(),
+        return MatchSnapshot(
+            stored=replace(
+                snapshot.stored,
+                staged_mulligans=staged_mulligans,
+                version=snapshot.version + 1,
+                updated_at=self._clock(),
+            ),
+            state=snapshot.state,
         )
 
     def _save(self, previous_snapshot: MatchSnapshot, updated_snapshot: MatchSnapshot) -> None:
@@ -327,9 +339,7 @@ class MatchService:
 def _default_rng_factory(seed: int | None, event_counter: int) -> SupportsRandom | None:
     if seed is None:
         return None
-    from gwent_service.engine.randomness import StdlibRandomAdapter
-
-    return StdlibRandomAdapter(seed + event_counter)
+    return SeededRandom(seed + event_counter)
 
 
 def _utc_now() -> datetime:

@@ -5,7 +5,7 @@ from gwent_engine.ai.baseline.context import (
     classify_context,
 )
 
-from .test_baseline_support import make_assessment
+from .support import make_assessment
 
 
 def test_classify_context_detects_opening_even_state() -> None:

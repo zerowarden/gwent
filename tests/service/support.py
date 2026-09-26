@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
+from gwent_engine.core import ChoiceSourceKind
+from gwent_engine.core.state import GameState
+from gwent_engine.serialize import game_state_to_dict
 from gwent_service.application.commands import (
     CreateMatchCommand,
     CreateMatchParticipantCommand,
@@ -17,6 +21,8 @@ from gwent_service.domain.repositories import MatchRepository
 from gwent_service.engine.adapter import GwentEngineAdapter
 from gwent_service.infrastructure.memory_repo import InMemoryMatchRepository
 
+from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
+from tests.engine.scenario_builder import card, rows, scenario
 from tests.support import IdentityShuffle
 
 
@@ -131,6 +137,50 @@ def build_started_match(
     )
     resolve_empty_mulligans(service, match_id=match_id)
     return service, repository
+
+
+def pending_decoy_state(name: str) -> GameState:
+    """A decoy pending choice owned by alice with one legal board target."""
+
+    return (
+        scenario(name)
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card("p1_source_decoy", "neutral_decoy")],
+            board=rows(ranged=[card("p1_spy_target", "scoiatael_dol_blathanna_archer")]),
+        )
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_reserve_unit", "scoiatael_dol_blathanna_archer")],
+        )
+        .card_choice(
+            choice_id="pending_choice_1",
+            player_id=PLAYER_ONE_ID,
+            source_kind=ChoiceSourceKind.DECOY,
+            source_card_instance_id="p1_source_decoy",
+            legal_target_card_instance_ids=("p1_spy_target",),
+        )
+        .build()
+    )
+
+
+def replace_match_state(
+    repository: MatchRepository,
+    *,
+    match_id: str,
+    state: GameState,
+) -> StoredMatch:
+    stored_match = repository.get(match_id)
+    if stored_match is None:
+        raise AssertionError(f"Match {match_id!r} does not exist.")
+    updated = replace(
+        stored_match,
+        state_payload=game_state_to_dict(state),
+        staged_mulligans=(),
+        version=stored_match.version + 1,
+    )
+    repository.update(updated, expected_version=stored_match.version)
+    return updated
 
 
 def resolve_empty_mulligans(service: MatchService, *, match_id: str) -> None:

@@ -131,6 +131,12 @@ def dead_card_penalty(
     return penalty
 
 
+def weather_row_delta(summary: RowWeatherSummary) -> int:
+    """Strength that applying weather to one row would remove."""
+
+    return max(0, summary.non_hero_unit_base_strength - summary.non_hero_unit_count)
+
+
 def projected_weather_loss(
     row_summaries: Sequence[RowWeatherSummary],
     *,
@@ -139,7 +145,5 @@ def projected_weather_loss(
     """Estimate current vulnerability as strength that weather would actually remove."""
     active_rows = set(active_weather_rows)
     return sum(
-        max(0, summary.non_hero_unit_base_strength - summary.non_hero_unit_count)
-        for summary in row_summaries
-        if summary.row not in active_rows
+        weather_row_delta(summary) for summary in row_summaries if summary.row not in active_rows
     )

@@ -17,10 +17,11 @@ from gwent_engine.ai.baseline.projection.models import (
 from gwent_engine.ai.baseline.projection.resolver_context import (
     ProjectionResolverContext,
 )
-from gwent_engine.ai.observations import PlayerObservation
+from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.utils import (
     is_non_hero_unit,
     viewer_deck_count,
+    viewer_deck_definition,
     viewer_deck_definitions,
 )
 from gwent_engine.cards import CardDefinition, CardRegistry
@@ -76,7 +77,10 @@ class LeaderProjectionResolver(ProjectionResolverContext):
             case LeaderAbilityKind.DISCARD_AND_CHOOSE_FROM_DECK:
                 projection = self._project_discard_and_choose_from_deck()
             case LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND:
-                projection = self._project_return_card_from_own_discard_to_hand()
+                projection = self._project_discard_retrieval(
+                    self.viewer.discard,
+                    ability_kind=LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND,
+                )
             case LeaderAbilityKind.HORN_OWN_ROW:
                 projection = self._project_horn_own_row()
             case LeaderAbilityKind.SCORCH_OPPONENT_ROW:
@@ -84,7 +88,10 @@ class LeaderProjectionResolver(ProjectionResolverContext):
             case LeaderAbilityKind.OPTIMIZE_AGILE_ROWS:
                 projection = self._project_optimize_agile_rows()
             case LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND:
-                projection = self._project_take_card_from_opponent_discard_to_hand()
+                projection = self._project_discard_retrieval(
+                    self.opponent.discard,
+                    ability_kind=LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND,
+                )
             case _:
                 projection = None
         return projection
@@ -215,14 +222,19 @@ class LeaderProjectionResolver(ProjectionResolverContext):
             live_targets=len(hand_cards) + deck_count,
         )
 
-    def _project_return_card_from_own_discard_to_hand(self) -> LeaderActionProjection:
-        discard_cards = tuple(
+    def _project_discard_retrieval(
+        self,
+        discard_cards: tuple[ObservedCard, ...],
+        *,
+        ability_kind: LeaderAbilityKind,
+    ) -> LeaderActionProjection:
+        retrievable_cards = tuple(
             card
-            for card in self.viewer.discard
+            for card in discard_cards
             if _is_leader_discard_retrieval_target(self.card_registry.get(card.definition_id))
         )
-        if not discard_cards:
-            return self._noop(ability_kind=LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND)
+        if not retrievable_cards:
+            return self._noop(ability_kind=ability_kind)
 
         best_value = max(
             projected_future_card_value(
@@ -230,17 +242,17 @@ class LeaderProjectionResolver(ProjectionResolverContext):
                 observation=self.observation,
                 card_registry=self.card_registry,
             )
-            for card in discard_cards
+            for card in retrievable_cards
         )
         return LeaderActionProjection(
-            ability_kind=LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND,
+            ability_kind=ability_kind,
             projected_net_board_swing=0,
             projected_hand_value_delta=best_value,
             viewer_hand_count_delta=1,
             is_noop=False,
             minimum_row_total=None,
             opponent_row_total=None,
-            live_targets=len(discard_cards),
+            live_targets=len(retrievable_cards),
         )
 
     def _project_horn_own_row(self) -> LeaderActionProjection:
@@ -391,36 +403,6 @@ class LeaderProjectionResolver(ProjectionResolverContext):
             moved_units=moved_units,
         )
 
-    def _project_take_card_from_opponent_discard_to_hand(self) -> LeaderActionProjection:
-        opponent_discard = tuple(
-            card
-            for card in self.opponent.discard
-            if _is_leader_discard_retrieval_target(self.card_registry.get(card.definition_id))
-        )
-        if not opponent_discard:
-            return self._noop(
-                ability_kind=LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND
-            )
-
-        best_value = max(
-            projected_future_card_value(
-                self.card_registry.get(card.definition_id),
-                observation=self.observation,
-                card_registry=self.card_registry,
-            )
-            for card in opponent_discard
-        )
-        return LeaderActionProjection(
-            ability_kind=LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND,
-            projected_net_board_swing=0,
-            projected_hand_value_delta=best_value,
-            viewer_hand_count_delta=1,
-            is_noop=False,
-            minimum_row_total=None,
-            opponent_row_total=None,
-            live_targets=len(opponent_discard),
-        )
-
     def _effective_strength(
         self,
         cards: list[ProjectedBattlefieldCard],
@@ -442,18 +424,13 @@ class LeaderProjectionResolver(ProjectionResolverContext):
         if self.leader_definition is None:
             return None
         if self.action.target_card_instance_id is not None:
-            chosen_definition_id = next(
-                (
-                    entry.definition_id
-                    for entry in self.observation.viewer_deck_composition
-                    if self.action.target_card_instance_id in entry.instance_ids
-                ),
-                None,
+            definition = viewer_deck_definition(
+                self.observation,
+                self.card_registry,
+                self.action.target_card_instance_id,
             )
-            if chosen_definition_id is not None:
-                definition = self.card_registry.get(chosen_definition_id)
-                if definition.card_type == CardType.SPECIAL:
-                    return special_ability_kind(definition)
+            if definition is not None and definition.card_type == CardType.SPECIAL:
+                return special_ability_kind(definition)
         weather_ability_kind = self.leader_definition.weather_ability_kind
         if weather_ability_kind is None or not is_weather_ability(weather_ability_kind):
             return None

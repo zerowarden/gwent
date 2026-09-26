@@ -1,29 +1,17 @@
 from typing import cast
 
-from tests.api.support import api_client
+from tests.api.support import api_client, create_match_payload
 
 
 def test_leave_match_works_via_http() -> None:
     with api_client() as (client, _repository):
         _ = client.post(
             "/matches",
-            json={
-                "match_id": "api_leave_match",
-                "viewer_player_id": "alice",
-                "participants": [
-                    {
-                        "service_player_id": "alice",
-                        "engine_player_id": "p1",
-                        "deck_id": "scoiatael_high_stakes",
-                    },
-                    {
-                        "service_player_id": "bob",
-                        "engine_player_id": "p2",
-                        "deck_id": "scoiatael_high_stakes",
-                    },
-                ],
-                "rng_seed": 7,
-            },
+            json=create_match_payload(
+                match_id="api_leave_match",
+                player_one_deck="scoiatael_high_stakes",
+                player_two_deck="scoiatael_high_stakes",
+            ),
         )
         response = client.post(
             "/matches/api_leave_match/actions/leave",

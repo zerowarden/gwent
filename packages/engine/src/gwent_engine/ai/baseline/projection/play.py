@@ -33,6 +33,7 @@ from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_PO
 from gwent_engine.ai.utils import (
     is_non_hero_unit,
     viewer_deck_count,
+    viewer_deck_definitions,
     viewer_hand_definition,
 )
 from gwent_engine.cards import CardDefinition, CardRegistry
@@ -379,9 +380,8 @@ def projected_muster_cards_from_viewer_deck(
             battlefield_side=battlefield_side,
             row=row,
         )
-        for entry in observation.viewer_deck_composition
-        if (definition := card_registry.get(entry.definition_id)).muster_group == muster_group
-        for _ in entry.instance_ids
+        for definition in viewer_deck_definitions(observation, card_registry)
+        if definition.muster_group == muster_group
     )
 
 
