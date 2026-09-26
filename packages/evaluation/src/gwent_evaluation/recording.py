@@ -21,7 +21,7 @@ class SummaryRecorder:
 
     def record_decision(self, decision: MatchDecision) -> None:
         self.decision_seconds += decision.duration_seconds
-        self.trace_digest = canonical_digest((self.trace_digest, _chosen_option_id(decision)))
+        self.trace_digest = canonical_digest((self.trace_digest, _decision_identity(decision)))
 
     def record_transition(self, transition: MatchTransition) -> None:
         self.trace_digest = canonical_digest(
@@ -84,6 +84,19 @@ class ExperimentRecorder(SummaryRecorder):
             samples=tuple(self.samples),
             trajectory=tuple(self.trajectory),
         )
+
+
+def _decision_identity(decision: MatchDecision) -> object:
+    if isinstance(decision, FailedDecisionAttempt):
+        return (
+            "failed_decision",
+            decision.kind.value,
+            decision.actor,
+            decision.failure.stage.value,
+            decision.failure.exception_type,
+            decision.chosen_option_id,
+        )
+    return _chosen_option_id(decision)
 
 
 def _legal_option_ids(decision: MatchDecision) -> tuple[str, ...]:

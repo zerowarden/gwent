@@ -23,11 +23,17 @@ from gwent_engine.serialize import action_from_id
 
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
-from gwent_evaluation.execution import CaseExecution, execute_case, semantic_digest
+from gwent_evaluation.execution import (
+    CaseExecution,
+    build_run_manifest,
+    execute_case,
+    semantic_digest,
+)
 from gwent_evaluation.models import MatchResult, ScheduledMatch, TrajectoryStep
+from gwent_evaluation.provenance import default_repository_root
 from gwent_evaluation.schedule import other_seat
 from gwent_evaluation.storage import RunStore
-from gwent_evaluation.validation import LoadedRun
+from gwent_evaluation.validation import LoadedRun, execution_identity
 
 
 class ReplayError(ValueError):
@@ -52,8 +58,14 @@ class Divergence:
 class ReproductionOutcome:
     case_id: str
     termination: TerminationReason
-    reproduced: bool
+    execution_identity_matches: bool
+    semantics_reproduced: bool
     divergences: tuple[Divergence, ...]
+
+    @property
+    def reproduced(self) -> bool:
+        """Compatibility alias for semantic reproduction, independent of identity drift."""
+        return self.semantics_reproduced
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,17 +85,31 @@ class ReplayOutcome:
         return self.termination is not TerminationReason.COMPLETED
 
 
-def reproduce_case(run_root: Path, case_id: str) -> ReproductionOutcome:
-    """Re-execute one recorded case with its declared agents, assets, and seeds."""
+def reproduce_case(
+    run_root: Path, case_id: str, *, repository_root: Path | None = None
+) -> ReproductionOutcome:
+    """Report current execution identity and semantic reproduction independently."""
 
     store = _store(run_root)
     assets = resolve_assets()
     loaded = store.load(trajectory_cases=(case_id,), card_registry=assets.card_registry)
     match, result = _require_case(loaded, case_id)
+    suite = loaded.manifest.suite
+    candidate = resolve_agent(suite.candidate)
+    opponents = {opponent: resolve_agent(opponent) for opponent in suite.opponents}
+    current_manifest = build_run_manifest(
+        suite=suite,
+        run_id=loaded.manifest.run_id,
+        matches=loaded.matches,
+        candidate=candidate,
+        opponents=tuple(opponents.values()),
+        assets=assets,
+        repository_root=repository_root or default_repository_root(),
+    )
     case = execute_case(
         match,
-        candidate=resolve_agent(match.candidate_agent),
-        opponent=resolve_agent(match.opponent_agent),
+        candidate=candidate,
+        opponent=opponents[match.opponent_agent],
         assets=assets,
     )
     divergences = _compare_execution(result, case)
@@ -95,7 +121,10 @@ def reproduce_case(run_root: Path, case_id: str) -> ReproductionOutcome:
     return ReproductionOutcome(
         case_id=case_id,
         termination=result.termination,
-        reproduced=not divergences,
+        execution_identity_matches=(
+            execution_identity(current_manifest) == loaded.execution_identity
+        ),
+        semantics_reproduced=not divergences,
         divergences=divergences,
     )
 

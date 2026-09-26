@@ -37,7 +37,7 @@ from gwent_evaluation.recording import ExperimentRecorder, SummaryRecorder
 from gwent_evaluation.reporting import LoadedRun, persist_run_report
 from gwent_evaluation.schedule import CASE_ID_VERSION, other_seat, schedule_suite
 from gwent_evaluation.storage import RunConflictError, RunStore
-from gwent_evaluation.validation import execution_identity, validate_result_against_execution
+from gwent_evaluation.validation import validate_result_against_execution
 
 
 class EvidencePolicy(StrEnum):
@@ -81,7 +81,7 @@ def execute_run(
     candidate = resolve_agent(suite.candidate)
     opponents = {opponent: resolve_agent(opponent) for opponent in suite.opponents}
     matches = schedule_suite(suite)
-    manifest = _build_manifest(
+    manifest = build_run_manifest(
         suite=suite,
         run_id=run_id,
         matches=matches,
@@ -95,7 +95,9 @@ def execute_run(
             "Optimization, validation and test runs require a clean checkout with a lockfile."
         )
     store = RunStore(output_root=output_root, run_id=run_id)
-    persisted = store.prepare(manifest, matches=matches).results
+    prepared = store.prepare(manifest, matches=matches)
+    persisted = prepared.results
+    execution_id = prepared.execution_identity
     results: list[MatchResult] = []
     executed_case_ids: list[str] = []
     resumed_case_ids: list[str] = []
@@ -119,10 +121,10 @@ def execute_run(
                 match.case_id,
                 case.evidence,
                 include_trajectory=include_trajectory,
-                execution_identity=execution_identity(manifest),
+                execution_identity=execution_id,
             )
-        result = _build_result(match, case, evidence=evidence_refs, manifest=manifest)
-        validate_result_against_execution(result, match, manifest)
+        result = _build_result(match, case, evidence=evidence_refs, execution_id=execution_id)
+        validate_result_against_execution(result, match, prepared)
         store.write_result(result)
         results.append(result)
         executed_case_ids.append(match.case_id)
@@ -144,7 +146,7 @@ def execute_run(
     )
 
 
-def _build_manifest(
+def build_run_manifest(
     *,
     suite: SuiteSpec,
     run_id: str,
@@ -237,14 +239,14 @@ def _build_result(
     case: CaseExecution,
     *,
     evidence: EvidenceRefs,
-    manifest: RunManifest,
+    execution_id: str,
 ) -> MatchResult:
     execution = case.execution
     final_state = execution.final_state
     winner = execution.match_winner
     return MatchResult(
         schema_version=RECORD_SCHEMA_VERSION,
-        execution_identity=execution_identity(manifest),
+        execution_identity=execution_id,
         case_id=match.case_id,
         termination=execution.termination,
         candidate_agent_id=match.candidate_agent.agent_id,

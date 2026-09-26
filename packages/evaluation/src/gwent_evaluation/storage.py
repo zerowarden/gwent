@@ -102,7 +102,8 @@ class RunStore:
                     f"Run {self.run_id!r} already exists with a different manifest."
                 )
             return loaded
-        validate_loaded_run(LoadedRun(manifest, matches, {}))
+        loaded = LoadedRun(manifest, matches, {})
+        validate_loaded_run(loaded)
         self.matches_dir.mkdir(parents=True, exist_ok=True)
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
         _atomic_write_text(
@@ -114,7 +115,7 @@ class RunStore:
             "".join(canonical_json(record_to_dict(match)) + "\n" for match in matches),
         )
 
-        return LoadedRun(manifest, matches, {})
+        return loaded
 
     def read_manifest(self) -> RunManifest:
         if not self.manifest_path.exists():
@@ -273,9 +274,9 @@ class RunStore:
             result = self._read_result(match.case_id)
             if result is not None:
                 results[match.case_id] = result
-        loaded = LoadedRun(manifest, matches, results)
-        validate_loaded_run(loaded)
         trajectories: dict[str, tuple[TrajectoryStep, ...]] = {}
+        loaded = LoadedRun(manifest, matches, results, trajectories)
+        validate_loaded_run(loaded)
         for match in matches:
             result = results.get(match.case_id)
             if result is None:
@@ -287,7 +288,7 @@ class RunStore:
                     match,
                     card_registry=card_registry,
                 )
-        return LoadedRun(manifest, matches, results, trajectories)
+        return loaded
 
     def _verify_evidence(self, result: MatchResult) -> None:
         for recorded_path, digest, expected_path in (

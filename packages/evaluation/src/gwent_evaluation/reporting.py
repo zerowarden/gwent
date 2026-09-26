@@ -41,7 +41,7 @@ from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.schedule import ScheduleBlock, schedule_blocks
 from gwent_evaluation.storage import RunStore
 from gwent_evaluation.validation import LoadedRun as LoadedRun
-from gwent_evaluation.validation import benchmark_identity, validate_loaded_run
+from gwent_evaluation.validation import validate_loaded_run
 
 
 class ReportError(ValueError):
@@ -502,7 +502,7 @@ def _compatibility_reasons(reference: LoadedRun, candidate: LoadedRun) -> tuple[
         reasons.append("runtime identities differ")
     if reference_manifest.opponents != candidate_manifest.opponents:
         reasons.append("resolved opponent configurations differ")
-    if benchmark_identity(reference_manifest) != benchmark_identity(candidate_manifest):
+    if reference.benchmark_identity != candidate.benchmark_identity:
         reasons.append("benchmark identities differ")
     return tuple(reasons)
 

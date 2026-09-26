@@ -16,6 +16,7 @@ from typing import cast
 from gwent_evaluation.agents import AgentResolutionError
 from gwent_evaluation.execution import EvidencePolicy, execute_run
 from gwent_evaluation.models import SuiteSpec
+from gwent_evaluation.provenance import default_repository_root as _repository_root
 from gwent_evaluation.records import StorageError
 from gwent_evaluation.replay import (
     ReplayError,
@@ -166,7 +167,7 @@ def _cmd_replay(args: argparse.Namespace) -> int:
     case_id = cast(str, args.case)
     outcome: ReplayOutcome | ReproductionOutcome
     if cast(bool, args.reproduce):
-        outcome = reproduce_case(run_root, case_id)
+        outcome = reproduce_case(run_root, case_id, repository_root=_repository_root())
     else:
         replay_outcome = replay_case(run_root, case_id)
         if replay_outcome.prefix_only:
@@ -174,6 +175,9 @@ def _cmd_replay(args: argparse.Namespace) -> int:
         outcome = replay_outcome
     verdict = "yes" if outcome.reproduced else "no"
     print(f"case: {outcome.case_id} termination={outcome.termination.value} reproduced={verdict}")
+    if isinstance(outcome, ReproductionOutcome):
+        identity_verdict = "yes" if outcome.execution_identity_matches else "no"
+        print(f"execution_identity_matches={identity_verdict} semantics_reproduced={verdict}")
     for divergence in outcome.divergences:
         print(
             f"  index={divergence.index} field={divergence.field} "
@@ -218,10 +222,6 @@ def _default_suites_path() -> Path:
 
 def _default_agents_path() -> Path:
     return _repository_root() / "experiments" / "agents.json"
-
-
-def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[4]
 
 
 __all__ = ["EXIT_DIVERGENCE", "EXIT_ERROR", "EXIT_OK", "main"]

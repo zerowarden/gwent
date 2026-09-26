@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 from shutil import copyfile
@@ -9,9 +10,11 @@ from typing import NoReturn, cast
 import pytest
 from gwent_evaluation import EvidencePolicy, SuitePurpose, replay_case
 from gwent_evaluation import execution as execution_module
+from gwent_evaluation import validation as validation_module
 from gwent_evaluation.models import SpecError, SuiteSpec
 from gwent_evaluation.provenance import (
     RepositoryProvenance,
+    canonical_digest,
     file_digest,
     read_repository_provenance,
 )
@@ -259,3 +262,45 @@ def test_intact_foreign_trajectory_is_rejected_even_when_its_digest_is_recorded(
     )
     with pytest.raises(CorruptRecordError, match="another execution"):
         _ = replay_case(second.root, result.case_id)
+
+
+def test_identity_processing_scales_with_manifests_not_cases(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    benchmark_sizes: list[int] = []
+    execution_hashes: list[str] = []
+
+    def track_identity(payload: object) -> str:
+        digest = canonical_digest(payload)
+        if isinstance(payload, Mapping):
+            fields = cast(Mapping[str, object], payload)
+            if "planned_case_ids" in fields:
+                benchmark_sizes.append(len(cast(tuple[str, ...], fields["planned_case_ids"])))
+            if "benchmark" in fields:
+                execution_hashes.append(cast(str, fields["benchmark"]))
+        return digest
+
+    monkeypatch.setattr(validation_module, "canonical_digest", track_identity)
+    counts: list[tuple[int, ...]] = []
+    for seed_count in (1, 4):
+        suite = replace(tiny_suite(), seeds=tuple(range(seed_count)))
+        run_counts: list[int] = []
+        for _attempt in range(2):
+            benchmark_sizes.clear()
+            execution_hashes.clear()
+            execution = execute_suite(tmp_path / str(seed_count), suite=suite)
+            run_counts.append(len(benchmark_sizes))
+            assert len(benchmark_sizes) == len(execution_hashes)
+            assert all(size == len(execution.results) for size in benchmark_sizes)
+        benchmark_sizes.clear()
+        execution_hashes.clear()
+        loaded = load_run(tmp_path / str(seed_count) / "run")
+        validation_module.validate_loaded_run(loaded)
+        _ = build_run_report(loaded)
+        _ = build_run_comparison(loaded, loaded)
+        assert len(benchmark_sizes) == len(execution_hashes) == 1
+        counts.append(tuple(run_counts))
+
+    # Execution, evidence binding, resume, and reporting each reuse run identities.
+    assert counts[0] == counts[1]
+    assert all(0 < count <= 2 for count in counts[0])

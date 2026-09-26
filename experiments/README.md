@@ -84,6 +84,14 @@ resumes an interrupted run after verifying existing records; conflicting
 manifests are rejected. Exit codes: `0` success, `1` reproduced divergence or
 incompatible comparison, `2` invalid input.
 
+`replay --reproduce` re-executes the declared agents and reports two independent
+flags: `execution_identity_matches` compares the current implementation, runtime,
+resolved configurations, and assets against the recorded execution identity;
+`semantics_reproduced` compares the outcome and semantic trace. Identity drift
+can coexist with reproduced semantics. The existing `reproduced` verdict and
+exit status continue to reflect semantic reproduction. Python callers can pass
+`repository_root` to `reproduce_case()` when using a non-default checkout.
+
 A run directory contains `manifest.json`, `schedule.jsonl`, `matches/`,
 `evidence/`, `report.json`, and `report.md`.
 

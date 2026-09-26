@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import cast
 
@@ -7,9 +8,13 @@ import pytest
 from gwent_engine.ai.agents import BotAgent, GreedyBot
 from gwent_engine.ai.arena.models import TerminationReason
 from gwent_evaluation import AgentSpec, EvidencePolicy, SuiteSpec, replay_case, reproduce_case
+from gwent_evaluation import execution as execution_module
 from gwent_evaluation.agents import ResolvedAgent
+from gwent_evaluation.assets import ResolvedAssets
 from gwent_evaluation.models import BotFamily, RunExecution
+from gwent_evaluation.provenance import RepositoryProvenance
 from gwent_evaluation.replay import ReplayError
+from gwent_evaluation.storage import RunStore
 
 from tests.engine.ai.bots import AlwaysPassBot, FailingAfterBot
 from tests.evaluation.support import (
@@ -73,6 +78,8 @@ def test_completed_cases_reproduce_and_replay(tmp_path: Path) -> None:
     assert any(result.pending_choice_occurred for result in execution.results)
     for result in execution.results:
         reproduction = reproduce_case(execution.root, result.case_id)
+        assert reproduction.execution_identity_matches is True
+        assert reproduction.semantics_reproduced is True
         assert reproduction.reproduced is True
         assert reproduction.divergences == ()
 
@@ -127,10 +134,64 @@ def test_reproduction_detects_policy_divergence(
     reproduction = reproduce_case(execution.root, case_id)
 
     assert reproduction.reproduced is False
+    assert reproduction.execution_identity_matches is True
+    assert reproduction.semantics_reproduced is False
     assert len(reproduction.divergences) == 1
     divergence = reproduction.divergences[0]
     assert divergence.index == 3
     assert divergence.field == "action_id"
+
+
+@pytest.mark.parametrize(
+    "changed", ["implementation", "runtime", "candidate", "opponent", "decks", "cards", "leaders"]
+)
+def test_reproduction_reports_identity_drift_independently_of_semantics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    execution = _execute(tmp_path, suite=replace(_suite(), action_budget=1))
+    manifest = RunStore.from_root(execution.root).read_manifest()
+    if changed == "implementation":
+
+        def changed_provenance(_root: Path) -> RepositoryProvenance:
+            return replace(manifest.repository, implementation_digest="changed")
+
+        monkeypatch.setattr(execution_module, "read_repository_provenance", changed_provenance)
+    elif changed == "runtime":
+        monkeypatch.setattr(
+            execution_module,
+            "read_runtime_provenance",
+            lambda: replace(manifest.runtime, python_version="changed"),
+        )
+    elif changed in {"candidate", "opponent"}:
+        original_digest = ResolvedAgent.digest
+        agent_id = (
+            manifest.candidate.agent_id
+            if changed == "candidate"
+            else manifest.opponents[0].agent_id
+        )
+
+        def changed_digest(agent: ResolvedAgent) -> str:
+            return "changed" if agent.agent_id == agent_id else original_digest(agent)
+
+        monkeypatch.setattr(ResolvedAgent, "digest", changed_digest)
+    else:
+
+        def changed_asset_digest(_assets: ResolvedAssets, *_args: str) -> str:
+            return "changed"
+
+        method = {
+            "decks": "deck_digest",
+            "cards": "card_data_digest",
+            "leaders": "leader_data_digest",
+        }[changed]
+        monkeypatch.setattr(ResolvedAssets, method, changed_asset_digest)
+
+    reproduction = reproduce_case(execution.root, execution.results[0].case_id)
+
+    assert reproduction.execution_identity_matches is False
+    assert reproduction.semantics_reproduced is True
+    assert reproduction.reproduced is True
+    assert reproduction.divergences == ()
 
 
 def test_failure_prefix_reproduces_and_replays(

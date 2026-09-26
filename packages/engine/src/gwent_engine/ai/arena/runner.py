@@ -36,6 +36,7 @@ from gwent_engine.core.reducer import apply_action_with_intermediate_state
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
+from gwent_engine.serialize import action_from_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -315,7 +316,7 @@ def _choose_decision(
             _decision_failure_stage(kind),
             actor,
             "IllegalActionError",
-            f"{bot.display_name} emitted an illegal action.",
+            f"{bot.display_name} emitted an illegal action: {_returned_diagnostic(action)}.",
         )
         record(
             FailedDecisionAttempt(
@@ -380,7 +381,8 @@ def _choose_mulligan_decision(
             _decision_failure_stage(kind),
             player_id,
             "IllegalActionError",
-            f"{bot.display_name} emitted an illegal mulligan selection.",
+            f"{bot.display_name} emitted an illegal mulligan selection: "
+            + f"{_returned_diagnostic(selection)}.",
         )
         chosen = _returned_mulligan_id(selection)
         record(
@@ -400,10 +402,30 @@ def _choose_mulligan_decision(
 
 
 def _returned_action_id(action: GameAction) -> str:
+    return _canonical_returned_action_id(action) or _malformed_return_id(action)
+
+
+def _canonical_returned_action_id(action: GameAction) -> str | None:
     try:
-        return action_to_id(action)
-    except (TypeError, ValueError, AttributeError):
-        return repr(action)
+        identifier = action_to_id(action)
+        decoded = action_from_id(identifier)
+        if type(decoded) is type(action) and decoded == action:
+            return identifier
+    except Exception:
+        # Malformed agent values must not turn diagnostic encoding into an engine error.
+        pass
+    return None
+
+
+def _malformed_return_id(value: object) -> str:
+    return f"malformed_return:{type(value).__module__}.{type(value).__qualname__}"
+
+
+def _returned_diagnostic(value: object) -> str:
+    try:
+        return repr(value)
+    except Exception:
+        return _malformed_return_id(value)
 
 
 def _engine_call[T](
@@ -524,8 +546,8 @@ def _failed_execution(
 
 
 def _returned_mulligan_id(selection: object) -> str:
-    return (
-        mulligan_selection_id(selection)
-        if isinstance(selection, MulliganSelection)
-        else repr(selection)
-    )
+    if isinstance(selection, MulliganSelection):
+        action = ResolveMulligansAction(selections=(selection,))
+        if _canonical_returned_action_id(action) is not None:
+            return mulligan_selection_id(selection)
+    return _malformed_return_id(selection)

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.arena.models import MatchFailureStage, MatchStepKind, TerminationReason
@@ -17,14 +18,24 @@ from gwent_evaluation.records import CorruptRecordError, record_to_dict
 from gwent_evaluation.schedule import CASE_ID_VERSION, schedule_suite
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True)
 class LoadedRun:
+    """Run records with identities cached for this immutable manifest."""
+
     manifest: RunManifest
     matches: tuple[ScheduledMatch, ...]
     results: Mapping[str, MatchResult]
     trajectories: Mapping[str, tuple[TrajectoryStep, ...]] = field(
         default_factory=dict[str, tuple[TrajectoryStep, ...]]
     )
+
+    @cached_property
+    def benchmark_identity(self) -> str:
+        return benchmark_identity(self.manifest)
+
+    @cached_property
+    def execution_identity(self) -> str:
+        return _execution_identity(self.manifest, self.benchmark_identity)
 
 
 def benchmark_identity(manifest: RunManifest) -> str:
@@ -46,9 +57,13 @@ def benchmark_identity(manifest: RunManifest) -> str:
 
 
 def execution_identity(manifest: RunManifest) -> str:
+    return _execution_identity(manifest, benchmark_identity(manifest))
+
+
+def _execution_identity(manifest: RunManifest, benchmark: str) -> str:
     return canonical_digest(
         {
-            "benchmark": benchmark_identity(manifest),
+            "benchmark": benchmark,
             "candidate": manifest.candidate,
             "candidate_spec": manifest.suite.candidate,
         }
@@ -80,11 +95,12 @@ def validate_schedule(manifest: RunManifest, matches: tuple[ScheduledMatch, ...]
 def validate_result_against_execution(
     result: MatchResult,
     scheduled_match: ScheduledMatch,
-    manifest: RunManifest,
+    run: LoadedRun,
 ) -> None:
     match = scheduled_match
+    manifest = run.manifest
     checks = {
-        "execution identity": (result.execution_identity, execution_identity(manifest)),
+        "execution identity": (result.execution_identity, run.execution_identity),
         "case id": (result.case_id, match.case_id),
         "candidate": (result.candidate_agent_id, manifest.candidate.agent_id),
         "opponent": (result.opponent_agent_id, match.opponent_agent.agent_id),
@@ -155,4 +171,4 @@ def validate_loaded_run(loaded: LoadedRun) -> None:
     for match in loaded.matches:
         result = loaded.results.get(match.case_id)
         if result is not None:
-            validate_result_against_execution(result, match, loaded.manifest)
+            validate_result_against_execution(result, match, loaded)

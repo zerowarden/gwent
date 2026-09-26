@@ -72,6 +72,10 @@ def read_repository_provenance(repository_root: Path) -> RepositoryProvenance:
     )
 
 
+def default_repository_root() -> Path:
+    return Path(__file__).resolve().parents[4]
+
+
 def read_runtime_provenance() -> RuntimeProvenance:
     return RuntimeProvenance(
         python_implementation=sys.implementation.name,
