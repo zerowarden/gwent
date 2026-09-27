@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import cast
 
 from gwent_engine.ai.agents import BotAgent
 from gwent_engine.ai.arena import BotFamilyDefinition, bot_family
 from gwent_engine.ai.baseline import BaseProfileDefinition, get_base_profile_definition
+from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
+from gwent_engine.ai.policy import BaselineConfig
 
-from gwent_evaluation.models import AgentSpec
+from gwent_evaluation.models import AgentSpec, BotFamily, SuiteSpec
 from gwent_evaluation.provenance import canonical_digest
 
 
@@ -17,7 +20,7 @@ class AgentResolutionError(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class ResolvedAgent:
-    """An agent spec bound to its canonical engine family and named configuration."""
+    """An agent spec bound to its canonical engine family and configuration."""
 
     spec: AgentSpec
     family: BotFamilyDefinition
@@ -42,6 +45,9 @@ class ResolvedAgent:
     def build(self, *, bot_id: str, seed: int | None = None) -> BotAgent:
         """Build the engine bot, applying the seed only when the family supports one."""
 
+        configuration = self.heuristic_configuration
+        if configuration is not None:
+            return self.family.build_resolved(bot_id=bot_id, heuristic_configuration=configuration)
         return self.family.build_resolved(
             bot_id=bot_id,
             profile=self.profile,
@@ -49,6 +55,13 @@ class ResolvedAgent:
         )
 
     def configuration(self) -> dict[str, object]:
+        configuration = self.heuristic_configuration
+        if configuration is not None:
+            return {
+                "family": self.family_id,
+                "heuristic_configuration_digest": configuration.digest(),
+                "observation_contract_version": OBSERVATION_CONTRACT_VERSION,
+            }
         return {
             "family": self.family_id,
             "profile": self.profile,
@@ -58,6 +71,34 @@ class ResolvedAgent:
 
     def digest(self) -> str:
         return canonical_digest(self.configuration())
+
+    @property
+    def heuristic_configuration(self) -> HeuristicConfiguration | None:
+        if self.family.family is not BotFamily.HEURISTIC:
+            return None
+        assert self.profile is not None
+        explicit = self.spec.heuristic_configuration
+        baseline = (
+            explicit.baseline
+            if explicit is not None
+            else cast(BaselineConfig, self.family.fixed_configuration["baseline"])
+        )
+        return HeuristicConfiguration(baseline=baseline, profile=self.profile)
+
+    def snapshot(self) -> AgentSpec:
+        configuration = self.heuristic_configuration
+        if configuration is None:
+            return self.spec
+        return replace(self.spec, profile=None, heuristic_configuration=configuration)
+
+
+def snapshot_suite(suite: SuiteSpec) -> SuiteSpec:
+    """Materialize heuristic values before scheduling or persisting a run."""
+    return replace(
+        suite,
+        candidate=resolve_agent(suite.candidate).snapshot(),
+        opponents=tuple(resolve_agent(agent).snapshot() for agent in suite.opponents),
+    )
 
 
 def resolve_agent(spec: AgentSpec) -> ResolvedAgent:
@@ -77,6 +118,8 @@ def _resolve_profile(
     *,
     family: BotFamilyDefinition,
 ) -> BaseProfileDefinition | None:
+    if spec.heuristic_configuration is not None:
+        return spec.heuristic_configuration.profile
     if not family.accepts_profile:
         if spec.profile is not None:
             raise AgentResolutionError(

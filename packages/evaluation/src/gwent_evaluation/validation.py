@@ -12,7 +12,13 @@ from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import StartGameAction
 
-from gwent_evaluation.models import MatchResult, RunManifest, ScheduledMatch, TrajectoryStep
+from gwent_evaluation.models import (
+    DecisionSample,
+    MatchResult,
+    RunManifest,
+    ScheduledMatch,
+    TrajectoryStep,
+)
 from gwent_evaluation.provenance import SEED_DERIVATION_VERSION, canonical_digest
 from gwent_evaluation.records import CorruptRecordError, record_to_dict
 from gwent_evaluation.schedule import CASE_ID_VERSION, schedule_suite
@@ -28,6 +34,10 @@ class LoadedRun:
     trajectories: Mapping[str, tuple[TrajectoryStep, ...]] = field(
         default_factory=dict[str, tuple[TrajectoryStep, ...]]
     )
+    samples: Mapping[str, tuple[DecisionSample, ...]] = field(
+        default_factory=dict[str, tuple[DecisionSample, ...]]
+    )
+    result_digests: Mapping[str, str] = field(default_factory=dict[str, str])
 
     @cached_property
     def benchmark_identity(self) -> str:
@@ -70,7 +80,8 @@ def _execution_identity(manifest: RunManifest, benchmark: str) -> str:
     )
 
 
-def validate_schedule(manifest: RunManifest, matches: tuple[ScheduledMatch, ...]) -> None:
+def validate_manifest_schedule(manifest: RunManifest) -> tuple[ScheduledMatch, ...]:
+    """Validate manifest scheduling metadata and return its authoritative schedule."""
     if (
         manifest.seed_derivation_version != SEED_DERIVATION_VERSION
         or manifest.case_id_version != CASE_ID_VERSION
@@ -79,8 +90,8 @@ def validate_schedule(manifest: RunManifest, matches: tuple[ScheduledMatch, ...]
     if manifest.repository.implementation_digest is None:
         raise CorruptRecordError("Manifest has no implementation identity.")
     expected = schedule_suite(manifest.suite)
-    if matches != expected or manifest.planned_case_ids != tuple(m.case_id for m in expected):
-        raise CorruptRecordError("The persisted schedule does not match its manifest.")
+    if manifest.planned_case_ids != tuple(m.case_id for m in expected):
+        raise CorruptRecordError("The manifest case ids do not match its schedule.")
     if (
         manifest.candidate.agent_id != manifest.suite.candidate.agent_id
         or manifest.candidate.family != manifest.suite.candidate.family.value
@@ -90,6 +101,13 @@ def validate_schedule(manifest: RunManifest, matches: tuple[ScheduledMatch, ...]
         (a.agent_id, a.family.value) for a in manifest.suite.opponents
     ):
         raise CorruptRecordError("Manifest opponents do not match its suite.")
+    return expected
+
+
+def validate_schedule(manifest: RunManifest, matches: tuple[ScheduledMatch, ...]) -> None:
+    expected = validate_manifest_schedule(manifest)
+    if matches != expected:
+        raise CorruptRecordError("The persisted schedule does not match its manifest.")
 
 
 def validate_result_against_execution(

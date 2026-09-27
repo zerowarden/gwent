@@ -27,7 +27,6 @@ def _materialize(state: GameState) -> PlayerSimulation:
     return materialize_player_simulation(
         observation,
         card_registry=CARD_REGISTRY,
-        leader_registry=LEADER_REGISTRY,
     )
 
 
@@ -260,7 +259,6 @@ def test_translated_viewer_deck_action_applies_to_simulation() -> None:
     simulation = materialize_player_simulation(
         observation,
         card_registry=CARD_REGISTRY,
-        leader_registry=LEADER_REGISTRY,
     )
     legal_actions = enumerate_legal_actions(
         state,

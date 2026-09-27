@@ -99,8 +99,6 @@ def _validate_unit_play_legality(
         return
     if action.target_card_instance_id is not None:
         raise IllegalActionError("Only Medic unit cards may target another card.")
-    if action.secondary_target_card_instance_id is not None:
-        raise IllegalActionError("Only Medic unit cards may declare a secondary target.")
 
 
 def _validate_medic_play_legality(
@@ -117,8 +115,6 @@ def _validate_medic_play_legality(
         return
 
     if action.target_card_instance_id is not None:
-        raise IllegalActionError("Medic discard targets are resolved through pending choice.")
-    if action.secondary_target_card_instance_id is not None:
         raise IllegalActionError("Medic discard targets are resolved through pending choice.")
     if any(
         can_target_for_medic(
@@ -144,10 +140,6 @@ def _validate_randomized_medic_play_action(
         raise IllegalActionError(
             "Randomized restoration leaders do not allow explicit Medic targets."
         )
-    if action.secondary_target_card_instance_id is not None:
-        raise IllegalActionError(
-            "Randomized restoration leaders do not allow Medic secondary targets."
-        )
 
 
 def _validate_special_play_legality(
@@ -157,9 +149,6 @@ def _validate_special_play_legality(
     definition: CardDefinition,
     card_registry: CardRegistry,
 ) -> None:
-    if action.secondary_target_card_instance_id is not None:
-        raise IllegalActionError("Special cards do not declare a secondary target.")
-
     ability_kind = special_ability_kind(definition)
     if ability_kind == AbilityKind.COMMANDERS_HORN:
         _validate_commanders_horn_legality(state, player, action, definition, card_registry)

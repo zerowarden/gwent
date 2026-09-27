@@ -351,6 +351,11 @@ def _unit_has_horn_signal(definition: CardDefinition) -> bool:
 
 
 def _special_has_horn_signal(definition: CardDefinition) -> bool:
+    # Scoring only honors single-ability COMMANDERS_HORN specials. This is
+    # deliberately narrower than `row_effects.horn_source_for_row`, which also
+    # treats any card carrying COMMANDERS_HORN (including the unit
+    # skellige_clan_draig_bon_dhu) as a horn source; scoring must keep the
+    # card-type-specific predicate so row strengths stay unchanged.
     return definition.card_type == CardType.SPECIAL and definition.ability_kinds == (
         AbilityKind.COMMANDERS_HORN,
     )

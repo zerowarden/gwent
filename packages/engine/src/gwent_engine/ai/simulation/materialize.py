@@ -32,7 +32,6 @@ from gwent_engine.core.state import (
     PlayerState,
     RowState,
 )
-from gwent_engine.leaders import LeaderRegistry
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +59,7 @@ def materialize_player_simulation(
     observation: PlayerObservation,
     *,
     card_registry: CardRegistry,
-    leader_registry: LeaderRegistry | None = None,
 ) -> PlayerSimulation:
-    del leader_registry
     registry = provision_simulation_registry(card_registry)
     viewer_public, opponent_public = _resolve_player_views(observation)
     public = observation.public_state
@@ -258,7 +255,6 @@ def _materialize_pending_choice(
             visible.legal_target_card_instance_ids,
             deck_instance_map=deck_instance_map,
         ),
-        legal_rows=visible.legal_rows,
         min_selections=visible.min_selections,
         max_selections=visible.max_selections,
         source_row=visible.source_row,
@@ -282,20 +278,12 @@ def _translate_action(
                     action.target_card_instance_id,
                     deck_instance_map=deck_instance_map,
                 ),
-                secondary_target_card_instance_id=_translate_optional(
-                    action.secondary_target_card_instance_id,
-                    deck_instance_map=deck_instance_map,
-                ),
             )
         case UseLeaderAbilityAction():
             return replace(
                 action,
                 target_card_instance_id=_translate_optional(
                     action.target_card_instance_id,
-                    deck_instance_map=deck_instance_map,
-                ),
-                secondary_target_card_instance_id=_translate_optional(
-                    action.secondary_target_card_instance_id,
                     deck_instance_map=deck_instance_map,
                 ),
                 selected_card_instance_ids=_translate_ids(

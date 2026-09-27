@@ -15,7 +15,8 @@ from gwent_engine.ai.arena.models import (
 from gwent_evaluation import AgentSpec, EvidencePolicy, SuiteSpec
 from gwent_evaluation import execution as execution_module
 from gwent_evaluation.agents import ResolvedAgent
-from gwent_evaluation.models import MatchResult, RunExecution
+from gwent_evaluation.execution import RunExecution
+from gwent_evaluation.models import MatchResult
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.storage import RunConflictError
 

@@ -137,7 +137,6 @@ class SearchEngine:
         simulation = materialize_player_simulation(
             observation,
             card_registry=card_registry,
-            leader_registry=leader_registry,
         )
         ordered_candidates = order_search_candidates(
             generate_search_candidates(

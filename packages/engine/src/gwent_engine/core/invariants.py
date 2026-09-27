@@ -107,7 +107,7 @@ def _check_pending_choice(state: GameState) -> None:
         raise InvariantError("Pending choices are only valid during active in-round play.")
     if state.current_player != pending_choice.player_id:
         raise InvariantError("Pending choice player must remain the current player.")
-    if not pending_choice.legal_target_card_instance_ids and not pending_choice.legal_rows:
+    if not pending_choice.legal_target_card_instance_ids:
         raise InvariantError("Pending choices must expose at least one legal selection.")
     if pending_choice.source_card_instance_id is not None:
         source_card = state.card(pending_choice.source_card_instance_id)

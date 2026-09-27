@@ -125,12 +125,10 @@ def _choice_action_score(
     action: ResolveChoiceAction,
     visible_definitions: dict[CardInstanceId, CardDefinition],
 ) -> int:
-    if action.selected_card_instance_ids:
-        return sum(
-            _card_selection_score(visible_definitions.get(card_id))
-            for card_id in action.selected_card_instance_ids
-        )
-    return sum(row_preference(row) for row in action.selected_rows)
+    return sum(
+        _card_selection_score(visible_definitions.get(card_id))
+        for card_id in action.selected_card_instance_ids
+    )
 
 
 def _play_action_score(

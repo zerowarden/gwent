@@ -121,7 +121,6 @@ class PendingChoice:
     source_card_instance_id: CardInstanceId | None = None
     source_leader_id: LeaderId | None = None
     legal_target_card_instance_ids: tuple[CardInstanceId, ...] = ()
-    legal_rows: tuple[Row, ...] = ()
     min_selections: int = 1
     max_selections: int = 1
     source_row: Row | None = None
@@ -137,8 +136,6 @@ class PendingChoice:
             self.legal_target_card_instance_ids
         ):
             raise ValueError("PendingChoice legal target ids must be unique.")
-        if len(set(self.legal_rows)) != len(self.legal_rows):
-            raise ValueError("PendingChoice legal rows must be unique.")
 
 
 @dataclass(frozen=True, slots=True)

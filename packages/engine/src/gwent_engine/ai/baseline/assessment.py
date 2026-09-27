@@ -2,6 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from gwent_engine.ai.baseline.projection.context import (
+    active_weather_rows as context_active_weather_rows,
+)
+from gwent_engine.ai.baseline.projection.context import (
+    opponent_public as opponent_public_view,
+)
+from gwent_engine.ai.baseline.projection.context import (
+    viewer_public as viewer_public_view,
+)
 from gwent_engine.ai.observations import (
     ObservedCard,
     PlayerObservation,
@@ -72,8 +81,8 @@ def build_assessment(
     from gwent_engine.ai.baseline.projection.board import current_public_board_projection
 
     public_state = observation.public_state
-    viewer_public = _player_view(public_state.players, observation.viewer_player_id)
-    opponent_public = _other_player_view(public_state.players, observation.viewer_player_id)
+    viewer_public = viewer_public_view(observation)
+    opponent_public = opponent_public_view(observation)
     board_projection = current_public_board_projection(
         observation,
         card_registry=card_registry,
@@ -90,15 +99,7 @@ def build_assessment(
         card_registry=card_registry,
         board_strength=board_projection.opponent_score,
     )
-    active_weather_rows = tuple(
-        row
-        for row, cards in (
-            (Row.CLOSE, public_state.battlefield_weather.close),
-            (Row.RANGED, public_state.battlefield_weather.ranged),
-            (Row.SIEGE, public_state.battlefield_weather.siege),
-        )
-        if cards
-    )
+    active_weather_rows = context_active_weather_rows(observation)
     return DecisionAssessment(
         viewer_player_id=observation.viewer_player_id,
         phase=public_state.phase,
@@ -178,21 +179,3 @@ def _row_summary(
         ),
         base_strength=sum(definition.base_strength for definition in definitions),
     )
-
-
-def _player_view(
-    players: tuple[PublicPlayerStateView, PublicPlayerStateView],
-    player_id: PlayerId,
-) -> PublicPlayerStateView:
-    if players[0].player_id == player_id:
-        return players[0]
-    return players[1]
-
-
-def _other_player_view(
-    players: tuple[PublicPlayerStateView, PublicPlayerStateView],
-    player_id: PlayerId,
-) -> PublicPlayerStateView:
-    if players[0].player_id == player_id:
-        return players[1]
-    return players[0]

@@ -122,7 +122,7 @@ class MatchReportBuilder:
                         "Winner",
                         winner_status_text(
                             final_state.match_winner,
-                            final_state.status.value,
+                            final_state.status,
                         ),
                     ),
                     ("Round", str(final_state.round_number)),

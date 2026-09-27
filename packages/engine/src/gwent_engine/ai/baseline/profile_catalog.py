@@ -7,6 +7,7 @@ from pathlib import Path
 
 from gwent_shared.error_translation import translate_mapping_key
 from gwent_shared.extract import (
+    expect_finite_float,
     expect_mapping,
     optional_int_field,
     require_mapping_field,
@@ -284,6 +285,6 @@ def _optional_float_field(
     raw_value = mapping.get(field)
     if raw_value is None:
         return None
-    if isinstance(raw_value, bool) or not isinstance(raw_value, (int, float)):
-        raise DefinitionLoadError(f"{context} field {field!r} must be numeric if provided.")
-    return float(raw_value)
+    return expect_finite_float(
+        raw_value, context=context, label=field, error_factory=DefinitionLoadError
+    )

@@ -17,7 +17,7 @@ from gwent_engine.core.state import CardInstance, GameState, LeaderState, Player
 from gwent_engine.factions.passives import resolve_starting_player_choice
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.leader_abilities import resolve_setup_passive_leader_effects
-from gwent_engine.rules.state_ops import replace_card_instances
+from gwent_engine.rules.state_ops import card_in_zone, replace_card_instances
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,9 +131,9 @@ def apply_mulligan(
             )
         )
         for card_id in replaced_cards:
-            updated_cards[card_id] = replace(state.card(card_id), zone=Zone.DECK)
+            updated_cards[card_id] = card_in_zone(state.card(card_id), zone=Zone.DECK)
         for card_id in drawn_cards:
-            updated_cards[card_id] = replace(state.card(card_id), zone=Zone.HAND)
+            updated_cards[card_id] = card_in_zone(state.card(card_id), zone=Zone.HAND)
         events.append(
             MulliganPerformedEvent(
                 event_id=next_event_id,
@@ -202,7 +202,7 @@ def _prepare_player_for_opening_hand(
     opening_hand = tuple(shuffled_deck[:OPENING_HAND_SIZE])
     remaining_deck = tuple(shuffled_deck[OPENING_HAND_SIZE:])
     for card_id in opening_hand:
-        updated_cards[card_id] = replace(state.card(card_id), zone=Zone.HAND)
+        updated_cards[card_id] = card_in_zone(state.card(card_id), zone=Zone.HAND)
 
     return (
         replace(

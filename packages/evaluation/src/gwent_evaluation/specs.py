@@ -4,6 +4,10 @@ from collections.abc import Callable, Mapping
 from enum import Enum
 from pathlib import Path
 
+from gwent_engine.ai.heuristic_configuration import (
+    HeuristicConfiguration,
+    HeuristicConfigurationError,
+)
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_shared.extract import (
     expect_int,
@@ -19,7 +23,8 @@ from gwent_shared.extract import (
 from gwent_shared.json_payloads import load_json_mapping
 
 from gwent_evaluation.models import (
-    SUPPORTED_SCHEMA_VERSION,
+    AGENT_SPEC_VERSION,
+    SUITE_SPEC_VERSION,
     AgentSpec,
     BotFamily,
     SchedulingPolicy,
@@ -30,7 +35,9 @@ from gwent_evaluation.models import SpecError as SpecError
 
 type AgentResolver = Callable[[str], AgentSpec]
 
-_AGENT_SPEC_FIELDS = frozenset({"schema_version", "agent_id", "family", "profile"})
+_AGENT_SPEC_FIELDS = frozenset(
+    {"schema_version", "agent_id", "family", "profile", "heuristic_configuration"}
+)
 _SUITE_SPEC_FIELDS = frozenset(
     {
         "schema_version",
@@ -53,7 +60,7 @@ def load_agent_catalog(path: Path) -> dict[str, AgentSpec]:
 
     document = _load_document(path)
     _reject_unknown_fields(document, _AGENT_CATALOG_FIELDS, context=str(path))
-    _ = _require_schema_version(document, context=str(path))
+    _ = _require_schema_version(document, expected=AGENT_SPEC_VERSION, context=str(path))
     catalog: dict[str, AgentSpec] = {}
     for index, entry in enumerate(
         require_sequence_field(document, "agents", context=str(path), error_factory=SpecError)
@@ -76,7 +83,7 @@ def load_suite_catalog(
 
     document = _load_document(path)
     _reject_unknown_fields(document, _SUITE_CATALOG_FIELDS, context=str(path))
-    _ = _require_schema_version(document, context=str(path))
+    _ = _require_schema_version(document, expected=SUITE_SPEC_VERSION, context=str(path))
     resolve_agent = _catalog_agent_resolver(agents)
     catalog: dict[str, SuiteSpec] = {}
     for index, entry in enumerate(
@@ -98,15 +105,25 @@ def load_suite_catalog(
 def parse_agent_spec(payload: object, *, context: str = "<agent spec>") -> AgentSpec:
     mapping = expect_mapping(payload, context=context, error_factory=SpecError)
     _reject_unknown_fields(mapping, _AGENT_SPEC_FIELDS, context=context)
-    schema_version = _require_schema_version(mapping, context=context)
+    schema_version = _require_schema_version(mapping, expected=AGENT_SPEC_VERSION, context=context)
     agent_id = require_str_field(mapping, "agent_id", context=context, error_factory=SpecError)
     family = _require_enum_field(mapping, "family", BotFamily, context=context)
     profile = optional_str_field(mapping, "profile", context=context, error_factory=SpecError)
+    raw_configuration = mapping.get("heuristic_configuration")
+    try:
+        configuration = (
+            None
+            if raw_configuration is None
+            else HeuristicConfiguration.from_dict(raw_configuration)
+        )
+    except HeuristicConfigurationError as error:
+        raise SpecError(f"{context}: {error}") from error
     return AgentSpec(
         schema_version=schema_version,
         agent_id=agent_id,
         family=family,
         profile=profile,
+        heuristic_configuration=configuration,
     )
 
 
@@ -118,7 +135,7 @@ def parse_suite_spec(
 ) -> SuiteSpec:
     mapping = expect_mapping(payload, context=context, error_factory=SpecError)
     _reject_unknown_fields(mapping, _SUITE_SPEC_FIELDS, context=context)
-    schema_version = _require_schema_version(mapping, context=context)
+    schema_version = _require_schema_version(mapping, expected=SUITE_SPEC_VERSION, context=context)
     suite_id = require_str_field(mapping, "suite_id", context=context, error_factory=SpecError)
     purpose = _require_enum_field(mapping, "purpose", SuitePurpose, context=context)
     deck_pairs = _require_deck_pairs(mapping, context=context)
@@ -173,17 +190,16 @@ def _reject_unknown_fields(
         raise SpecError(f"{context} contains unknown field(s): {formatted}.")
 
 
-def _require_schema_version(mapping: Mapping[str, object], *, context: str) -> int:
+def _require_schema_version(mapping: Mapping[str, object], *, expected: int, context: str) -> int:
     schema_version = require_int_field(
         mapping,
         "schema_version",
         context=context,
         error_factory=SpecError,
     )
-    if schema_version != SUPPORTED_SCHEMA_VERSION:
+    if schema_version != expected:
         raise SpecError(
-            f"{context} schema_version must be {SUPPORTED_SCHEMA_VERSION}, "
-            + f"found {schema_version}."
+            f"{context} schema_version must be {expected}, " + f"found {schema_version}."
         )
     return schema_version
 

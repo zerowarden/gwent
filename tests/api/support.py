@@ -54,3 +54,13 @@ def create_match_payload(
         ],
         "rng_seed": rng_seed,
     }
+
+
+def complete_mulligans(client: TestClient, match_id: str) -> None:
+    """Submit empty mulligans for both seats so the match reaches in-round play."""
+    for service_player_id in ("alice", "bob"):
+        response = client.post(
+            f"/matches/{match_id}/mulligan",
+            json={"service_player_id": service_player_id, "card_instance_ids": []},
+        )
+        assert response.status_code == 200

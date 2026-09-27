@@ -31,7 +31,6 @@ def _play_action(
     *,
     target_row: Row | None = None,
     target_card_instance_id: str | None = None,
-    secondary_target_card_instance_id: str | None = None,
 ) -> PlayCardAction:
     return PlayCardAction(
         player_id=PLAYER_ONE_ID,
@@ -39,11 +38,6 @@ def _play_action(
         target_row=target_row,
         target_card_instance_id=(
             CardInstanceId(target_card_instance_id) if target_card_instance_id is not None else None
-        ),
-        secondary_target_card_instance_id=(
-            CardInstanceId(secondary_target_card_instance_id)
-            if secondary_target_card_instance_id is not None
-            else None
         ),
     )
 
@@ -234,14 +228,6 @@ def test_validate_play_card_legality_rejects_non_unit_non_special_cards() -> Non
             ),
             "Only Medic unit cards may target another card",
         ),
-        (
-            _play_action(
-                "p1_vanguard_in_hand",
-                target_row=Row.CLOSE,
-                secondary_target_card_instance_id="discard_target_archer",
-            ),
-            "Only Medic unit cards may declare a secondary target",
-        ),
     ],
 )
 def test_non_medic_unit_legality_rejects_invalid_targets(
@@ -289,14 +275,6 @@ def test_medic_legality_requires_rng_for_randomized_restore_leader() -> None:
             ),
             "do not allow explicit Medic targets",
         ),
-        (
-            _play_action(
-                "p1_field_surgeon_in_hand",
-                target_row=Row.RANGED,
-                secondary_target_card_instance_id="p1_archer_in_discard",
-            ),
-            "do not allow Medic secondary targets",
-        ),
     ],
 )
 def test_randomized_medic_legality_rejects_explicit_targets(
@@ -325,14 +303,6 @@ def test_randomized_medic_legality_rejects_explicit_targets(
                 "p1_field_surgeon_in_hand",
                 target_row=Row.RANGED,
                 target_card_instance_id="p1_archer_in_discard",
-            ),
-            "Medic discard targets are resolved through pending choice.",
-        ),
-        (
-            _play_action(
-                "p1_field_surgeon_in_hand",
-                target_row=Row.RANGED,
-                secondary_target_card_instance_id="p1_archer_in_discard",
             ),
             "Medic discard targets are resolved through pending choice.",
         ),
@@ -422,24 +392,6 @@ def test_non_medic_unit_legality_accepts_clean_row_play() -> None:
         state,
         _play_action("p1_vanguard_in_hand", target_row=Row.CLOSE),
     )
-
-
-def test_special_legality_rejects_secondary_targets() -> None:
-    state = (
-        scenario("legality_reject_special_secondary_targets")
-        .player("p1", hand=[card("p1_horn_special_in_hand", "neutral_commanders_horn")])
-        .build()
-    )
-
-    with pytest.raises(IllegalActionError, match="Special cards do not declare a secondary target"):
-        _validate_play(
-            state,
-            _play_action(
-                "p1_horn_special_in_hand",
-                target_row=Row.CLOSE,
-                secondary_target_card_instance_id="p1_archer_target",
-            ),
-        )
 
 
 @pytest.mark.parametrize(

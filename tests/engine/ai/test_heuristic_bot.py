@@ -719,10 +719,7 @@ def test_leader_score_explanation_exposes_named_terms() -> None:
     context = classify_context(assessment)
     profile = compose_profile(DEFAULT_BASELINE_CONFIG, assessment, context)
     breakdown = explain_action_score(
-        UseLeaderAbilityAction(
-            player_id=PLAYER_ONE_ID,
-            target_row=Row.RANGED,
-        ),
+        UseLeaderAbilityAction(player_id=PLAYER_ONE_ID),
         observation=observation,
         assessment=assessment,
         context=context,

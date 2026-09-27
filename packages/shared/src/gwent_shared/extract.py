@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
 from typing import cast
@@ -13,6 +14,7 @@ __all__ = [
     "expect_constructor",
     "expect_constructor_sequence",
     "expect_enum",
+    "expect_finite_float",
     "expect_int",
     "expect_mapping",
     "expect_optional_bool",
@@ -368,6 +370,26 @@ def expect_int(
     if isinstance(value, bool) or not isinstance(value, int):
         raise error_factory(_message(context, label, "must be an integer"))
     return value
+
+
+def expect_finite_float(
+    value: object,
+    *,
+    context: str,
+    label: str | None = None,
+    error_factory: ErrorFactory = TypeError,
+) -> float:
+    """Accept any non-boolean number that converts to a finite float, normalizing signed zero."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise error_factory(_message(context, label, "must be a finite number"))
+    try:
+        number = float(value)
+    except OverflowError as error:
+        raise error_factory(_message(context, label, "must be a finite number")) from error
+    if not math.isfinite(number):
+        raise error_factory(_message(context, label, "must be a finite number"))
+    return 0.0 if number == 0.0 else number
 
 
 def expect_enum[EnumType: Enum](

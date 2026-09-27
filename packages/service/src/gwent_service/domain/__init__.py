@@ -3,18 +3,10 @@ from gwent_service.domain.models import (
     StoredMatch,
     StoredPlayerSlot,
 )
-from gwent_service.domain.repositories import (
-    MatchCreator,
-    MatchReader,
-    MatchRepository,
-    MatchUpdater,
-)
+from gwent_service.domain.repositories import MatchRepository
 
 __all__ = [
-    "MatchCreator",
-    "MatchReader",
     "MatchRepository",
-    "MatchUpdater",
     "StagedMulliganSubmission",
     "StoredMatch",
     "StoredPlayerSlot",

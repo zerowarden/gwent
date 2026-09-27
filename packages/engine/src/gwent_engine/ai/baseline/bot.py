@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import final
+from typing import TYPE_CHECKING, final
 
 from gwent_engine.ai.baseline.assessment import build_assessment
 from gwent_engine.ai.baseline.decision_plan import build_decision_plan
@@ -23,6 +23,9 @@ from gwent_engine.core.actions import (
 )
 from gwent_engine.leaders import LeaderRegistry
 
+if TYPE_CHECKING:
+    from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+
 
 @final
 class HeuristicBot:
@@ -33,10 +36,16 @@ class HeuristicBot:
         profile_definition: BaseProfileDefinition = DEFAULT_BASE_PROFILE,
         bot_id: str = "heuristic_bot",
     ) -> None:
+        # Keep the configuration codec independent of baseline's eager exports.
+        from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+
+        self._configuration = HeuristicConfiguration(baseline=config, profile=profile_definition)
         self.bot_id = bot_id
-        self.display_name = profile_bot_display_name("HeuristicBot", profile_definition)
-        self._config = config
-        self._profile_definition = profile_definition
+        self.display_name = profile_bot_display_name("HeuristicBot", self._configuration.profile)
+
+    @property
+    def configuration(self) -> HeuristicConfiguration:
+        return self._configuration
 
     @staticmethod
     def from_profile_id(*, bot_id: str, profile_id: str | None) -> HeuristicBot:
@@ -81,8 +90,8 @@ class HeuristicBot:
             actions,
             card_registry=card_registry,
             leader_registry=leader_registry,
-            config=self._config,
-            profile_definition=self._profile_definition,
+            config=self._configuration.baseline,
+            profile_definition=self._configuration.profile,
         )
         return plan.chosen_action
 

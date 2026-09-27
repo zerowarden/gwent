@@ -9,8 +9,8 @@ import pytest
 from gwent_engine.ai.agents import BotAgent
 from gwent_evaluation import AgentSpec, SuiteSpec, compare_runs, report_run
 from gwent_evaluation.agents import ResolvedAgent
+from gwent_evaluation.execution import RunExecution
 from gwent_evaluation.metrics import BootstrapConfig, IntervalMethod
-from gwent_evaluation.models import RunExecution
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.reporting import (
     build_run_report,
@@ -65,7 +65,7 @@ def test_execute_run_writes_json_and_markdown_reports(tmp_path: Path) -> None:
     assert (root / "report.json").is_file()
     assert (root / "report.md").is_file()
     payload = read_json_object(root / "report.json")
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 3
     assert payload["run_id"] == "run"
     assert payload["suite_id"] == "reporting-test"
     assert payload["observation_contract_version"] == 2

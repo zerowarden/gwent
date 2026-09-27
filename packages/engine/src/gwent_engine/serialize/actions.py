@@ -13,7 +13,6 @@ from typing import cast
 
 from gwent_shared.extract import (
     expect_constructor_sequence,
-    expect_enum,
     expect_optional_enum,
     expect_sequence,
     expect_str,
@@ -121,7 +120,6 @@ def _play_card_payload(action: PlayCardAction) -> ActionPayload:
         "card_instance_id": str(action.card_instance_id),
         "target_row": action.target_row.value if action.target_row is not None else "",
         "target_card_instance_id": str(action.target_card_instance_id or ""),
-        "secondary_target_card_instance_id": str(action.secondary_target_card_instance_id or ""),
     }
 
 
@@ -139,7 +137,6 @@ def _resolve_choice_payload(action: ResolveChoiceAction) -> ActionPayload:
         "player_id": choice_view.player_id,
         "choice_id": choice_view.choice_id,
         "selected_card_instance_ids": choice_view.selected_card_instance_ids,
-        "selected_rows": choice_view.selected_rows,
     }
 
 
@@ -148,10 +145,7 @@ def _use_leader_ability_payload(action: UseLeaderAbilityAction) -> ActionPayload
     return {
         "type": "UseLeaderAbilityAction",
         "player_id": leader_view.player_id,
-        "target_row": leader_view.target_row or "",
-        "target_player": leader_view.target_player or "",
         "target_card_instance_id": leader_view.target_card_instance_id or "",
-        "secondary_target_card_instance_id": leader_view.secondary_target_card_instance_id or "",
         "selected_card_instance_ids": leader_view.selected_card_instance_ids,
     }
 
@@ -191,9 +185,6 @@ def _action_from_payload(payload: Mapping[str, object]) -> GameAction:
                 target_card_instance_id=_optional_card_instance_id(
                     payload, "target_card_instance_id"
                 ),
-                secondary_target_card_instance_id=_optional_card_instance_id(
-                    payload, "secondary_target_card_instance_id"
-                ),
             )
         case "PassAction":
             return PassAction(player_id=_require_player_id(payload, "player_id"))
@@ -206,18 +197,12 @@ def _action_from_payload(payload: Mapping[str, object]) -> GameAction:
                 selected_card_instance_ids=_card_instance_ids(
                     payload, "selected_card_instance_ids"
                 ),
-                selected_rows=_rows(payload, "selected_rows"),
             )
         case "UseLeaderAbilityAction":
             return UseLeaderAbilityAction(
                 player_id=_require_player_id(payload, "player_id"),
-                target_row=_optional_row(payload, "target_row"),
-                target_player=_optional_player_id(payload, "target_player"),
                 target_card_instance_id=_optional_card_instance_id(
                     payload, "target_card_instance_id"
-                ),
-                secondary_target_card_instance_id=_optional_card_instance_id(
-                    payload, "secondary_target_card_instance_id"
                 ),
                 selected_card_instance_ids=_card_instance_ids(
                     payload, "selected_card_instance_ids"
@@ -229,12 +214,6 @@ def _action_from_payload(payload: Mapping[str, object]) -> GameAction:
 
 def _require_player_id(payload: Mapping[str, object], field: str) -> PlayerId:
     return require_constructor_field(
-        payload, field, player_id, context=_ACTION_CONTEXT, error_factory=SerializationError
-    )
-
-
-def _optional_player_id(payload: Mapping[str, object], field: str) -> PlayerId | None:
-    return optional_constructor_field(
         payload, field, player_id, context=_ACTION_CONTEXT, error_factory=SerializationError
     )
 
@@ -277,15 +256,6 @@ def _card_instance_ids(
     )
 
 
-def _rows(payload: Mapping[str, object], field: str) -> tuple[Row, ...]:
-    entries = expect_sequence(
-        require_field(payload, field, context=_ACTION_CONTEXT, error_factory=SerializationError),
-        context=f"{_ACTION_CONTEXT}.{field}",
-        error_factory=SerializationError,
-    )
-    return tuple(_row(entry, context=f"{_ACTION_CONTEXT}.{field}") for entry in entries)
-
-
 def _optional_row(payload: Mapping[str, object], field: str) -> Row | None:
     return expect_optional_enum(
         payload.get(field),
@@ -294,10 +264,6 @@ def _optional_row(payload: Mapping[str, object], field: str) -> Row | None:
         label=field,
         error_factory=SerializationError,
     )
-
-
-def _row(value: object, *, context: str) -> Row:
-    return expect_enum(value, Row, context=context, error_factory=SerializationError)
 
 
 def _mulligan_selections(payload: Mapping[str, object]) -> tuple[MulliganSelection, ...]:

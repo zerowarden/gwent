@@ -31,7 +31,6 @@ class PlayCardCommand:
     card_instance_id: str
     target_row: str | None = None
     target_card_instance_id: str | None = None
-    secondary_target_card_instance_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,10 +49,7 @@ class LeaveMatchCommand:
 class UseLeaderAbilityCommand:
     match_id: str
     service_player_id: str
-    target_row: str | None = None
-    target_player: str | None = None
     target_card_instance_id: str | None = None
-    secondary_target_card_instance_id: str | None = None
     selected_card_instance_ids: tuple[str, ...] = ()
 
 
@@ -63,4 +59,3 @@ class ResolveChoiceCommand:
     service_player_id: str
     choice_id: str
     selected_card_instance_ids: tuple[str, ...] = ()
-    selected_rows: tuple[str, ...] = ()

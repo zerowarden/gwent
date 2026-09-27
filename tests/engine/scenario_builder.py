@@ -157,7 +157,6 @@ class PendingChoiceSpec:
     source_card_instance_id: str | None = None
     source_leader_id: LeaderId | None = None
     legal_target_card_instance_ids: tuple[str, ...] = ()
-    legal_rows: tuple[Row, ...] = ()
     kind: ChoiceKind = ChoiceKind.SELECT_CARD_INSTANCE
     min_selections: int = 1
     max_selections: int = 1
@@ -178,7 +177,6 @@ class PendingChoiceSpec:
             legal_target_card_instance_ids=tuple(
                 CardInstanceId(instance_id) for instance_id in self.legal_target_card_instance_ids
             ),
-            legal_rows=self.legal_rows,
             min_selections=self.min_selections,
             max_selections=self.max_selections,
             source_row=self.source_row,
@@ -276,7 +274,6 @@ class ScenarioBuilder:
         source_card_instance_id: str | None = None,
         source_leader_id: str | LeaderId | None = None,
         legal_target_card_instance_ids: tuple[str, ...] | list[str],
-        legal_rows: tuple[Row, ...] | list[Row] = (),
         kind: ChoiceKind = ChoiceKind.SELECT_CARD_INSTANCE,
         min_selections: int = 1,
         max_selections: int = 1,
@@ -289,7 +286,6 @@ class ScenarioBuilder:
             source_card_instance_id=source_card_instance_id,
             source_leader_id=None if source_leader_id is None else _leader_id(source_leader_id),
             legal_target_card_instance_ids=tuple(legal_target_card_instance_ids),
-            legal_rows=tuple(legal_rows),
             kind=kind,
             min_selections=min_selections,
             max_selections=max_selections,
@@ -321,7 +317,6 @@ class ScenarioBuilder:
         player_id: str | PlayerId,
         source_leader_id: str | LeaderId,
         legal_target_card_instance_ids: tuple[str, ...] | list[str] = (),
-        legal_rows: tuple[Row, ...] | list[Row] = (),
         min_selections: int = 1,
         max_selections: int = 1,
         source_row: Row | None = None,
@@ -333,7 +328,6 @@ class ScenarioBuilder:
             source_kind=ChoiceSourceKind.LEADER_ABILITY,
             source_leader_id=source_leader_id,
             legal_target_card_instance_ids=legal_target_card_instance_ids,
-            legal_rows=legal_rows,
             min_selections=min_selections,
             max_selections=max_selections,
             source_row=source_row,

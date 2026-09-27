@@ -8,7 +8,7 @@ calling policy code, so it can separate engine drift from policy drift.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from gwent_engine.ai.arena import TerminationReason, build_initial_state
@@ -20,19 +20,23 @@ from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.reducer import apply_action_with_intermediate_state
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import action_from_id
+from gwent_shared.json_payloads import dump_pretty_json
 
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
 from gwent_evaluation.execution import (
     CaseExecution,
+    build_result,
     build_run_manifest,
     execute_case,
     semantic_digest,
 )
 from gwent_evaluation.models import MatchResult, ScheduledMatch, TrajectoryStep
-from gwent_evaluation.provenance import default_repository_root
+from gwent_evaluation.provenance import canonical_digest, default_repository_root
+from gwent_evaluation.records import record_to_dict
+from gwent_evaluation.reporting import persist_run_report
 from gwent_evaluation.schedule import other_seat
-from gwent_evaluation.storage import RunStore
+from gwent_evaluation.storage import RunStore, atomic_write_text
 from gwent_evaluation.validation import LoadedRun, execution_identity
 
 
@@ -86,11 +90,23 @@ class ReplayOutcome:
 
 
 def reproduce_case(
-    run_root: Path, case_id: str, *, repository_root: Path | None = None
+    run_root: Path,
+    case_id: str,
+    *,
+    repository_root: Path | None = None,
+    diagnostic_root: Path | None = None,
 ) -> ReproductionOutcome:
-    """Report current execution identity and semantic reproduction independently."""
+    """Reproduce one case, optionally retaining rich evidence in a fresh linked run.
 
-    store = _store(run_root)
+    The diagnostic records only this case of the original schedule; it never
+    fills or replaces results in the source run.
+    """
+
+    if diagnostic_root is not None and (
+        diagnostic_root.exists() or diagnostic_root.resolve().is_relative_to(run_root.resolve())
+    ):
+        raise ReplayError("Diagnostic output must be a new directory, separate from the source.")
+    store = RunStore.from_root(run_root)
     assets = resolve_assets()
     loaded = store.load(trajectory_cases=(case_id,), card_registry=assets.card_registry)
     match, result = _require_case(loaded, case_id)
@@ -118,7 +134,7 @@ def reproduce_case(
         step_divergences = _compare_steps(recorded_steps, case.evidence.trajectory)
         if step_divergences:
             divergences = step_divergences
-    return ReproductionOutcome(
+    outcome = ReproductionOutcome(
         case_id=case_id,
         termination=result.termination,
         execution_identity_matches=(
@@ -127,12 +143,41 @@ def reproduce_case(
         semantics_reproduced=not divergences,
         divergences=divergences,
     )
+    if diagnostic_root is not None:
+        diagnostic = RunStore.from_root(diagnostic_root)
+        prepared = diagnostic.prepare(
+            replace(current_manifest, run_id=diagnostic.run_id), matches=loaded.matches
+        )
+        evidence = diagnostic.write_evidence(
+            case_id,
+            case.evidence,
+            include_trajectory=True,
+            execution_identity=prepared.execution_identity,
+        )
+        diagnostic.write_result(
+            build_result(match, case, evidence=evidence, execution_id=prepared.execution_identity)
+        )
+        _ = persist_run_report(diagnostic, diagnostic.load())
+        link = {
+            "schema_version": 1,
+            "source_run_root": str(store.root.resolve()),
+            "source_execution_identity": loaded.execution_identity,
+            "source_case_id": case_id,
+            "source_result_digest": loaded.result_digests[case_id],
+            "diagnostic_execution_identity": prepared.execution_identity,
+            "outcome": record_to_dict(outcome),
+        }
+        atomic_write_text(
+            diagnostic.root / "reproduction.json",
+            dump_pretty_json({**link, "record_digest": canonical_digest(link)}),
+        )
+    return outcome
 
 
 def replay_case(run_root: Path, case_id: str) -> ReplayOutcome:
     """Drive the reducer from recorded actions, without calling policy code."""
 
-    store = _store(run_root)
+    store = RunStore.from_root(run_root)
     assets = resolve_assets()
     loaded = store.load(trajectory_cases=(case_id,), card_registry=assets.card_registry)
     match, result = _require_case(loaded, case_id)
@@ -295,10 +340,6 @@ def _replayed_steps(divergences: tuple[Divergence, ...], *, total: int) -> int:
     if not divergences:
         return total
     return max(divergences[0].index - 1, 0)
-
-
-def _store(run_root: Path) -> RunStore:
-    return RunStore.from_root(run_root)
 
 
 def _require_case(loaded: LoadedRun, case_id: str) -> tuple[ScheduledMatch, MatchResult]:

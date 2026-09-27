@@ -1,27 +1,15 @@
-from tests.api.support import api_client
+from tests.api.support import api_client, create_match_payload
 
 
 def test_mulligan_flow_works_across_two_players() -> None:
     with api_client() as (client, _repository):
         client.post(  # pyright: ignore[reportUnusedCallResult]
             "/matches",
-            json={
-                "match_id": "api_mulligan",
-                "viewer_player_id": "alice",
-                "participants": [
-                    {
-                        "service_player_id": "alice",
-                        "engine_player_id": "p1",
-                        "deck_id": "monsters_muster_swarm_strict",
-                    },
-                    {
-                        "service_player_id": "bob",
-                        "engine_player_id": "p2",
-                        "deck_id": "nilfgaard_spy_medic_control_strict",
-                    },
-                ],
-                "rng_seed": 7,
-            },
+            json=create_match_payload(
+                match_id="api_mulligan",
+                player_one_deck="monsters_muster_swarm_strict",
+                player_two_deck="nilfgaard_spy_medic_control_strict",
+            ),
         )
         first_response = client.post(
             "/matches/api_mulligan/mulligan",

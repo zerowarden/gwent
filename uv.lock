@@ -252,10 +252,14 @@ version = "0.1.0"
 source = { editable = "packages/evaluation" }
 dependencies = [
     { name = "gwent-engine" },
+    { name = "gwent-shared" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "gwent-engine", editable = "packages/engine" }]
+requires-dist = [
+    { name = "gwent-engine", editable = "packages/engine" },
+    { name = "gwent-shared", editable = "packages/shared" },
+]
 
 [[package]]
 name = "gwent-service"

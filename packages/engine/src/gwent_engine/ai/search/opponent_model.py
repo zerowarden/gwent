@@ -11,6 +11,7 @@ from gwent_engine.ai.baseline import (
     build_assessment,
     classify_context,
     compose_profile,
+    leader_coarse_score,
 )
 from gwent_engine.ai.baseline.projection import project_leader_action
 from gwent_engine.ai.observations import (
@@ -232,14 +233,10 @@ def _public_explicit_reply_candidates(
         card_registry=card_registry,
         leader_registry=leader_registry,
     )
-    ordering_score = 1.0
-    if projection is not None:
-        scoring = DEFAULT_BASELINE_CONFIG.candidate_scoring
-        ordering_score = float(
-            projection.projected_net_board_swing
-            + projection.projected_hand_value_delta
-            + (projection.viewer_hand_count_delta * scoring.leader_hand_delta_multiplier)
-        )
+    ordering_score = leader_coarse_score(
+        projection,
+        DEFAULT_BASELINE_CONFIG.candidate_scoring,
+    )
     yield OpponentReplyCandidate(
         action=action,
         ordering_score=ordering_score,

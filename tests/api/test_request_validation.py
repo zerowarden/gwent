@@ -14,22 +14,8 @@ def test_invalid_row_values_are_rejected_as_client_errors() -> None:
                 "target_row": "invalid",
             },
         )
-        leader_response = client.post(
-            "/matches/api_row_validation/actions/use-leader",
-            json={"service_player_id": "alice", "target_row": "invalid"},
-        )
-        choice_response = client.post(
-            "/matches/api_row_validation/actions/resolve-choice",
-            json={
-                "service_player_id": "alice",
-                "choice_id": "pending_choice_1",
-                "selected_rows": ["invalid"],
-            },
-        )
 
     assert play_response.status_code == 422
-    assert leader_response.status_code == 422
-    assert choice_response.status_code == 422
 
 
 def test_unknown_deck_is_rejected_as_client_error_without_persisting() -> None:

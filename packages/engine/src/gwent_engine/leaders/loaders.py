@@ -23,10 +23,32 @@ from gwent_engine.core.yaml_parsing import (
     parse_enum,
     parse_faction_id,
     parse_optional_enum,
+    reject_unknown_fields,
     require_str,
 )
-from gwent_engine.leaders.abilities import SUPPORTED_LEADER_ABILITY_KINDS
 from gwent_engine.leaders.models import LeaderDefinition
+
+_KNOWN_LEADER_FIELDS = frozenset(
+    {
+        "leader_id",
+        "name",
+        "faction",
+        "source_set",
+        "ability_kind",
+        "ability_mode",
+        "selection_mode",
+        "weather_kind",
+        "affected_row",
+        "blocked_if_row_already_affected_by_horn",
+        "minimum_opponent_row_total",
+        "cards_to_draw",
+        "hand_discard_count",
+        "deck_pick_count",
+        "reveal_count",
+        "rule_text",
+        "implementation_notes",
+    }
+)
 
 
 def load_leader_definitions(path: Path) -> tuple[LeaderDefinition, ...]:
@@ -38,21 +60,18 @@ def load_leader_definitions(path: Path) -> tuple[LeaderDefinition, ...]:
 def _build_leader_definition(raw_leader: object, *, path: Path) -> LeaderDefinition:
     entry = expect_mapping(raw_leader, context=f"{path} leader entry")
     context = f"{path} leader {entry.get('leader_id', '<missing>')!r}"
+    reject_unknown_fields(entry, _KNOWN_LEADER_FIELDS, context=context)
     cards_to_draw = optional_int(entry, "cards_to_draw", context=context) or 0
-    ability_kind = _parse_leader_ability_kind(require_str(entry, "ability_kind", context=context))
-    if ability_kind not in SUPPORTED_LEADER_ABILITY_KINDS:
-        raise DefinitionLoadError(
-            f"{context} declares unsupported leader ability kind {ability_kind!r}."
-        )
     return LeaderDefinition(
         leader_id=LeaderId(require_str(entry, "leader_id", context=context)),
         name=require_str(entry, "name", context=context),
         faction=parse_faction_id(require_str(entry, "faction", context=context)),
-        ability_kind=ability_kind,
+        ability_kind=_parse_leader_ability_kind(
+            require_str(entry, "ability_kind", context=context)
+        ),
         ability_mode=_parse_leader_ability_mode(
             require_str(entry, "ability_mode", context=context)
         ),
-        uses_per_match=optional_int(entry, "uses_per_match", context=context) or 1,
         selection_mode=_parse_optional_selection_mode(
             optional_str(entry, "selection_mode", context=context),
             context=context,

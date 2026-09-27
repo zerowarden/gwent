@@ -20,13 +20,24 @@ from gwent_service.domain.models import (
     StoredPlayerSlot,
 )
 
+MATCH_COLUMNS: tuple[str, ...] = (
+    "match_id",
+    "state_payload",
+    "event_log_payloads",
+    "player_slots",
+    "staged_mulligans",
+    "version",
+    "created_at",
+    "updated_at",
+)
 
-def serialize_stored_match(stored_match: StoredMatch) -> tuple[object, ...]:
-    return (
-        stored_match.match_id,
-        dump_json(stored_match.state_payload),
-        dump_json(stored_match.event_log_payloads),
-        dump_json(
+
+def serialize_stored_match(stored_match: StoredMatch) -> dict[str, object]:
+    return {
+        "match_id": stored_match.match_id,
+        "state_payload": dump_json(stored_match.state_payload),
+        "event_log_payloads": dump_json(stored_match.event_log_payloads),
+        "player_slots": dump_json(
             [
                 {
                     "service_player_id": slot.service_player_id,
@@ -36,7 +47,7 @@ def serialize_stored_match(stored_match: StoredMatch) -> tuple[object, ...]:
                 for slot in stored_match.player_slots
             ]
         ),
-        dump_json(
+        "staged_mulligans": dump_json(
             [
                 {
                     "engine_player_id": submission.engine_player_id,
@@ -45,10 +56,10 @@ def serialize_stored_match(stored_match: StoredMatch) -> tuple[object, ...]:
                 for submission in stored_match.staged_mulligans
             ]
         ),
-        stored_match.version,
-        stored_match.created_at.isoformat(),
-        stored_match.updated_at.isoformat(),
-    )
+        "version": stored_match.version,
+        "created_at": stored_match.created_at.isoformat(),
+        "updated_at": stored_match.updated_at.isoformat(),
+    }
 
 
 def row_field(row: sqlite3.Row, column: str) -> object:

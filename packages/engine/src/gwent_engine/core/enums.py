@@ -100,7 +100,6 @@ class LeaderAbilityMode(StrEnum):
 class LeaderSelectionMode(StrEnum):
     SPECIFIC = "specific"
     CHOOSE = "choose"
-    RANDOM = "random"
 
 
 class LeaderAbilityKind(StrEnum):

@@ -1,9 +1,8 @@
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline.pending_choice import choose_pending_choice_action
 from gwent_engine.ai.observations import build_player_observation
-from gwent_engine.core import ChoiceKind, ChoiceSourceKind, Row
-from gwent_engine.core.actions import ResolveChoiceAction
-from gwent_engine.core.ids import CardInstanceId, ChoiceId
+from gwent_engine.core import ChoiceSourceKind
+from gwent_engine.core.ids import CardInstanceId
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
@@ -12,36 +11,6 @@ from ..support import (
     PLAYER_ONE_ID,
     PLAYER_TWO_ID,
 )
-
-
-def test_choose_pending_choice_action_prefers_close_for_row_selection() -> None:
-    state = (
-        scenario("row_choice_state")
-        .player("p1", hand=[card("p1_decoy_source", "neutral_decoy")])
-        .pending_choice(
-            choice_id="row_choice",
-            player_id="p1",
-            kind=ChoiceKind.SELECT_CARD_INSTANCE,
-            source_kind=ChoiceSourceKind.LEADER_ABILITY,
-            source_card_instance_id="p1_decoy_source",
-            legal_target_card_instance_ids=(),
-            legal_rows=(Row.CLOSE, Row.RANGED, Row.SIEGE),
-        )
-        .build()
-    )
-    legal_actions = enumerate_legal_actions(state, player_id=PLAYER_ONE_ID)
-
-    action = choose_pending_choice_action(
-        build_player_observation(state, PLAYER_ONE_ID),
-        legal_actions,
-        card_registry=CARD_REGISTRY,
-    )
-
-    assert action == ResolveChoiceAction(
-        player_id=PLAYER_ONE_ID,
-        choice_id=ChoiceId("row_choice"),
-        selected_rows=(Row.CLOSE,),
-    )
 
 
 def test_choose_pending_choice_action_prefers_spy_target_for_decoy() -> None:

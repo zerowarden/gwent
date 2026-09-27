@@ -95,7 +95,6 @@ def play_card(
             card_instance_id=request.card_instance_id,
             target_row=request.target_row,
             target_card_instance_id=request.target_card_instance_id,
-            secondary_target_card_instance_id=request.secondary_target_card_instance_id,
         )
     )
 
@@ -138,10 +137,7 @@ def use_leader(
         UseLeaderAbilityCommand(
             match_id=match_id,
             service_player_id=request.service_player_id,
-            target_row=request.target_row,
-            target_player=request.target_player,
             target_card_instance_id=request.target_card_instance_id,
-            secondary_target_card_instance_id=request.secondary_target_card_instance_id,
             selected_card_instance_ids=request.selected_card_instance_ids,
         )
     )
@@ -159,6 +155,5 @@ def resolve_choice(
             service_player_id=request.service_player_id,
             choice_id=request.choice_id,
             selected_card_instance_ids=request.selected_card_instance_ids,
-            selected_rows=request.selected_rows,
         )
     )

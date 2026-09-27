@@ -187,7 +187,9 @@ def _agent_identity(agent: AgentSpec) -> dict[str, object]:
     return {
         "agent_id": agent.agent_id,
         "family": agent.family.value,
-        "profile": agent.profile,
+        "profile": agent.profile
+        if agent.heuristic_configuration is None
+        else agent.heuristic_configuration.profile.profile_id,
     }
 
 

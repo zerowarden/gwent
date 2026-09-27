@@ -1,7 +1,7 @@
 """Noninteractive evaluation commands.
 
-`run`, `report`, `replay`, and `compare` are the whole M1 surface: M2 consumes
-the typed Python API and spec system rather than extending this CLI.
+The planning command resolves immutable study inputs and counts matches without
+executing them.
 """
 
 from __future__ import annotations
@@ -12,6 +12,8 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
+
+from gwent_shared.json_payloads import dump_pretty_json
 
 from gwent_evaluation.agents import AgentResolutionError
 from gwent_evaluation.execution import EvidencePolicy, execute_run
@@ -38,6 +40,8 @@ from gwent_evaluation.specs import (
     load_agent_catalog,
     load_suite_catalog,
 )
+from gwent_evaluation.tuning.sensitivity import run_sensitivity
+from gwent_evaluation.tuning.specs import load_study_spec, plan_study
 
 EXIT_OK = 0
 EXIT_DIVERGENCE = 1
@@ -69,6 +73,21 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Reproducible Gwent agent evaluation.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    tune_parser = subparsers.add_parser("tune", help="Plan a heuristic weight study.")
+    tune_commands = tune_parser.add_subparsers(dest="tune_command", required=True)
+    plan_parser = tune_commands.add_parser(
+        "plan", help="Resolve inputs and count matches; play no games."
+    )
+    _ = plan_parser.add_argument("spec", type=Path)
+    plan_parser.set_defaults(handler=_cmd_tune_plan)
+
+    sensitivity_parser = tune_commands.add_parser(
+        "sensitivity", help="Run the bounded diagnostic control panel and score sensitivity checks."
+    )
+    _ = sensitivity_parser.add_argument("spec", type=Path)
+    _ = sensitivity_parser.add_argument("--output", type=Path, default=None)
+    sensitivity_parser.set_defaults(handler=_cmd_tune_sensitivity)
 
     run_parser = subparsers.add_parser("run", help="Execute a suite and persist a run directory.")
     _ = run_parser.add_argument(
@@ -133,6 +152,33 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cmd_tune_plan(args: argparse.Namespace) -> int:
+    study = load_study_spec(cast(Path, args.spec), repository_root=_repository_root())
+    print(dump_pretty_json(plan_study(study)), end="")
+    return EXIT_OK
+
+
+def _cmd_tune_sensitivity(args: argparse.Namespace) -> int:
+    path = cast(Path, args.spec)
+    study = load_study_spec(path, repository_root=_repository_root())
+    output = cast(Path | None, args.output) or Path(".output/tuning") / path.stem / "sensitivity"
+    report = run_sensitivity(study, output_root=output, repository_root=_repository_root())
+    print(
+        dump_pretty_json(
+            {
+                "report": str(output / "report.json"),
+                "status": report.status,
+                "planned_matches": report.planned_matches,
+                "executed_matches": report.executed_matches,
+                "observation_count": report.observation_count,
+                "reasons": report.reasons,
+            }
+        ),
+        end="",
+    )
+    return EXIT_DIVERGENCE if report.reasons else EXIT_OK
+
+
 def _cmd_run(args: argparse.Namespace) -> int:
     suites_path = cast(Path | None, args.catalog) or _default_suites_path()
     agents_path = cast(Path | None, args.agents_catalog) or _default_agents_path()
@@ -146,7 +192,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
         repository_root=_repository_root(),
         evidence_policy=EvidencePolicy(cast(str, args.evidence_policy)),
     )
-    report = report_run(execution.root)
+    report = execution.report
     print(f"run: {execution.root}")
     print(
         f"executed={len(execution.executed_case_ids)} "

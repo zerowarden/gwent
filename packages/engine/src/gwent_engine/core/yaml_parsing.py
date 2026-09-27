@@ -45,6 +45,17 @@ def expect_sequence(value: object, *, context: str) -> Sequence[object]:
     return shared_expect_sequence(value, context=context, error_factory=DefinitionLoadError)
 
 
+def reject_unknown_fields(
+    mapping: Mapping[str, object],
+    known_fields: frozenset[str],
+    *,
+    context: str,
+) -> None:
+    unknown_fields = sorted(set(mapping) - known_fields)
+    if unknown_fields:
+        raise DefinitionLoadError(f"{context} has unknown fields: {', '.join(unknown_fields)}.")
+
+
 def require_str(mapping: Mapping[str, object], field: str, *, context: str) -> str:
     return require_str_field(mapping, field, context=context, error_factory=DefinitionLoadError)
 

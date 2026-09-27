@@ -7,13 +7,19 @@ differently depending on context or profile.
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Collection, Sequence
 from typing import Protocol
 
-from gwent_engine.ai.utils import is_non_hero_unit
 from gwent_engine.cards import CardDefinition
 from gwent_engine.core import AbilityKind, Row
+from gwent_engine.rules.battlefield_effects import weather_rows_for
+
+_WEATHER_ABILITY_KINDS = (
+    AbilityKind.BITING_FROST,
+    AbilityKind.IMPENETRABLE_FOG,
+    AbilityKind.TORRENTIAL_RAIN,
+    AbilityKind.SKELLIGE_STORM,
+)
 
 
 class RowWeatherSummary(Protocol):
@@ -27,11 +33,6 @@ class RowWeatherSummary(Protocol):
     def non_hero_unit_count(self) -> int: ...
 
 
-def post_action_hand_value(definitions: Sequence[CardDefinition]) -> int:
-    """Return the value of the hand that actually remains after a candidate play."""
-    return sum(definition.base_strength for definition in definitions)
-
-
 def preserved_leader_value(
     *,
     leader_used: bool,
@@ -39,71 +40,6 @@ def preserved_leader_value(
 ) -> float:
     """Model the value of still having an unused leader ability in reserve."""
     return 0.0 if leader_used else reserve_value
-
-
-def _duplicate_hand_synergy(definitions: Sequence[CardDefinition]) -> int:
-    score = 0
-    muster_counts = Counter(
-        definition.muster_group for definition in definitions if definition.muster_group is not None
-    )
-    bond_counts = Counter(
-        definition.bond_group for definition in definitions if definition.bond_group is not None
-    )
-    score += sum(count - 1 for count in muster_counts.values() if count > 1)
-    score += sum(count - 1 for count in bond_counts.values() if count > 1)
-    return score
-
-
-def projected_synergy_value(
-    remaining_hand: Sequence[CardDefinition],
-    *,
-    board_definitions: Sequence[CardDefinition] = (),
-    discard_definitions: Sequence[CardDefinition] = (),
-) -> int:
-    """Estimate synergy still available after a candidate action resolves.
-
-    This keeps the legacy hand-only duplicate count, but also values links
-    between the remaining hand and the current board plus visible recursion
-    value if a Medic line is still available later.
-    """
-
-    value = _duplicate_hand_synergy(remaining_hand)
-    board_bond_groups = {
-        definition.bond_group
-        for definition in board_definitions
-        if definition.bond_group is not None
-    }
-    board_muster_groups = {
-        definition.muster_group
-        for definition in board_definitions
-        if definition.muster_group is not None
-    }
-    value += sum(definition.bond_group in board_bond_groups for definition in remaining_hand)
-    value += sum(definition.muster_group in board_muster_groups for definition in remaining_hand)
-    if any(AbilityKind.MEDIC in definition.ability_kinds for definition in remaining_hand):
-        value += max(
-            (
-                definition.base_strength
-                for definition in discard_definitions
-                if is_non_hero_unit(definition)
-            ),
-            default=0,
-        )
-    return value
-
-
-def projected_scorch_loss(
-    strengths: Sequence[int],
-    *,
-    threshold: int,
-) -> int:
-    """Measure the actual strength lost if Scorch hits the current top tier."""
-    if not strengths:
-        return 0
-    highest = max(strengths)
-    if highest < threshold:
-        return 0
-    return sum(strength for strength in strengths if strength == highest)
 
 
 def dead_card_penalty(
@@ -117,17 +53,12 @@ def dead_card_penalty(
     for definition in definitions:
         if AbilityKind.CLEAR_WEATHER in definition.ability_kinds and not active_rows:
             penalty += 1
-        if AbilityKind.BITING_FROST in definition.ability_kinds and Row.CLOSE in active_rows:
-            penalty += 1
-        if AbilityKind.IMPENETRABLE_FOG in definition.ability_kinds and Row.RANGED in active_rows:
-            penalty += 1
-        if AbilityKind.TORRENTIAL_RAIN in definition.ability_kinds and Row.SIEGE in active_rows:
-            penalty += 1
-        if AbilityKind.SKELLIGE_STORM in definition.ability_kinds and {
-            Row.RANGED,
-            Row.SIEGE,
-        }.issubset(active_rows):
-            penalty += 1
+        penalty += sum(
+            1
+            for ability_kind in _WEATHER_ABILITY_KINDS
+            if ability_kind in definition.ability_kinds
+            and set(weather_rows_for(ability_kind)) <= active_rows
+        )
     return penalty
 
 
@@ -135,15 +66,3 @@ def weather_row_delta(summary: RowWeatherSummary) -> int:
     """Strength that applying weather to one row would remove."""
 
     return max(0, summary.non_hero_unit_base_strength - summary.non_hero_unit_count)
-
-
-def projected_weather_loss(
-    row_summaries: Sequence[RowWeatherSummary],
-    *,
-    active_weather_rows: Collection[Row] = (),
-) -> int:
-    """Estimate current vulnerability as strength that weather would actually remove."""
-    active_rows = set(active_weather_rows)
-    return sum(
-        weather_row_delta(summary) for summary in row_summaries if summary.row not in active_rows
-    )

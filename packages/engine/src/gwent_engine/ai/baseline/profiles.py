@@ -53,6 +53,7 @@ class HeuristicProfile:
     weight_provenance: tuple[WeightProvenance, ...]
     action_bonus: ActionBonusConfig
     candidate_limit: int
+    pass_config: PassConfig
     pass_lead_margin: int
     estimated_opponent_tempo_per_card: int
     elimination_estimated_opponent_tempo_per_card: int
@@ -79,6 +80,7 @@ class HeuristicProfile:
         weight_provenance: tuple[WeightProvenance, ...],
         action_bonus: ActionBonusConfig,
         candidate_limit: int,
+        pass_config: PassConfig,
         pass_lead_margin: int,
         estimated_opponent_tempo_per_card: int,
         elimination_estimated_opponent_tempo_per_card: int,
@@ -98,6 +100,7 @@ class HeuristicProfile:
             weight_provenance=weight_provenance,
             action_bonus=action_bonus,
             candidate_limit=candidate_limit,
+            pass_config=pass_config,
             pass_lead_margin=pass_lead_margin,
             estimated_opponent_tempo_per_card=estimated_opponent_tempo_per_card,
             elimination_estimated_opponent_tempo_per_card=(
@@ -151,6 +154,7 @@ def compose_profile(
         weight_provenance=weight_provenance,
         action_bonus=config.action_bonus,
         candidate_limit=candidate_limit,
+        pass_config=pass_config,
         pass_lead_margin=pass_lead_margin,
         estimated_opponent_tempo_per_card=pass_config.estimated_opponent_tempo_per_card,
         elimination_estimated_opponent_tempo_per_card=(

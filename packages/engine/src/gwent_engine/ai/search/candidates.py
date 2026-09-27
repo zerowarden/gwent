@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from gwent_engine.ai.actions import action_to_id
-from gwent_engine.ai.baseline import build_assessment, build_candidate_pool
+from gwent_engine.ai.baseline import build_candidate_pool
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
 from gwent_engine.ai.search.types import SearchCandidate
@@ -29,15 +29,9 @@ def generate_search_candidates(
     action_options = tuple(legal_actions)
     if not action_options:
         return ()
-    assessment = build_assessment(
-        observation,
-        card_registry,
-        legal_actions=action_options,
-    )
     pool = build_candidate_pool(
         observation,
         action_options,
-        assessment,
         config=DEFAULT_BASELINE_CONFIG,
         card_registry=card_registry,
         leader_registry=leader_registry,

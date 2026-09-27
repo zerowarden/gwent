@@ -11,10 +11,11 @@ from gwent_engine.ai.baseline.context import (
     TacticalMode,
     TempoState,
 )
+from gwent_engine.ai.baseline.projection.context import viewer_public
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import PassConfig
 from gwent_engine.ai.tactical_values import action_commitment_value, estimated_response_value
-from gwent_engine.ai.utils import viewer_hand_definition
+from gwent_engine.ai.utils import viewer_deck_count, viewer_hand_definition
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType
 from gwent_engine.core.actions import GameAction, PlayCardAction, UseLeaderAbilityAction
@@ -256,7 +257,7 @@ def _estimated_draw_followup_potential(
     is still strategically live.
     """
 
-    deck_count = _viewer_deck_count(observation)
+    deck_count = viewer_deck_count(observation)
     if deck_count <= 0:
         return 0
     per_action_draws: dict[CardInstanceId, int] = {}
@@ -338,27 +339,13 @@ def _viewer_board_has_reclaimable_spy(
     card_registry: CardRegistry,
 ) -> bool:
     viewer_player_id = observation.viewer_player_id
-    public_players = observation.public_state.players
-    viewer_public = (
-        public_players[0] if public_players[0].player_id == viewer_player_id else public_players[1]
-    )
+    viewer = viewer_public(observation)
     return any(
         AbilityKind.SPY in card_registry.get(card.definition_id).ability_kinds
-        for cards in (
-            viewer_public.rows.close,
-            viewer_public.rows.ranged,
-            viewer_public.rows.siege,
-        )
+        for cards in (viewer.rows.close, viewer.rows.ranged, viewer.rows.siege)
         for card in cards
         if card.battlefield_side == viewer_player_id
     )
-
-
-def _viewer_deck_count(observation: PlayerObservation) -> int:
-    public_players = observation.public_state.players
-    if public_players[0].player_id == observation.viewer_player_id:
-        return public_players[0].deck_count
-    return public_players[1].deck_count
 
 
 def _estimated_opponent_response(

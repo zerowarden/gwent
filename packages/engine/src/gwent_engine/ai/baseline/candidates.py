@@ -4,7 +4,6 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
 from gwent_engine.ai.actions import action_to_id
-from gwent_engine.ai.baseline.assessment import DecisionAssessment
 from gwent_engine.ai.baseline.pending_choice import pending_choice_score
 from gwent_engine.ai.baseline.projection import LeaderActionProjection, project_leader_action
 from gwent_engine.ai.observations import PlayerObservation
@@ -73,7 +72,6 @@ class _CandidateContext:
 def build_candidate_pool(
     observation: PlayerObservation,
     legal_actions: tuple[GameAction, ...],
-    assessment: DecisionAssessment,
     *,
     config: BaselineConfig,
     card_registry: CardRegistry,
@@ -105,7 +103,7 @@ def build_candidate_pool(
         )
     )
     always_keep, ranked = _partition_always_keep(scored_candidates)
-    retained = always_keep + ranked[: max(0, assessment.legal_action_count)]
+    retained = always_keep + ranked
     trimmed = tuple(
         sorted(
             _dedupe_by_action_id(retained, action=lambda candidate: candidate.action),
@@ -161,7 +159,7 @@ def _coarse_action_score(
         case PassAction():
             return scoring.pass_score
         case UseLeaderAbilityAction() as leader_action:
-            return _leader_coarse_score(
+            return leader_coarse_score(
                 context.leader_projection(leader_action),
                 scoring,
             )
@@ -173,7 +171,7 @@ def _coarse_action_score(
             return 0.0
 
 
-def _leader_coarse_score(
+def leader_coarse_score(
     projection: LeaderActionProjection | None,
     scoring: CandidateScoringConfig,
 ) -> float:

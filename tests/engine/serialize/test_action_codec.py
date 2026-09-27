@@ -38,7 +38,6 @@ def _actions() -> tuple[GameAction, ...]:
             card_instance_id=CardInstanceId("p1_card"),
             target_row=Row.CLOSE,
             target_card_instance_id=CardInstanceId("p2_target"),
-            secondary_target_card_instance_id=CardInstanceId("p2_secondary"),
         ),
         PlayCardAction(
             player_id=_PLAYER_TWO,
@@ -50,14 +49,10 @@ def _actions() -> tuple[GameAction, ...]:
             player_id=_PLAYER_ONE,
             choice_id=ChoiceId("medic_pick"),
             selected_card_instance_ids=(CardInstanceId("p1_discard_a"),),
-            selected_rows=(Row.CLOSE, Row.RANGED),
         ),
         UseLeaderAbilityAction(
             player_id=_PLAYER_TWO,
-            target_row=Row.SIEGE,
-            target_player=_PLAYER_ONE,
             target_card_instance_id=CardInstanceId("p1_target"),
-            secondary_target_card_instance_id=CardInstanceId("p1_secondary"),
             selected_card_instance_ids=(CardInstanceId("p2_hand_a"),),
         ),
         UseLeaderAbilityAction(player_id=_PLAYER_ONE),
@@ -103,7 +98,6 @@ def test_invalid_row_is_rejected() -> None:
         (
             ("card_instance_id", "p1_card"),
             ("player_id", "p1"),
-            ("secondary_target_card_instance_id", ""),
             ("target_card_instance_id", ""),
             ("target_row", "nowhere"),
             ("type", "PlayCardAction"),

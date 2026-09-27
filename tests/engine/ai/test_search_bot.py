@@ -59,7 +59,6 @@ def _simulate(
     return materialize_player_simulation(
         observation,
         card_registry=CARD_REGISTRY,
-        leader_registry=LEADER_REGISTRY,
     )
 
 
@@ -639,7 +638,6 @@ def test_search_materializes_without_incidental_catalog_placeholder() -> None:
     simulation = materialize_player_simulation(
         observation,
         card_registry=custom_registry,
-        leader_registry=LEADER_REGISTRY,
     )
     legal_actions = enumerate_legal_actions(
         state,

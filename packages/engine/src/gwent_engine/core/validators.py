@@ -152,49 +152,25 @@ def validate_resolve_choice_action(state: GameState, action: ResolveChoiceAction
     if action.choice_id != pending_choice.choice_id:
         raise IllegalActionError("ResolveChoiceAction choice_id does not match the pending choice.")
 
-    if pending_choice.legal_target_card_instance_ids:
-        selected_ids = action.selected_card_instance_ids
-        if action.selected_rows:
-            raise IllegalActionError("This pending choice does not allow row selections.")
-        _ = validate_distinct_selections(
-            selected_ids,
-            duplicate_message="ResolveChoiceAction cannot select the same card twice.",
-        )
-        _ = validate_selection_count(
-            selected_ids,
-            min_selections=pending_choice.min_selections,
-            max_selections=pending_choice.max_selections,
-            invalid_count_message="ResolveChoiceAction selected an invalid number of cards.",
-        )
-        _ = validate_legal_selections(
-            selected_ids,
-            legal_values=pending_choice.legal_target_card_instance_ids,
-            illegal_message="ResolveChoiceAction selected an illegal target card.",
-        )
-        return
+    if not pending_choice.legal_target_card_instance_ids:
+        raise IllegalActionError("Pending choice does not expose any legal selections.")
 
-    if pending_choice.legal_rows:
-        selected_rows = action.selected_rows
-        if action.selected_card_instance_ids:
-            raise IllegalActionError("This pending choice does not allow card selections.")
-        _ = validate_distinct_selections(
-            selected_rows,
-            duplicate_message="ResolveChoiceAction cannot select the same row twice.",
-        )
-        _ = validate_selection_count(
-            selected_rows,
-            min_selections=pending_choice.min_selections,
-            max_selections=pending_choice.max_selections,
-            invalid_count_message="ResolveChoiceAction selected an invalid number of rows.",
-        )
-        _ = validate_legal_selections(
-            selected_rows,
-            legal_values=pending_choice.legal_rows,
-            illegal_message="ResolveChoiceAction selected an illegal row.",
-        )
-        return
-
-    raise IllegalActionError("Pending choice does not expose any legal selections.")
+    selected_ids = action.selected_card_instance_ids
+    _ = validate_distinct_selections(
+        selected_ids,
+        duplicate_message="ResolveChoiceAction cannot select the same card twice.",
+    )
+    _ = validate_selection_count(
+        selected_ids,
+        min_selections=pending_choice.min_selections,
+        max_selections=pending_choice.max_selections,
+        invalid_count_message="ResolveChoiceAction selected an invalid number of cards.",
+    )
+    _ = validate_legal_selections(
+        selected_ids,
+        legal_values=pending_choice.legal_target_card_instance_ids,
+        illegal_message="ResolveChoiceAction selected an illegal target card.",
+    )
 
 
 def validate_use_leader_ability_action(

@@ -55,23 +55,12 @@ type ActiveLeaderHandler = Callable[
 
 
 def require_no_targets(action: UseLeaderAbilityAction) -> None:
-    if (
-        action.target_row is not None
-        or action.target_player is not None
-        or action.target_card_instance_id is not None
-        or action.secondary_target_card_instance_id is not None
-        or action.selected_card_instance_ids
-    ):
+    if action.target_card_instance_id is not None or action.selected_card_instance_ids:
         raise IllegalActionError("This leader ability does not take explicit targets.")
 
 
 def require_only_card_target(action: UseLeaderAbilityAction) -> None:
-    if (
-        action.target_row is not None
-        or action.target_player is not None
-        or action.secondary_target_card_instance_id is not None
-        or action.selected_card_instance_ids
-    ):
+    if action.selected_card_instance_ids:
         raise IllegalActionError("This leader ability only accepts a single card target.")
 
 

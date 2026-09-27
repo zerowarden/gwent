@@ -15,7 +15,7 @@ from gwent_engine.rules.avenger import (
     resolve_leave_battlefield_triggers,
     resolve_pending_avenger_summons_at_round_start,
 )
-from gwent_engine.rules.state_ops import replace_card_instances
+from gwent_engine.rules.state_ops import card_in_zone, replace_card_instances
 
 EMPTY_RETAINED_CARD_IDS: frozenset[CardInstanceId] = frozenset()
 
@@ -42,13 +42,7 @@ def cleanup_battlefield(
     )
     removed_cards = tuple(state.card(card_id) for card_id in moved_card_ids)
     updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
-        )
-        for card_id in moved_card_ids
+        card_id: card_in_zone(state.card(card_id), zone=Zone.DISCARD) for card_id in moved_card_ids
     }
     updated_players = _cleanup_players(
         state,

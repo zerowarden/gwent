@@ -139,16 +139,12 @@ class GwentEngineAdapter:
         card_instance_id: str,
         target_row: str | None = None,
         target_card_instance_id: str | None = None,
-        secondary_target_card_instance_id: str | None = None,
     ) -> GameAction:
         return PlayCardAction(
             player_id=PlayerId(player_id),
             card_instance_id=CardInstanceId(card_instance_id),
             target_row=_optional_row(target_row),
             target_card_instance_id=_optional_card_instance_id(target_card_instance_id),
-            secondary_target_card_instance_id=_optional_card_instance_id(
-                secondary_target_card_instance_id
-            ),
         )
 
     def build_player_action(self, *, kind: PlayerActionKind, player_id: str) -> GameAction:
@@ -163,20 +159,12 @@ class GwentEngineAdapter:
         self,
         *,
         player_id: str,
-        target_row: str | None = None,
-        target_player: str | None = None,
         target_card_instance_id: str | None = None,
-        secondary_target_card_instance_id: str | None = None,
         selected_card_instance_ids: tuple[str, ...] = (),
     ) -> GameAction:
         return UseLeaderAbilityAction(
             player_id=PlayerId(player_id),
-            target_row=_optional_row(target_row),
-            target_player=PlayerId(target_player) if target_player is not None else None,
             target_card_instance_id=_optional_card_instance_id(target_card_instance_id),
-            secondary_target_card_instance_id=_optional_card_instance_id(
-                secondary_target_card_instance_id
-            ),
             selected_card_instance_ids=tuple(
                 CardInstanceId(card_instance_id) for card_instance_id in selected_card_instance_ids
             ),
@@ -188,7 +176,6 @@ class GwentEngineAdapter:
         player_id: str,
         choice_id: str,
         selected_card_instance_ids: tuple[str, ...] = (),
-        selected_rows: tuple[str, ...] = (),
     ) -> GameAction:
         return ResolveChoiceAction(
             player_id=PlayerId(player_id),
@@ -196,7 +183,6 @@ class GwentEngineAdapter:
             selected_card_instance_ids=tuple(
                 CardInstanceId(card_instance_id) for card_instance_id in selected_card_instance_ids
             ),
-            selected_rows=tuple(_row(row) for row in selected_rows),
         )
 
     def apply_engine_action(

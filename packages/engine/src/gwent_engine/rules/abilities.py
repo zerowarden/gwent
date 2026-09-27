@@ -40,9 +40,10 @@ from gwent_engine.rules.players import (
     opponent_player_id_from_state,
     other_player_from_state,
 )
-from gwent_engine.rules.row_effects import horn_source_for_row, row_has_active_mardroeme
+from gwent_engine.rules.row_effects import horn_source_for_row
 from gwent_engine.rules.state_ops import (
     append_to_row,
+    card_in_zone,
     draw_cards_into_hand,
     next_player_after_non_pass_action,
     remove_from_play_source_zone,
@@ -80,11 +81,6 @@ def apply_unit_card(
     medic_targets: dict[CardInstanceId, CardInstanceId] = {}
     if action.target_card_instance_id is not None:
         medic_targets[action.card_instance_id] = action.target_card_instance_id
-    if (
-        action.target_card_instance_id is not None
-        and action.secondary_target_card_instance_id is not None
-    ):
-        medic_targets[action.target_card_instance_id] = action.secondary_target_card_instance_id
 
     context = AbilityResolutionContext(
         card_registry=card_registry,
@@ -178,12 +174,7 @@ def destroy_battlefield_cards(
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     removed_cards = tuple(state.card(card_id) for card_id in destroyed_card_ids)
     updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
-        )
+        card_id: card_in_zone(state.card(card_id), zone=Zone.DISCARD)
         for card_id in destroyed_card_ids
     }
     updated_players = tuple(
@@ -201,6 +192,45 @@ def destroy_battlefield_cards(
         event_id_start=event_id_start,
         queue_for_next_round=False,
     )
+
+
+def resolve_row_scorch(
+    state: GameState,
+    card_registry: CardRegistry,
+    row_card_ids: tuple[CardInstanceId, ...],
+    *,
+    threshold: int,
+    event_id_start: int,
+    leader_registry: LeaderRegistry | None = None,
+) -> tuple[GameState, tuple[CardInstanceId, ...], tuple[GameEvent, ...]]:
+    from gwent_engine.rules.scoring import calculate_effective_strength
+
+    row_total = sum(
+        calculate_effective_strength(
+            state,
+            card_registry,
+            card_id,
+            leader_registry=leader_registry,
+        )
+        for card_id in row_card_ids
+    )
+    if row_total < threshold:
+        return state, (), ()
+    destroyed_card_ids = strongest_eligible_unit_card_ids(
+        state,
+        card_registry,
+        row_card_ids,
+        leader_registry=leader_registry,
+    )
+    if not destroyed_card_ids:
+        return state, (), ()
+    next_state, destroy_events = destroy_battlefield_cards(
+        state,
+        destroyed_card_ids,
+        card_registry=card_registry,
+        event_id_start=event_id_start,
+    )
+    return next_state, destroyed_card_ids, destroy_events
 
 
 def _play_unit_card_instance(
@@ -269,7 +299,7 @@ def play_card_instance(
             )
         updated_players.append(updated_player)
 
-    updated_card = replace(
+    updated_card = card_in_zone(
         state.card(card_instance_id),
         zone=Zone.BATTLEFIELD,
         row=target_row,
@@ -555,41 +585,21 @@ def _resolve_unit_scorch_after_play(
     played_by_player_id: PlayerId,
     context: AbilityResolutionContext,
 ) -> GameState:
-    from gwent_engine.rules.scoring import calculate_effective_strength
-
     card = state.card(card_instance_id)
     assert card.row is not None
     assert card.battlefield_side is not None
     opponent = other_player_from_state(state, card.battlefield_side)
     affected_row = card.row
-    opponent_row_cards = opponent.rows.cards_for(affected_row)
-    row_total = sum(
-        calculate_effective_strength(
-            state,
-            context.card_registry,
-            row_card_id,
-            leader_registry=context.leader_registry,
-        )
-        for row_card_id in opponent_row_cards
+    next_state, destroyed_card_ids, destroy_events = resolve_row_scorch(
+        state,
+        context.card_registry,
+        opponent.rows.cards_for(affected_row),
+        threshold=SCORCH_THRESHOLD,
+        event_id_start=_next_event_id(context),
+        leader_registry=context.leader_registry,
     )
-    destroyed_card_ids: tuple[CardInstanceId, ...] = ()
-    next_state = state
-    if row_total >= SCORCH_THRESHOLD:
-        destroyed_card_ids = strongest_eligible_unit_card_ids(
-            state,
-            context.card_registry,
-            opponent_row_cards,
-            leader_registry=context.leader_registry,
-        )
-        if destroyed_card_ids:
-            next_state, destroy_events = destroy_battlefield_cards(
-                state,
-                destroyed_card_ids,
-                card_registry=context.card_registry,
-                event_id_start=_next_event_id(context),
-            )
-            for event in destroy_events:
-                _append_event(context, event)
+    for event in destroy_events:
+        _append_event(context, event)
     _append_event(
         context,
         UnitScorchResolvedEvent(
@@ -637,36 +647,7 @@ def _resolve_global_unit_scorch_after_play(
     return next_state
 
 
-def _resolve_berserker_after_play(
-    state: GameState,
-    card_instance_id: CardInstanceId,
-    played_by_player_id: PlayerId,
-    context: AbilityResolutionContext,
-) -> GameState:
-    del played_by_player_id
-    card = state.card(card_instance_id)
-    if card.row is None or card.battlefield_side is None:
-        return state
-    if not row_has_active_mardroeme(
-        state,
-        context.card_registry,
-        card.battlefield_side,
-        card.row,
-    ):
-        return state
-    next_state, transform_events = apply_berserker_transformations_for_row(
-        state,
-        card_registry=context.card_registry,
-        battlefield_side=card.battlefield_side,
-        row=card.row,
-        event_id_start=_next_event_id(context),
-    )
-    for event in transform_events:
-        _append_event(context, event)
-    return next_state
-
-
-def _resolve_unit_source_mardroeme_after_play(
+def _resolve_mardroeme_transformations_after_play(
     state: GameState,
     card_instance_id: CardInstanceId,
     played_by_player_id: PlayerId,
@@ -752,6 +733,6 @@ AFTER_UNIT_PLAYED_HANDLERS: dict[AbilityKind, AfterUnitPlayedHandler] = {
     AbilityKind.SCORCH: _resolve_global_unit_scorch_after_play,
     AbilityKind.UNIT_COMMANDERS_HORN: _resolve_unit_horn_after_play,
     AbilityKind.UNIT_SCORCH_ROW: _resolve_unit_scorch_after_play,
-    AbilityKind.BERSERKER: _resolve_berserker_after_play,
-    AbilityKind.MARDROEME: _resolve_unit_source_mardroeme_after_play,
+    AbilityKind.BERSERKER: _resolve_mardroeme_transformations_after_play,
+    AbilityKind.MARDROEME: _resolve_mardroeme_transformations_after_play,
 }

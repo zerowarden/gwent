@@ -151,6 +151,10 @@ class BattlefieldProjectionResolver:
                 index,
                 weather_rows=set(context.active_weather_row_set),
                 horn_rows=set(context.horn_rows),
+                halve_weather_penalty=(
+                    cards[index].battlefield_side in context.halve_weather_penalty_sides
+                ),
+                double_spy_strength=context.double_spy_strength_global,
             )
             for index in range(len(cards))
             if (
@@ -186,6 +190,10 @@ class BattlefieldProjectionResolver:
                 index,
                 weather_rows=set(context.active_weather_row_set),
                 horn_rows=set(context.horn_rows),
+                halve_weather_penalty=(
+                    cards[index].battlefield_side in context.halve_weather_penalty_sides
+                ),
+                double_spy_strength=context.double_spy_strength_global,
             )
             for index in row_indexes
         )
@@ -197,6 +205,10 @@ class BattlefieldProjectionResolver:
                 index,
                 weather_rows=set(context.active_weather_row_set),
                 horn_rows=set(context.horn_rows),
+                halve_weather_penalty=(
+                    cards[index].battlefield_side in context.halve_weather_penalty_sides
+                ),
+                double_spy_strength=context.double_spy_strength_global,
             )
             for index in row_indexes
             if (

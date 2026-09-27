@@ -11,7 +11,8 @@ from gwent_evaluation import AgentSpec, EvidencePolicy, SuiteSpec, replay_case, 
 from gwent_evaluation import execution as execution_module
 from gwent_evaluation.agents import ResolvedAgent
 from gwent_evaluation.assets import ResolvedAssets
-from gwent_evaluation.models import BotFamily, RunExecution
+from gwent_evaluation.execution import RunExecution
+from gwent_evaluation.models import BotFamily
 from gwent_evaluation.provenance import RepositoryProvenance
 from gwent_evaluation.replay import ReplayError
 from gwent_evaluation.storage import RunStore

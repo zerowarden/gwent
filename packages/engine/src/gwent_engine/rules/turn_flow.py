@@ -18,7 +18,7 @@ from gwent_engine.core.events import (
     PlayerPassedEvent,
     SpecialCardResolvedEvent,
 )
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PlayerState, RowState
 from gwent_engine.leaders import LeaderRegistry
@@ -28,13 +28,17 @@ from gwent_engine.rules.abilities import (
     strongest_battlefield_unit_card_ids,
 )
 from gwent_engine.rules.avenger import resolve_leave_battlefield_triggers
-from gwent_engine.rules.battlefield_effects import weather_row_for
+from gwent_engine.rules.battlefield_effects import (
+    clear_weather_cards,
+    is_weather_ability,
+    weather_row_for,
+)
 from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
 from gwent_engine.rules.players import other_player_from_pair, replace_player
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.state_ops import (
     append_to_row,
-    discard_owned_weather_cards,
+    card_in_zone,
     next_player_after_non_pass_action,
     replace_card_instance,
     replace_card_instances,
@@ -78,6 +82,16 @@ def apply_play_card(
         raise ValueError(f"Unsupported special-play card type: {definition.card_type!r}")
 
     ability_kind = special_ability_kind(definition)
+    if is_weather_ability(ability_kind):
+        return _apply_weather_card(
+            state,
+            action,
+            player,
+            card_registry,
+            leader_registry,
+            rng,
+            ability_kind,
+        )
     handler = SPECIAL_CARD_HANDLERS.get(ability_kind)
     if handler is not None:
         return handler(
@@ -137,7 +151,7 @@ def _apply_row_targeted_special_base(
         hand=tuple(card_id for card_id in player.hand if card_id != action.card_instance_id),
         rows=append_to_row(player.rows, action.target_row, action.card_instance_id),
     )
-    updated_card = replace(
+    updated_card = card_in_zone(
         state.card(action.card_instance_id),
         zone=Zone.BATTLEFIELD,
         row=action.target_row,
@@ -225,11 +239,10 @@ def _apply_weather_card(
         player,
         hand=tuple(card_id for card_id in player.hand if card_id != action.card_instance_id),
     )
-    updated_card = replace(
+    updated_card = card_in_zone(
         state.card(action.card_instance_id),
         zone=Zone.WEATHER,
         row=affected_row,
-        battlefield_side=None,
     )
     events: tuple[GameEvent, ...] = (
         CardPlayedEvent(
@@ -299,33 +312,16 @@ def _apply_clear_weather(
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del player, card_registry, leader_registry, rng
     cleared_weather_ids = state.battlefield_weather.all_cards()
-    discarded_card_ids = (*cleared_weather_ids, action.card_instance_id)
-    first_player, second_player = state.players
+    updated_players, updated_cards = clear_weather_cards(state, cleared_weather_ids)
     updated_players = (
-        _discard_cleared_weather_cards(
-            state,
-            first_player,
-            played_card_id=action.card_instance_id,
-            acting_player_id=action.player_id,
-            cleared_weather_ids=cleared_weather_ids,
-        ),
-        _discard_cleared_weather_cards(
-            state,
-            second_player,
-            played_card_id=action.card_instance_id,
-            acting_player_id=action.player_id,
-            cleared_weather_ids=cleared_weather_ids,
-        ),
+        _discard_played_clear_weather_card(updated_players[0], action),
+        _discard_played_clear_weather_card(updated_players[1], action),
     )
-    updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
-        )
-        for card_id in discarded_card_ids
-    }
+    updated_cards[action.card_instance_id] = card_in_zone(
+        state.card(action.card_instance_id),
+        zone=Zone.DISCARD,
+    )
+    discarded_card_ids = (*cleared_weather_ids, action.card_instance_id)
     events = _special_card_discard_events(state, action, ability_kind, discarded_card_ids)
     next_state = replace(
         state,
@@ -369,11 +365,9 @@ def _apply_scorch(
         discard=(*acting_player.discard, action.card_instance_id),
     )
     updated_cards = {
-        action.card_instance_id: replace(
+        action.card_instance_id: card_in_zone(
             scorched_state.card(action.card_instance_id),
             zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
         ),
     }
     events = (
@@ -419,13 +413,10 @@ def _apply_decoy(
         ),
     )
     updated_target_card = replace(
-        target_card,
+        card_in_zone(target_card, zone=Zone.HAND),
         owner=action.player_id,
-        zone=Zone.HAND,
-        row=None,
-        battlefield_side=None,
     )
-    updated_decoy_card = replace(
+    updated_decoy_card = card_in_zone(
         state.card(action.card_instance_id),
         zone=Zone.BATTLEFIELD,
         row=target_card.row,
@@ -476,30 +467,22 @@ def _apply_decoy(
     return next_state, events
 
 
-def _discard_cleared_weather_cards(
-    state: GameState,
+def _discard_played_clear_weather_card(
     player: PlayerState,
-    *,
-    played_card_id: CardInstanceId,
-    acting_player_id: PlayerId,
-    cleared_weather_ids: tuple[CardInstanceId, ...],
+    action: PlayCardAction,
 ) -> PlayerState:
-    updated_player = discard_owned_weather_cards(state, player, cleared_weather_ids)
-    hand = updated_player.hand
-    discard = updated_player.discard
-    if player.player_id == acting_player_id:
-        hand = tuple(card_id for card_id in player.hand if card_id != played_card_id)
-        discard = (*discard, played_card_id)
-    return replace(updated_player, hand=hand, discard=discard)
+    if player.player_id != action.player_id:
+        return player
+    return replace(
+        player,
+        hand=tuple(card_id for card_id in player.hand if card_id != action.card_instance_id),
+        discard=(*player.discard, action.card_instance_id),
+    )
 
 
 SPECIAL_CARD_HANDLERS: dict[AbilityKind, SpecialCardHandler] = {
     AbilityKind.COMMANDERS_HORN: _apply_commanders_horn,
     AbilityKind.MARDROEME: _apply_special_mardroeme,
-    AbilityKind.BITING_FROST: _apply_weather_card,
-    AbilityKind.IMPENETRABLE_FOG: _apply_weather_card,
-    AbilityKind.TORRENTIAL_RAIN: _apply_weather_card,
-    AbilityKind.SKELLIGE_STORM: _apply_weather_card,
     AbilityKind.CLEAR_WEATHER: _apply_clear_weather,
     AbilityKind.SCORCH: _apply_scorch,
     AbilityKind.DECOY: _apply_decoy,

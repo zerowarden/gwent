@@ -4,9 +4,9 @@ from dataclasses import dataclass
 
 from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.projection import projected_future_card_value
-from gwent_engine.ai.observations import ObservedCard, PlayerObservation
+from gwent_engine.ai.baseline.projection.context import opponent_public, viewer_public
+from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
-from gwent_engine.ai.row_preference import row_preference
 from gwent_engine.ai.utils import (
     is_non_hero_unit,
     viewer_deck_count,
@@ -16,7 +16,7 @@ from gwent_engine.ai.utils import (
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, ChoiceSourceKind, LeaderAbilityKind
 from gwent_engine.core.actions import GameAction, ResolveChoiceAction
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 
 
@@ -66,7 +66,6 @@ def choose_pending_choice_action(
                 card_registry=card_registry,
                 leader_registry=leader_registry,
             ),
-            row_preference(action.selected_rows[0]) if action.selected_rows else 0,
             -len(action.selected_card_instance_ids),
             action_to_id(action),
         ),
@@ -106,8 +105,6 @@ def explain_pending_choice_score_components(
         card_registry,
         include_viewer_deck=True,
     )
-    if action.selected_rows:
-        return (("row_preference", sum(row_preference(row) for row in action.selected_rows)),)
     if pending_choice.source_kind == ChoiceSourceKind.LEADER_ABILITY:
         return _leader_choice_score_components(
             action,
@@ -164,20 +161,8 @@ def _leader_choice_zones(observation: PlayerObservation) -> _LeaderChoiceZones:
     return _LeaderChoiceZones(
         viewer_hand_ids={card.instance_id for card in observation.viewer_hand},
         viewer_deck_ids=set(viewer_deck_instance_ids(observation)),
-        viewer_discard_ids={
-            card.instance_id
-            for card in _public_player_discard(
-                observation,
-                player_id=observation.viewer_player_id,
-            )
-        },
-        opponent_discard_ids={
-            card.instance_id
-            for card in _public_player_discard(
-                observation,
-                player_id=_opponent_player_id(observation),
-            )
-        },
+        viewer_discard_ids={card.instance_id for card in viewer_public(observation).discard},
+        opponent_discard_ids={card.instance_id for card in opponent_public(observation).discard},
     )
 
 
@@ -273,25 +258,6 @@ def _discard_and_choose_components(
 
 def _single_component(name: str, value: int) -> tuple[tuple[str, int], ...]:
     return ((name, value),) if value else ()
-
-
-def _opponent_player_id(observation: PlayerObservation) -> PlayerId:
-    return next(
-        player.player_id
-        for player in observation.public_state.players
-        if player.player_id != observation.viewer_player_id
-    )
-
-
-def _public_player_discard(
-    observation: PlayerObservation,
-    *,
-    player_id: PlayerId,
-) -> tuple[ObservedCard, ...]:
-    player = next(
-        player for player in observation.public_state.players if player.player_id == player_id
-    )
-    return player.discard
 
 
 def _target_score_components(

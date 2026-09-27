@@ -18,6 +18,7 @@ from gwent_shared.json_payloads import dump_pretty_json
 
 from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.models import (
+    DecisionSample,
     EvidenceRefs,
     MatchEvidence,
     MatchResult,
@@ -29,6 +30,7 @@ from gwent_evaluation.provenance import canonical_digest, canonical_json, file_d
 from gwent_evaluation.records import (
     CorruptRecordError,
     StorageError,
+    decision_sample_from_dict,
     decision_sample_to_dict,
     match_result_from_dict,
     parse_record_mapping,
@@ -106,11 +108,11 @@ class RunStore:
         validate_loaded_run(loaded)
         self.matches_dir.mkdir(parents=True, exist_ok=True)
         self.evidence_dir.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(
+        atomic_write_text(
             self.manifest_path,
             dump_pretty_json({"manifest_identity": identity, **record_to_dict(manifest)}),
         )
-        _atomic_write_text(
+        atomic_write_text(
             self.schedule_path,
             "".join(canonical_json(record_to_dict(match)) + "\n" for match in matches),
         )
@@ -136,10 +138,7 @@ class RunStore:
             raise CorruptRecordError(f"Manifest identity mismatch for {self.manifest_path}.")
         return manifest
 
-    def read_result(self, case_id: str) -> MatchResult | None:
-        return self.load().results.get(case_id)
-
-    def _read_result(self, case_id: str) -> MatchResult | None:
+    def _read_result(self, case_id: str) -> tuple[MatchResult, str] | None:
         path = self.result_path(case_id)
         if not path.exists():
             return None
@@ -159,7 +158,7 @@ class RunStore:
             raise CorruptRecordError(str(error)) from error
         if result.case_id != case_id:
             raise CorruptRecordError(f"Record case id mismatch for {path}: {result.case_id!r}.")
-        return result
+        return result, digest
 
     def read_schedule(self) -> tuple[ScheduledMatch, ...]:
         try:
@@ -178,17 +177,6 @@ class RunStore:
                 )
             )
         return tuple(matches)
-
-    def read_trajectory(
-        self,
-        case_id: str,
-        *,
-        card_registry: CardRegistry | None = None,
-    ) -> tuple[TrajectoryStep, ...] | None:
-        loaded = self.load(trajectory_cases=(case_id,), card_registry=card_registry)
-        if case_id not in loaded.results:
-            raise CorruptRecordError("Trajectory has no bound result.")
-        return loaded.trajectories.get(case_id)
 
     def _read_trajectory(
         self,
@@ -227,11 +215,11 @@ class RunStore:
     def write_result(self, result: MatchResult) -> None:
         payload = record_to_dict(result)
         document = {"record_digest": canonical_digest(payload), **payload}
-        _atomic_write_text(self.result_path(result.case_id), dump_pretty_json(document))
+        atomic_write_text(self.result_path(result.case_id), dump_pretty_json(document))
 
     def write_report(self, payload: Mapping[str, object], markdown: str) -> None:
-        _atomic_write_text(self.report_path, dump_pretty_json(payload))
-        _atomic_write_text(self.report_markdown_path, markdown)
+        atomic_write_text(self.report_path, dump_pretty_json(payload))
+        atomic_write_text(self.report_markdown_path, markdown)
 
     def write_evidence(
         self,
@@ -244,7 +232,7 @@ class RunStore:
         samples_text = "".join(
             canonical_json(decision_sample_to_dict(sample)) + "\n" for sample in evidence.samples
         )
-        _atomic_write_text(self.samples_path(case_id), samples_text)
+        atomic_write_text(self.samples_path(case_id), samples_text)
         trajectory_path = self.trajectory_path(case_id)
         if include_trajectory:
             trajectory_payload = {
@@ -252,7 +240,7 @@ class RunStore:
                 "case_id": case_id,
                 "steps": [trajectory_step_to_dict(step) for step in evidence.trajectory],
             }
-            _atomic_write_text(trajectory_path, canonical_json(trajectory_payload))
+            atomic_write_text(trajectory_path, canonical_json(trajectory_payload))
         elif trajectory_path.exists():
             trajectory_path.unlink()
         return EvidenceRefs(
@@ -263,25 +251,35 @@ class RunStore:
         )
 
     def load(
-        self, *, trajectory_cases: tuple[str, ...] = (), card_registry: CardRegistry | None = None
+        self,
+        *,
+        trajectory_cases: tuple[str, ...] = (),
+        sample_cases: tuple[str, ...] = (),
+        card_registry: CardRegistry | None = None,
     ) -> LoadedRun:
         if trajectory_cases and card_registry is None:
             card_registry = resolve_assets().card_registry
         manifest = self.read_manifest()
         matches = self.read_schedule()
         results: dict[str, MatchResult] = {}
+        result_digests: dict[str, str] = {}
         for match in matches:
-            result = self._read_result(match.case_id)
-            if result is not None:
-                results[match.case_id] = result
+            record = self._read_result(match.case_id)
+            if record is not None:
+                parsed_result, digest = record
+                results[match.case_id] = parsed_result
+                result_digests[match.case_id] = digest
         trajectories: dict[str, tuple[TrajectoryStep, ...]] = {}
-        loaded = LoadedRun(manifest, matches, results, trajectories)
+        samples: dict[str, tuple[DecisionSample, ...]] = {}
+        loaded = LoadedRun(manifest, matches, results, trajectories, samples, result_digests)
         validate_loaded_run(loaded)
         for match in matches:
             result = results.get(match.case_id)
             if result is None:
                 continue
             self._verify_evidence(result)
+            if match.case_id in sample_cases:
+                samples[match.case_id] = self._read_samples(result)
             if match.case_id in trajectory_cases and result.evidence.trajectory_path is not None:
                 trajectories[match.case_id] = self._read_trajectory(
                     result,
@@ -289,6 +287,20 @@ class RunStore:
                     card_registry=card_registry,
                 )
         return loaded
+
+    def _read_samples(self, result: MatchResult) -> tuple[DecisionSample, ...]:
+        if result.evidence.samples_path is None:
+            raise CorruptRecordError("Run has no persisted decision samples.")
+        path = self.samples_path(result.case_id)
+        samples = tuple(
+            decision_sample_from_dict(parse_record_mapping(line, context=str(path)))
+            for line in path.read_text(encoding="utf-8").splitlines()
+        )
+        if len(samples) != result.decision_count or any(
+            sample.index != index for index, sample in enumerate(samples, 1)
+        ):
+            raise CorruptRecordError("Decision sample count/indices do not match the result.")
+        return samples
 
     def _verify_evidence(self, result: MatchResult) -> None:
         for recorded_path, digest, expected_path in (
@@ -329,7 +341,7 @@ def _read_record_mapping(path: Path) -> Mapping[str, object]:
     return parse_record_mapping(text, context=str(path))
 
 
-def _atomic_write_text(path: Path, content: str) -> None:
+def atomic_write_text(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
     _ = temporary.write_text(content, encoding="utf-8")

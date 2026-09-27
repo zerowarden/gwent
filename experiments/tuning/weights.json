@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "study_id": "weights-v1",
+  "mode": "scientific",
+  "agents_catalog": "../agents.json",
+  "suites_catalog": "../suites.json",
+  "suites": {
+    "optimization": "weights-optimize",
+    "validation": "weights-validation",
+    "test": "weights-test"
+  },
+  "parameter_space": {
+    "schema_version": 1,
+    "space_id": "evaluation-weights-v1",
+    "parameters": [
+      {
+        "name": "immediate_points",
+        "lower": 0.25,
+        "upper": 4.0
+      },
+      {
+        "name": "card_advantage",
+        "lower": 0.0,
+        "upper": 8.0
+      },
+      {
+        "name": "remaining_hand_value",
+        "lower": 0.0,
+        "upper": 1.0
+      },
+      {
+        "name": "leader_value",
+        "lower": 0.0,
+        "upper": 16.0
+      },
+      {
+        "name": "scorch_exposure",
+        "lower": -6.0,
+        "upper": 0.0
+      },
+      {
+        "name": "weather_exposure",
+        "lower": -4.0,
+        "upper": 0.0
+      },
+      {
+        "name": "horn_potential",
+        "lower": 0.0,
+        "upper": 2.4
+      },
+      {
+        "name": "synergy_retention",
+        "lower": 0.0,
+        "upper": 4.0
+      },
+      {
+        "name": "overcommit_penalty",
+        "lower": -4.0,
+        "upper": 0.0
+      },
+      {
+        "name": "dead_card_penalty",
+        "lower": -4.0,
+        "upper": 0.0
+      },
+      {
+        "name": "exact_finish_bonus",
+        "lower": 0.0,
+        "upper": 16.0
+      }
+    ]
+  },
+  "optimizers": [
+    {
+      "method": "random",
+      "seed": 26092601,
+      "proposal_budget": 128,
+      "batch_size": 16,
+      "generations": null,
+      "initial_sigma": null,
+      "protocol_version": 1
+    },
+    {
+      "method": "cma_es",
+      "seed": 26092602,
+      "proposal_budget": 128,
+      "batch_size": 16,
+      "generations": 8,
+      "initial_sigma": 0.2,
+      "protocol_version": 1
+    }
+  ],
+  "objective_version": 1,
+  "selection": {
+    "version": 1,
+    "finalist_count": 3,
+    "minimum_test_improvement": 0.02,
+    "maximum_stratum_decline": 0.05,
+    "strata": [
+      "opponent",
+      "candidate_deck"
+    ]
+  },
+  "sensitivity": {
+    "version": 1,
+    "pilot_seeds": [
+      9001
+    ],
+    "max_pilot_matches": 192,
+    "observations_per_match": 8,
+    "minimum_relative_score_witnesses": 1,
+    "minimum_changed_actions": 1,
+    "minimum_changed_outcomes": 1
+  },
+  "bootstrap": {
+    "resamples": 2000,
+    "confidence_level": 0.95,
+    "minimum_blocks": 8,
+    "seed": 26092603
+  },
+  "evidence_policy": "none",
+  "evaluation_match_budget": 279552
+}

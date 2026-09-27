@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from gwent_engine.ai.baseline import ActionScoreBreakdown
+from gwent_engine.ai.baseline import ActionScoreBreakdown, PressureMode
 from gwent_engine.ai.debug import CandidateExplanation, HeuristicDecisionExplanation
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.cli.models import BotDecisionExplanation, CliStep
@@ -241,7 +241,7 @@ def override_reason(explanation: BotDecisionExplanation | None) -> str | None:
 def pass_debug_details(explanation: HeuristicDecisionExplanation) -> dict[str, int]:
     tempo_per_card = (
         explanation.profile.elimination_estimated_opponent_tempo_per_card
-        if explanation.context.pressure.value == "elimination"
+        if explanation.context.pressure == PressureMode.ELIMINATION
         else explanation.profile.estimated_opponent_tempo_per_card
     )
     estimated_opponent_response = explanation.assessment.opponent.hand_count * tempo_per_card

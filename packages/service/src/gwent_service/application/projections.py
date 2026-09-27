@@ -158,7 +158,6 @@ def _build_pending_choice_view(
             pending_choice.legal_target_card_instance_ids,
             adapter=adapter,
         ),
-        legal_rows=tuple(row.value for row in pending_choice.legal_rows),
         min_selections=pending_choice.min_selections,
         max_selections=pending_choice.max_selections,
         source_row=None if pending_choice.source_row is None else pending_choice.source_row.value,

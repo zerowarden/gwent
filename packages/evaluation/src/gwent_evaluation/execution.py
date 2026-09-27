@@ -12,7 +12,7 @@ from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 from gwent_engine.core.randomness import SeededRandom
 from gwent_shared.extract import stringify_optional
 
-from gwent_evaluation.agents import ResolvedAgent, resolve_agent
+from gwent_evaluation.agents import ResolvedAgent, resolve_agent, snapshot_suite
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
 from gwent_evaluation.models import (
     RECORD_SCHEMA_VERSION,
@@ -21,7 +21,6 @@ from gwent_evaluation.models import (
     EvidenceRefs,
     MatchEvidence,
     MatchResult,
-    RunExecution,
     RunManifest,
     ScheduledMatch,
     SuiteSpec,
@@ -34,10 +33,20 @@ from gwent_evaluation.provenance import (
     read_runtime_provenance,
 )
 from gwent_evaluation.recording import ExperimentRecorder, SummaryRecorder
-from gwent_evaluation.reporting import LoadedRun, persist_run_report
+from gwent_evaluation.reporting import RunReport, persist_run_report
 from gwent_evaluation.schedule import CASE_ID_VERSION, other_seat, schedule_suite
 from gwent_evaluation.storage import RunConflictError, RunStore
-from gwent_evaluation.validation import validate_result_against_execution
+from gwent_evaluation.validation import LoadedRun, validate_result_against_execution
+
+
+@dataclass(frozen=True, slots=True)
+class RunExecution:
+    run_id: str
+    root: Path
+    results: tuple[MatchResult, ...]
+    executed_case_ids: tuple[str, ...]
+    resumed_case_ids: tuple[str, ...]
+    report: RunReport
 
 
 class EvidencePolicy(StrEnum):
@@ -70,6 +79,7 @@ def execute_run(
     output_root: Path,
     repository_root: Path,
     evidence_policy: EvidencePolicy = EvidencePolicy.FAILURES,
+    expected_manifest: RunManifest | None = None,
 ) -> RunExecution:
     """Execute or resume one run, persisting results and evidence atomically.
 
@@ -77,6 +87,7 @@ def execute_run(
     re-executes or silently replaces completed work.
     """
 
+    suite = snapshot_suite(suite)
     assets = resolve_assets()
     candidate = resolve_agent(suite.candidate)
     opponents = {opponent: resolve_agent(opponent) for opponent in suite.opponents}
@@ -90,6 +101,8 @@ def execute_run(
         assets=assets,
         repository_root=repository_root,
     )
+    if expected_manifest is not None and manifest != expected_manifest:
+        raise RunConflictError("Execution conditions differ from the pinned manifest.")
     if suite.purpose.requires_clean_checkout and not manifest.repository.is_clean_checkout:
         raise RunConflictError(
             "Optimization, validation and test runs require a clean checkout with a lockfile."
@@ -123,13 +136,13 @@ def execute_run(
                 include_trajectory=include_trajectory,
                 execution_identity=execution_id,
             )
-        result = _build_result(match, case, evidence=evidence_refs, execution_id=execution_id)
+        result = build_result(match, case, evidence=evidence_refs, execution_id=execution_id)
         validate_result_against_execution(result, match, prepared)
         store.write_result(result)
         results.append(result)
         executed_case_ids.append(match.case_id)
 
-    _ = persist_run_report(
+    report = persist_run_report(
         store,
         LoadedRun(
             manifest=manifest,
@@ -143,6 +156,7 @@ def execute_run(
         results=tuple(results),
         executed_case_ids=tuple(executed_case_ids),
         resumed_case_ids=tuple(resumed_case_ids),
+        report=report,
     )
 
 
@@ -164,8 +178,8 @@ def build_run_manifest(
         seed_derivation_version=SEED_DERIVATION_VERSION,
         case_id_version=CASE_ID_VERSION,
         planned_case_ids=tuple(match.case_id for match in matches),
-        candidate=_agent_identity(candidate),
-        opponents=tuple(_agent_identity(opponent) for opponent in opponents),
+        candidate=agent_identity(candidate),
+        opponents=tuple(agent_identity(opponent) for opponent in opponents),
         assets=AssetIdentities(
             deck_digests=tuple((deck_id, assets.deck_digest(deck_id)) for deck_id in deck_ids),
             card_data_digest=assets.card_data_digest(),
@@ -176,13 +190,30 @@ def build_run_manifest(
     )
 
 
-def _agent_identity(resolved: ResolvedAgent) -> AgentIdentity:
+def agent_identity(resolved: ResolvedAgent) -> AgentIdentity:
+    """The recorded identity of a resolved participant."""
     return AgentIdentity(
         agent_id=resolved.agent_id,
         family=resolved.family_id,
         profile=resolved.profile_id,
         digest=resolved.digest(),
     )
+
+
+def validate_run_environment(manifest: RunManifest, *, repository_root: Path) -> None:
+    """Recheck pinned implementation, runtime, participants, and assets at a run boundary."""
+    suite = manifest.suite
+    current = build_run_manifest(
+        suite=suite,
+        run_id=manifest.run_id,
+        matches=schedule_suite(suite),
+        candidate=resolve_agent(suite.candidate),
+        opponents=tuple(resolve_agent(item) for item in suite.opponents),
+        assets=resolve_assets(),
+        repository_root=repository_root,
+    )
+    if current != manifest:
+        raise RunConflictError("Execution conditions differ from the pinned manifest.")
 
 
 def execute_case(
@@ -234,13 +265,14 @@ def execute_case(
     )
 
 
-def _build_result(
+def build_result(
     match: ScheduledMatch,
     case: CaseExecution,
     *,
     evidence: EvidenceRefs,
     execution_id: str,
 ) -> MatchResult:
+    """Reduce an executed case to the authoritative persisted outcome record."""
     execution = case.execution
     final_state = execution.final_state
     winner = execution.match_winner

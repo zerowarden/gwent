@@ -26,7 +26,6 @@ class PlayCardAction:
     card_instance_id: CardInstanceId
     target_row: Row | None = None
     target_card_instance_id: CardInstanceId | None = None
-    secondary_target_card_instance_id: CardInstanceId | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,16 +43,12 @@ class ResolveChoiceAction:
     player_id: PlayerId
     choice_id: ChoiceId
     selected_card_instance_ids: tuple[CardInstanceId, ...] = ()
-    selected_rows: tuple[Row, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
 class UseLeaderAbilityAction:
     player_id: PlayerId
-    target_row: Row | None = None
-    target_player: PlayerId | None = None
     target_card_instance_id: CardInstanceId | None = None
-    secondary_target_card_instance_id: CardInstanceId | None = None
     selected_card_instance_ids: tuple[CardInstanceId, ...] = ()
 
 

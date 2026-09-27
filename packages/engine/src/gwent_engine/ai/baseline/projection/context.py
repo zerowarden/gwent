@@ -9,6 +9,7 @@ from gwent_engine.ai.observations import (
     PublicPlayerStateView,
 )
 from gwent_engine.core import Row
+from gwent_engine.core.ids import PlayerId
 
 
 @dataclass(frozen=True)
@@ -22,6 +23,20 @@ class PublicPlayerContext:
     @cached_property
     def opponent(self) -> PublicPlayerStateView:
         return opponent_public(self.observation)
+
+    @cached_property
+    def halve_weather_penalty_sides(self) -> frozenset[PlayerId]:
+        return frozenset(
+            player.player_id
+            for player in self.observation.public_state.players
+            if player.leader.halves_weather_penalty
+        )
+
+    @cached_property
+    def double_spy_strength_global(self) -> bool:
+        return any(
+            player.leader.doubles_spy_strength for player in self.observation.public_state.players
+        )
 
 
 def viewer_public(observation: PlayerObservation) -> PublicPlayerStateView:

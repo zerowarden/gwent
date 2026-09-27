@@ -53,11 +53,6 @@ class PlayProjectionResolver(ProjectionResolverContext):
     - build projected battlefield additions
     - resolve deterministic battlefield mutations
     - compare before/after board and future-value surfaces
-
-    The future-value terms still live in the legacy module for now, so this
-    resolver imports them lazily when needed. That keeps this extraction
-    bounded to the play slice rather than coupling it to the later
-    `future_value.py` split.
     """
 
     action: PlayCardAction

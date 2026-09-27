@@ -8,6 +8,7 @@ from gwent_engine.ai.baseline.bot import HeuristicBot
 from gwent_engine.ai.baseline.candidates import (
     CandidateAction,
     build_candidate_pool,
+    leader_coarse_score,
 )
 from gwent_engine.ai.baseline.context import (
     DecisionContext,
@@ -116,6 +117,7 @@ __all__ = [
     "explain_ranked_actions",
     "explain_tactical_override",
     "get_base_profile_definition",
+    "leader_coarse_score",
     "load_base_profiles",
     "load_default_base_profiles",
     "minimum_commitment_finish",

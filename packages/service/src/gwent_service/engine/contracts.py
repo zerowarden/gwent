@@ -74,7 +74,6 @@ class EngineAdapter(Protocol):
         card_instance_id: str,
         target_row: str | None = None,
         target_card_instance_id: str | None = None,
-        secondary_target_card_instance_id: str | None = None,
     ) -> GameAction: ...
 
     def build_player_action(self, *, kind: PlayerActionKind, player_id: str) -> GameAction: ...
@@ -83,10 +82,7 @@ class EngineAdapter(Protocol):
         self,
         *,
         player_id: str,
-        target_row: str | None = None,
-        target_player: str | None = None,
         target_card_instance_id: str | None = None,
-        secondary_target_card_instance_id: str | None = None,
         selected_card_instance_ids: tuple[str, ...] = (),
     ) -> GameAction: ...
 
@@ -96,7 +92,6 @@ class EngineAdapter(Protocol):
         player_id: str,
         choice_id: str,
         selected_card_instance_ids: tuple[str, ...] = (),
-        selected_rows: tuple[str, ...] = (),
     ) -> GameAction: ...
 
     def apply_engine_action(

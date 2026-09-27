@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from gwent_engine.cli.report.format import HTMLFormatter
+from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import GameAction
 from gwent_engine.core.ids import PlayerId, player_id
 
@@ -90,7 +91,7 @@ def signed_additions_text(
     return f"{math_number_text(total)} = {' '.join(parts)}"
 
 
-def winner_status_text(winner: PlayerId | None, status: str) -> str:
+def winner_status_text(winner: PlayerId | None, status: GameStatus) -> str:
     if winner is None:
-        return "draw" if status == "match_ended" else "pending"
+        return "draw" if status == GameStatus.MATCH_ENDED else "pending"
     return str(winner)

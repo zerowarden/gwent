@@ -15,11 +15,8 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
-from gwent_engine.rules.abilities import (
-    destroy_battlefield_cards,
-    strongest_eligible_unit_card_ids,
-)
-from gwent_engine.rules.battlefield_effects import weather_row_for
+from gwent_engine.rules.abilities import resolve_row_scorch
+from gwent_engine.rules.battlefield_effects import clear_weather_cards, weather_row_for
 from gwent_engine.rules.leader_common import (
     ActiveLeaderHandler,
     discard_and_choose_selection_required,
@@ -38,7 +35,7 @@ from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.scoring import calculate_effective_strength
 from gwent_engine.rules.state_ops import (
     append_to_row,
-    discard_owned_weather_cards,
+    card_in_zone,
     draw_cards_into_hand,
     next_player_after_non_pass_action,
     replace_card_instance,
@@ -201,19 +198,7 @@ def _activate_clear_weather_leader(
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del action, card_registry, rng, leader_registry
     cleared_weather_ids = state.battlefield_weather.all_cards()
-    updated_players = tuple(
-        discard_owned_weather_cards(state, current_player, cleared_weather_ids)
-        for current_player in state.players
-    )
-    updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
-        )
-        for card_id in cleared_weather_ids
-    }
+    updated_players, updated_cards = clear_weather_cards(state, cleared_weather_ids)
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
             event_id=state.event_counter + 1,
@@ -227,7 +212,7 @@ def _activate_clear_weather_leader(
     return (
         replace(
             state,
-            players=(updated_players[0], updated_players[1]),
+            players=updated_players,
             card_instances=replace_card_instances(state.card_instances, updated_cards),
             weather=RowState(),
         ),
@@ -260,11 +245,10 @@ def _activate_play_weather_from_deck_leader(
         player,
         deck=tuple(card_id for card_id in player.deck if card_id != chosen_card_id),
     )
-    updated_card = replace(
+    updated_card = card_in_zone(
         state.card(chosen_card_id),
         zone=Zone.WEATHER,
         row=affected_row,
-        battlefield_side=None,
     )
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
@@ -329,33 +313,14 @@ def _activate_scorch_opponent_row_leader(
     assert leader_definition.affected_row is not None
     opponent = other_player_from_pair(state.players, player.player_id)
     affected_row = leader_definition.affected_row
-    opponent_row_cards = opponent.rows.cards_for(affected_row)
-    row_total = sum(
-        calculate_effective_strength(
-            state,
-            card_registry,
-            card_id,
-            leader_registry=leader_registry,
-        )
-        for card_id in opponent_row_cards
+    next_state, destroyed_card_ids, destroy_events = resolve_row_scorch(
+        state,
+        card_registry,
+        opponent.rows.cards_for(affected_row),
+        threshold=leader_definition.minimum_opponent_row_total,
+        event_id_start=state.event_counter + 2,
+        leader_registry=leader_registry,
     )
-    destroyed_card_ids: tuple[CardInstanceId, ...] = ()
-    next_state = state
-    destroy_events: tuple[GameEvent, ...] = ()
-    if row_total >= leader_definition.minimum_opponent_row_total:
-        destroyed_card_ids = strongest_eligible_unit_card_ids(
-            state,
-            card_registry,
-            opponent_row_cards,
-            leader_registry=leader_registry,
-        )
-        if destroyed_card_ids:
-            next_state, destroy_events = destroy_battlefield_cards(
-                state,
-                destroyed_card_ids,
-                card_registry=card_registry,
-                event_id_start=state.event_counter + 2,
-            )
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
             event_id=state.event_counter + 1,
@@ -397,24 +362,11 @@ def _activate_discard_and_choose_from_deck_leader(
         discard=player.discard + discarded_card_ids,
     )
     updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.DISCARD,
-            row=None,
-            battlefield_side=None,
-        )
+        card_id: card_in_zone(state.card(card_id), zone=Zone.DISCARD)
         for card_id in discarded_card_ids
     }
     updated_cards.update(
-        {
-            card_id: replace(
-                state.card(card_id),
-                zone=Zone.HAND,
-                row=None,
-                battlefield_side=None,
-            )
-            for card_id in drawn_card_ids
-        }
+        {card_id: card_in_zone(state.card(card_id), zone=Zone.HAND) for card_id in drawn_card_ids}
     )
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
@@ -693,12 +645,7 @@ def _activate_shuffle_all_discards_into_decks_leader(
             )
         )
         for card_id in player_state.discard:
-            updated_cards[card_id] = replace(
-                state.card(card_id),
-                zone=Zone.DECK,
-                row=None,
-                battlefield_side=None,
-            )
+            updated_cards[card_id] = card_in_zone(state.card(card_id), zone=Zone.DECK)
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
             event_id=state.event_counter + 1,

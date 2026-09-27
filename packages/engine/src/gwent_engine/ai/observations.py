@@ -10,6 +10,7 @@ from gwent_engine.core import (
     FactionId,
     GameStatus,
     LeaderAbilityKind,
+    LeaderAbilityMode,
     Phase,
     Row,
 )
@@ -35,6 +36,8 @@ class ObservedLeader:
     disabled: bool
     horn_row: Row | None
     available_horn_row: Row | None = None
+    halves_weather_penalty: bool = False
+    doubles_spy_strength: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,7 +86,6 @@ class VisiblePendingChoiceView:
     source_card_instance_id: CardInstanceId | None
     source_leader_id: LeaderId | None
     legal_target_card_instance_ids: tuple[CardInstanceId, ...]
-    legal_rows: tuple[Row, ...]
     min_selections: int
     max_selections: int
     source_row: Row | None
@@ -239,6 +241,8 @@ def observed_leader_to_dict(leader: ObservedLeader) -> dict[str, object]:
         "available_horn_row": (
             leader.available_horn_row.value if leader.available_horn_row is not None else None
         ),
+        "halves_weather_penalty": leader.halves_weather_penalty,
+        "doubles_spy_strength": leader.doubles_spy_strength,
     }
 
 
@@ -332,16 +336,28 @@ def _build_observed_leader(
     leader_registry: LeaderRegistry | None,
 ) -> ObservedLeader:
     available_horn_row = None
-    if leader_registry is not None and not player.leader.used and not player.leader.disabled:
+    halves_weather_penalty = False
+    doubles_spy_strength = False
+    if leader_registry is not None and not player.leader.disabled:
         leader_definition = leader_registry.get(player.leader.leader_id)
         if leader_definition.ability_kind == LeaderAbilityKind.HORN_OWN_ROW:
-            available_horn_row = leader_definition.affected_row
+            if not player.leader.used:
+                available_horn_row = leader_definition.affected_row
+        if leader_definition.ability_mode == LeaderAbilityMode.PASSIVE:
+            halves_weather_penalty = (
+                leader_definition.ability_kind == LeaderAbilityKind.HALVE_WEATHER_PENALTY
+            )
+            doubles_spy_strength = (
+                leader_definition.ability_kind == LeaderAbilityKind.DOUBLE_SPY_STRENGTH_GLOBAL
+            )
     return ObservedLeader(
         leader_id=player.leader.leader_id,
         used=player.leader.used,
         disabled=player.leader.disabled,
         horn_row=player.leader.horn_row,
         available_horn_row=available_horn_row,
+        halves_weather_penalty=halves_weather_penalty,
+        doubles_spy_strength=doubles_spy_strength,
     )
 
 
@@ -372,7 +388,6 @@ def _build_visible_pending_choice_view(
         source_card_instance_id=pending_choice.source_card_instance_id,
         source_leader_id=pending_choice.source_leader_id,
         legal_target_card_instance_ids=pending_choice.legal_target_card_instance_ids,
-        legal_rows=pending_choice.legal_rows,
         min_selections=pending_choice.min_selections,
         max_selections=pending_choice.max_selections,
         source_row=pending_choice.source_row,
@@ -392,7 +407,6 @@ def _visible_pending_choice_to_dict(
         source_card_instance_id=pending_choice.source_card_instance_id,
         source_leader_id=pending_choice.source_leader_id,
         legal_target_card_instance_ids=pending_choice.legal_target_card_instance_ids,
-        legal_rows=pending_choice.legal_rows,
         min_selections=pending_choice.min_selections,
         max_selections=pending_choice.max_selections,
         source_row=pending_choice.source_row,

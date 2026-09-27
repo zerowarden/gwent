@@ -418,6 +418,10 @@ class LeaderProjectionResolver(ProjectionResolverContext):
                 projected_cards=(),
                 replacement_cards=tuple(cards),
             ),
+            halve_weather_penalty=(
+                cards[index].battlefield_side in self.halve_weather_penalty_sides
+            ),
+            double_spy_strength=self.double_spy_strength_global,
         )
 
     def _weather_ability_from_action(self) -> AbilityKind | None:

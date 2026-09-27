@@ -40,6 +40,17 @@ def replace_row_card(
             return replace(rows, siege=updated_cards)
 
 
+def card_in_zone(
+    card: CardInstance,
+    *,
+    zone: Zone,
+    row: Row | None = None,
+    battlefield_side: PlayerId | None = None,
+) -> CardInstance:
+    """Position a card in a zone, enforcing the CardInstance position invariants."""
+    return replace(card, zone=zone, row=row, battlefield_side=battlefield_side)
+
+
 def replace_card_instance(
     card_instances: tuple[CardInstance, ...],
     updated_card: CardInstance,
@@ -84,13 +95,7 @@ def draw_cards_into_hand(
         hand=(*player.hand, *drawn_card_ids),
     )
     updated_cards = {
-        card_id: replace(
-            state.card(card_id),
-            zone=Zone.HAND,
-            row=None,
-            battlefield_side=None,
-        )
-        for card_id in drawn_card_ids
+        card_id: card_in_zone(state.card(card_id), zone=Zone.HAND) for card_id in drawn_card_ids
     }
     return (
         replace(

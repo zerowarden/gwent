@@ -8,11 +8,12 @@ from typing import cast
 
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_evaluation import AgentSpec, EvidencePolicy, SuitePurpose, SuiteSpec, execute_run
+from gwent_evaluation.execution import RunExecution
 from gwent_evaluation.metrics import CaseStatus, ScoredCase
 from gwent_evaluation.models import (
-    SUPPORTED_SCHEMA_VERSION,
+    AGENT_SPEC_VERSION,
+    SUITE_SPEC_VERSION,
     BotFamily,
-    RunExecution,
     SchedulingPolicy,
 )
 from gwent_shared.extract import expect_mapping, expect_sequence, expect_str
@@ -116,7 +117,7 @@ def agent_spec(
     profile: str | None = None,
 ) -> AgentSpec:
     return AgentSpec(
-        schema_version=SUPPORTED_SCHEMA_VERSION,
+        schema_version=AGENT_SPEC_VERSION,
         agent_id=agent_id,
         family=family,
         profile=profile,
@@ -141,7 +142,7 @@ def suite_spec(
     action_budget: int = 512,
 ) -> SuiteSpec:
     return SuiteSpec(
-        schema_version=SUPPORTED_SCHEMA_VERSION,
+        schema_version=SUITE_SPEC_VERSION,
         suite_id=suite_id,
         purpose=SuitePurpose.SMOKE,
         candidate=candidate or greedy_agent(),

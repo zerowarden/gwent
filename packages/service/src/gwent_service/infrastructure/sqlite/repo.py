@@ -14,9 +14,16 @@ from gwent_service.application.errors import (
 )
 from gwent_service.domain.models import StoredMatch
 from gwent_service.infrastructure.sqlite.payloads import (
+    MATCH_COLUMNS,
     deserialize_stored_match,
     row_field,
     serialize_stored_match,
+)
+
+_NAMED_COLUMNS = ", ".join(MATCH_COLUMNS)
+_PLACEHOLDERS = ", ".join(f":{column}" for column in MATCH_COLUMNS)
+_UPDATED_COLUMNS = ",\n                    ".join(
+    f"{column} = :{column}" for column in MATCH_COLUMNS if column != "match_id"
 )
 
 
@@ -31,18 +38,7 @@ class SQLiteMatchRepository:
         with closing(self._connect()) as connection, connection:
             try:
                 _ = connection.execute(
-                    """
-                    INSERT INTO matches (
-                        match_id,
-                        state_payload,
-                        event_log_payloads,
-                        player_slots,
-                        staged_mulligans,
-                        version,
-                        created_at,
-                        updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
+                    f"INSERT INTO matches ({_NAMED_COLUMNS}) VALUES ({_PLACEHOLDERS})",
                     payload,
                 )
             except sqlite3.IntegrityError as exc:
@@ -53,19 +49,7 @@ class SQLiteMatchRepository:
             row = cast(
                 sqlite3.Row | None,
                 connection.execute(
-                    """
-                    SELECT
-                        match_id,
-                        state_payload,
-                        event_log_payloads,
-                        player_slots,
-                        staged_mulligans,
-                        version,
-                        created_at,
-                        updated_at
-                    FROM matches
-                    WHERE match_id = ?
-                    """,
+                    f"SELECT {_NAMED_COLUMNS} FROM matches WHERE match_id = ?",
                     (match_id,),
                 ).fetchone(),
             )
@@ -77,29 +61,13 @@ class SQLiteMatchRepository:
         payload = serialize_stored_match(stored_match)
         with closing(self._connect()) as connection, connection:
             cursor = connection.execute(
-                """
+                f"""
                 UPDATE matches
                 SET
-                    state_payload = ?,
-                    event_log_payloads = ?,
-                    player_slots = ?,
-                    staged_mulligans = ?,
-                    version = ?,
-                    created_at = ?,
-                    updated_at = ?
-                WHERE match_id = ? AND version = ?
+                    {_UPDATED_COLUMNS}
+                WHERE match_id = :match_id AND version = :expected_version
                 """,
-                (
-                    payload[1],
-                    payload[2],
-                    payload[3],
-                    payload[4],
-                    payload[5],
-                    payload[6],
-                    payload[7],
-                    payload[0],
-                    expected_version,
-                ),
+                {**payload, "expected_version": expected_version},
             )
             if cursor.rowcount == 0:
                 self._raise_update_failure(connection, stored_match.match_id, expected_version)

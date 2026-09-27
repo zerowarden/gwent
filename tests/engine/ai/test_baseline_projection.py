@@ -9,20 +9,25 @@ from gwent_engine.ai.baseline.projection import (
     project_play_action,
     projected_future_card_value,
 )
+from gwent_engine.ai.baseline.projection.board import current_public_board_projection
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.cards.registry import CardRegistry
 from gwent_engine.core import Row
 from gwent_engine.core.actions import PlayCardAction, UseLeaderAbilityAction
 from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
 from gwent_engine.core.state import GameState
+from gwent_engine.rules.scoring import calculate_round_scores
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
+    MONSTERS_DOUBLE_SPY_LEADER_ID,
     NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
     PLAYER_ONE_ID,
+    PLAYER_TWO_ID,
     SCOIATAEL_RANGED_HORN_LEADER_ID,
+    SKELLIGE_KING_BRAN_LEADER_ID,
 )
 from .support import (
     make_clear_weather_leader_state,
@@ -794,3 +799,54 @@ def _play_action_for(
         for action in legal_actions
         if isinstance(action, PlayCardAction) and action.card_instance_id == card_instance_id
     )
+
+
+def test_board_projection_matches_engine_scoring_with_leader_passives() -> None:
+    state = (
+        scenario("projection_leader_passives")
+        .player(
+            "p1",
+            faction="skellige",
+            leader_id=SKELLIGE_KING_BRAN_LEADER_ID,
+            board=rows(close=[card("p1_close_archer", "scoiatael_dol_blathanna_archer")]),
+        )
+        .player(
+            "p2",
+            faction="monsters",
+            leader_id=MONSTERS_DOUBLE_SPY_LEADER_ID,
+            board=rows(ranged=[card("p2_spy", "nilfgaard_vattier_de_rideaux")]),
+        )
+        .weather(rows(close=[card("weather_frost", "neutral_biting_frost")]))
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+
+    projection = current_public_board_projection(
+        observation,
+        card_registry=CARD_REGISTRY,
+    )
+    engine_scores = {
+        score.player_id: score.total
+        for score in calculate_round_scores(
+            state,
+            CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        )
+    }
+
+    assert projection.viewer_score == engine_scores[PLAYER_ONE_ID]
+    assert projection.opponent_score == engine_scores[PLAYER_TWO_ID]
+    viewer_leader = next(
+        player.leader
+        for player in observation.public_state.players
+        if player.player_id == PLAYER_ONE_ID
+    )
+    assert viewer_leader.halves_weather_penalty
+
+    opponent_observation = build_player_observation(state, PLAYER_TWO_ID, LEADER_REGISTRY)
+    opponent_leader = next(
+        player.leader
+        for player in opponent_observation.public_state.players
+        if player.player_id == PLAYER_TWO_ID
+    )
+    assert opponent_leader.doubles_spy_strength

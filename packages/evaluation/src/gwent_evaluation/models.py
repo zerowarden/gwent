@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from math import isfinite
-from pathlib import Path
+from typing import cast
 
 from gwent_engine.ai.arena import BotFamily as BotFamily
 from gwent_engine.ai.arena import bot_family
@@ -16,14 +16,16 @@ from gwent_engine.ai.arena.models import (
     TerminationReason as TerminationReason,
 )
 from gwent_engine.ai.baseline import get_base_profile_definition
+from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION, PlayerObservation
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, GameId, PlayerId
 from gwent_engine.core.state import GameState
 
 from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance
 
-SUPPORTED_SCHEMA_VERSION = 1
-RECORD_SCHEMA_VERSION = 2
+AGENT_SPEC_VERSION = 2
+SUITE_SPEC_VERSION = 1
+RECORD_SCHEMA_VERSION = 3
 
 
 class SpecError(ValueError):
@@ -52,11 +54,30 @@ class AgentSpec:
     agent_id: str
     family: BotFamily
     profile: str | None = None
+    heuristic_configuration: HeuristicConfiguration | None = None
 
     def __post_init__(self) -> None:
-        if self.schema_version != SUPPORTED_SCHEMA_VERSION or not self.agent_id.strip():
+        if (
+            type(self.schema_version) is not int
+            or self.schema_version != AGENT_SPEC_VERSION
+            or not isinstance(cast(object, self.agent_id), str)
+            or not self.agent_id.strip()
+        ):
             raise SpecError("Agent requires a supported schema_version and nonempty agent_id.")
+        if type(self.family) is not BotFamily:
+            raise SpecError("Agent family must be a BotFamily.")
+        if self.heuristic_configuration is not None:
+            if self.family is not BotFamily.HEURISTIC:
+                raise SpecError("Only heuristic agents support an explicit configuration.")
+            if self.profile is not None:
+                raise SpecError(
+                    "A named profile and explicit configuration are mutually exclusive."
+                )
+            if not isinstance(cast(object, self.heuristic_configuration), HeuristicConfiguration):
+                raise SpecError("Expected a typed HeuristicConfiguration.")
         if self.profile is not None:
+            if not isinstance(cast(object, self.profile), str):
+                raise SpecError("profile must be a string.")
             if not bot_family(self.family).accepts_profile:
                 raise SpecError(
                     f"family {self.family.value!r} does not support a profile override."
@@ -82,8 +103,17 @@ class SuiteSpec:
     observation_contract_version: int
 
     def __post_init__(self) -> None:
-        if self.schema_version != SUPPORTED_SCHEMA_VERSION:
-            raise SpecError(f"schema_version must be {SUPPORTED_SCHEMA_VERSION}.")
+        if type(self.schema_version) is not int or self.schema_version != SUITE_SPEC_VERSION:
+            raise SpecError(f"schema_version must be {SUITE_SPEC_VERSION}.")
+        if (
+            type(self.candidate) is not AgentSpec
+            or type(self.opponents) is not tuple
+            or any(type(agent) is not AgentSpec for agent in self.opponents)
+            or type(self.deck_pairs) is not tuple
+            or any(type(pair) is not tuple for pair in self.deck_pairs)
+            or type(self.seeds) is not tuple
+        ):
+            raise SpecError("Suites require immutable typed participants, deck pairs, and seeds.")
         if not self.suite_id.strip():
             raise SpecError("suite_id must not be empty.")
         if self.observation_contract_version != OBSERVATION_CONTRACT_VERSION:
@@ -134,7 +164,7 @@ class DecisionSample:
     """Player-safe decision evidence, safe to use as evaluation/training input.
 
     The observation is the exact `PlayerObservation` the agent received, so a
-    sample can never expose information outside the WS01 boundary.
+    sample can never expose information outside the player-observation boundary.
     """
 
     index: int
@@ -286,15 +316,6 @@ class RunManifest:
     assets: AssetIdentities
     repository: RepositoryProvenance
     runtime: RuntimeProvenance
-
-
-@dataclass(frozen=True, slots=True)
-class RunExecution:
-    run_id: str
-    root: Path
-    results: tuple[MatchResult, ...]
-    executed_case_ids: tuple[str, ...]
-    resumed_case_ids: tuple[str, ...]
 
 
 def candidate_score_for_outcome(

@@ -194,7 +194,6 @@ class MatchService:
                 card_instance_id=command.card_instance_id,
                 target_row=command.target_row,
                 target_card_instance_id=command.target_card_instance_id,
-                secondary_target_card_instance_id=command.secondary_target_card_instance_id,
             )
 
         return self._execute_action(command.match_id, command.service_player_id, build_action)
@@ -218,19 +217,10 @@ class MatchService:
         return self._execute_action(command.match_id, command.service_player_id, build_action)
 
     def use_leader(self, command: UseLeaderAbilityCommand) -> MatchView:
-        def build_action(snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
-            target_player = None
-            if command.target_player is not None:
-                target_player = self._require_player_slot(
-                    snapshot,
-                    command.target_player,
-                ).engine_player_id
+        def build_action(_snapshot: MatchSnapshot, viewer_slot: StoredPlayerSlot) -> GameAction:
             return self._adapter.build_use_leader_ability_action(
                 player_id=viewer_slot.engine_player_id,
-                target_row=command.target_row,
-                target_player=target_player,
                 target_card_instance_id=command.target_card_instance_id,
-                secondary_target_card_instance_id=command.secondary_target_card_instance_id,
                 selected_card_instance_ids=command.selected_card_instance_ids,
             )
 
@@ -242,7 +232,6 @@ class MatchService:
                 player_id=viewer_slot.engine_player_id,
                 choice_id=command.choice_id,
                 selected_card_instance_ids=command.selected_card_instance_ids,
-                selected_rows=command.selected_rows,
             )
 
         return self._execute_action(command.match_id, command.service_player_id, build_action)

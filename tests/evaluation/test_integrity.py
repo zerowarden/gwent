@@ -242,7 +242,7 @@ def test_checksums_do_not_replace_result_binding(tmp_path: Path, field: str, val
     payload[field] = value
     write_json_object(path, {**payload, "record_digest": canonical_digest(payload)})
     with pytest.raises(CorruptRecordError):
-        _ = store.read_result(run.results[0].case_id)
+        _ = store.load()
 
 
 def test_intact_foreign_trajectory_is_rejected_even_when_its_digest_is_recorded(

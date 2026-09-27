@@ -5,6 +5,7 @@ from functools import partial
 
 from gwent_shared.extract import (
     expect_mapping,
+    optional_bool_field,
     optional_constructor_field,
     require_bool_field,
     require_constructor_field,
@@ -39,6 +40,11 @@ _sequence = partial(require_sequence_field, context="observation", error_factory
 _text = partial(require_str_field, context="observation", error_factory=ValueError)
 _integer = partial(require_int_field, context="observation", error_factory=ValueError)
 _boolean = partial(require_bool_field, context="observation", error_factory=ValueError)
+_optional_bool = partial(
+    optional_bool_field,
+    context="observation",
+    error_factory=ValueError,
+)
 _construct = partial(require_constructor_field, context="observation", error_factory=ValueError)
 _optional = partial(optional_constructor_field, context="observation", error_factory=ValueError)
 
@@ -130,6 +136,8 @@ def _player(payload: object) -> PublicPlayerStateView:
             disabled=_boolean(leader, "disabled"),
             horn_row=_optional(leader, "horn_row", Row),
             available_horn_row=_optional(leader, "available_horn_row", Row),
+            halves_weather_penalty=_optional_bool(leader, "halves_weather_penalty") is True,
+            doubles_spy_strength=_optional_bool(leader, "doubles_spy_strength") is True,
         ),
         deck_count=_integer(data, "deck_count"),
         hand_count=_integer(data, "hand_count"),
@@ -146,7 +154,6 @@ def _visible_choice(payload: object) -> VisiblePendingChoiceView | None:
         return None
     data = _mapping(payload)
     targets = _sequence(data, "legal_target_card_instance_ids")
-    rows = _sequence(data, "legal_rows")
     if not all(isinstance(target, str) and target for target in targets):
         raise ValueError("Choice targets must be nonempty strings.")
     return VisiblePendingChoiceView(
@@ -157,7 +164,6 @@ def _visible_choice(payload: object) -> VisiblePendingChoiceView | None:
         source_card_instance_id=_optional(data, "source_card_instance_id", CardInstanceId),
         source_leader_id=_optional(data, "source_leader_id", LeaderId),
         legal_target_card_instance_ids=tuple(CardInstanceId(str(target)) for target in targets),
-        legal_rows=tuple(Row(str(row)) for row in rows),
         min_selections=_integer(data, "min_selections"),
         max_selections=_integer(data, "max_selections"),
         source_row=_optional(data, "source_row", Row),

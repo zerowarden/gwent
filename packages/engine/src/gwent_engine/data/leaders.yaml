@@ -5,7 +5,6 @@ leaders:
     source_set: base_game
     ability_kind: play_weather_from_deck
     ability_mode: active
-    uses_per_match: 1
     weather_kind: impenetrable_fog
     selection_mode: specific
     rule_text: "Pick an Impenetrable Fog card from your deck and play it instantly."
@@ -17,7 +16,6 @@ leaders:
     source_set: base_game
     ability_kind: clear_weather
     ability_mode: active
-    uses_per_match: 1
     rule_text: "Clear any weather effects (resulting from Biting Frost, Torrential Rain or Impenetrable Fog cards) in play."
     implementation_notes: "Resolve exactly like Clear Weather: remove all active weather cards/effects from the battlefield."
 
@@ -27,10 +25,7 @@ leaders:
     source_set: base_game
     ability_kind: horn_own_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: siege
-    target_side: self
-    persists_until: round_end
     blocked_if_row_already_affected_by_horn: true
     rule_text: "Doubles the strength of all your Siege units (unless a Commander's Horn is also present on that row)."
     implementation_notes: "Create a Horn effect on your own Siege row for the rest of the current round. If that row is already affected by any Horn source, the leader ability should not add a second Horn effect."
@@ -41,11 +36,8 @@ leaders:
     source_set: base_game
     ability_kind: scorch_opponent_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: siege
-    target_side: opponent
     minimum_opponent_row_total: 10
-    destroy_all_tied_strongest: true
     rule_text: "Destroy your enemy's strongest Siege unit(s) if the combined strength of all his or her Siege units is 10 or more."
     implementation_notes: "Check only the opponent Siege row. Use effective row strength, not just printed base strength. Destroy all tied strongest eligible non-hero units on that row."
 
@@ -55,11 +47,8 @@ leaders:
     source_set: hearts_of_stone
     ability_kind: scorch_opponent_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: ranged
-    target_side: opponent
     minimum_opponent_row_total: 10
-    destroy_all_tied_strongest: true
     rule_text: "Destroy your enemy's strongest Ranged Combat unit(s) if the combined strength of all his or her Ranged Combat units is 10 or more."
     implementation_notes: "Check only the opponent Ranged row. Use effective row strength, not just printed base strength. Destroy all tied strongest eligible non-hero units on that row."
 
@@ -69,7 +58,6 @@ leaders:
     source_set: base_game
     ability_kind: play_weather_from_deck
     ability_mode: active
-    uses_per_match: 1
     weather_kind: any_weather
     selection_mode: choose
     rule_text: "Pick any weather card from your deck and play it instantly."
@@ -81,10 +69,7 @@ leaders:
     source_set: base_game
     ability_kind: horn_own_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: close
-    target_side: self
-    persists_until: round_end
     blocked_if_row_already_affected_by_horn: true
     rule_text: "Double the strength of all your Close Combat units (unless a Commander's Horn is also present on that row)."
     implementation_notes: "Create a Horn effect on your own Close row for the rest of the current round. If that row is already affected by any Horn source, the leader ability should not add a second Horn effect."
@@ -95,10 +80,8 @@ leaders:
     source_set: base_game
     ability_kind: discard_and_choose_from_deck
     ability_mode: active
-    uses_per_match: 1
     hand_discard_count: 2
     deck_pick_count: 1
-    deck_pick_mode: choose
     rule_text: "Discard 2 card and draw 1 card of your choice from your deck."
     implementation_notes: "Discard exactly 2 cards from your hand to your discard pile, then choose exactly 1 card from your own deck and move it to your hand. This is not a random draw."
 
@@ -108,11 +91,7 @@ leaders:
     source_set: base_game
     ability_kind: return_card_from_own_discard_to_hand
     ability_mode: active
-    uses_per_match: 1
     selection_mode: choose
-    source_zone: own_discard
-    destination_zone: hand
-    allowed_card_scope: any_card
     rule_text: "Restore a card from your discard pile to your hand."
     implementation_notes: "Choose exactly 1 card from your own discard pile and move it to your hand. This is a return-to-hand effect, not a battlefield resurrection."
 
@@ -122,8 +101,6 @@ leaders:
     source_set: hearts_of_stone
     ability_kind: double_spy_strength_global
     ability_mode: passive
-    target_scope: both_players
-    persists_until: match_end
     rule_text: "Doubles the strength of all spy cards (affects both players)."
     implementation_notes: "Model as a continuous full-match modifier. Any spy card on the battlefield has its effective strength doubled, regardless of owner."
 
@@ -133,7 +110,6 @@ leaders:
     source_set: base_game
     ability_kind: play_weather_from_deck
     ability_mode: active
-    uses_per_match: 1
     weather_kind: torrential_rain
     selection_mode: specific
     rule_text: "Pick a Torrential Rain card from your deck and play it instantly."
@@ -145,10 +121,7 @@ leaders:
     source_set: base_game
     ability_kind: reveal_random_opponent_hand_cards
     ability_mode: active
-    uses_per_match: 1
     reveal_count: 3
-    selection_mode: random
-    visibility: acting_player_only
     rule_text: "Look at 3 random cards from your opponent's hand."
     implementation_notes: "Select 3 random cards from the opponent hand, or all of them if fewer than 3 remain. This is an information effect only and does not move cards."
 
@@ -158,8 +131,6 @@ leaders:
     source_set: base_game
     ability_kind: disable_opponent_leader
     ability_mode: passive
-    target_side: opponent
-    persists_until: match_end
     rule_text: "Cancel your opponent's Leader Ability."
     implementation_notes: "Recommended engine normalization: treat the opposing leader as disabled for the entire match. Active leader use is blocked and passive leader effects do not apply while disabled."
 
@@ -169,11 +140,7 @@ leaders:
     source_set: base_game
     ability_kind: take_card_from_opponent_discard_to_hand
     ability_mode: active
-    uses_per_match: 1
     selection_mode: choose
-    source_zone: opponent_discard
-    destination_zone: hand
-    allowed_card_scope: any_card
     rule_text: "Draw a card from your opponent's discard pile."
     implementation_notes: "Recommended engine normalization: choose exactly 1 card from your opponent discard pile and move it to your hand. Do not play it immediately."
 
@@ -183,9 +150,6 @@ leaders:
     source_set: hearts_of_stone
     ability_kind: randomize_restore_to_battlefield_selection
     ability_mode: passive
-    target_scope: both_players
-    persists_until: match_end
-    applies_only_to: restore_unit_to_battlefield_effects
     rule_text: "Abilities that restore a unit to the battlefield restore a randomly-chosen unit. Affects both players."
     implementation_notes: "This modifies battlefield-resurrection effects only, such as Medic-like effects. When an effect would let a player choose an eligible unit to restore directly to the battlefield, the restored unit is selected randomly instead. It should not affect effects that return cards to hand or shuffle cards into decks."
 
@@ -195,7 +159,6 @@ leaders:
     source_set: base_game
     ability_kind: play_weather_from_deck
     ability_mode: active
-    uses_per_match: 1
     weather_kind: biting_frost
     selection_mode: specific
     rule_text: "Pick a Biting Frost card from your deck and play it instantly."
@@ -207,7 +170,6 @@ leaders:
     source_set: base_game
     ability_kind: draw_extra_opening_card
     ability_mode: passive
-    trigger_timing: battle_start_before_mulligan
     cards_to_draw: 1
     rule_text: "Draw an extra card at the beginning of the battle."
     implementation_notes: "Recommended engine normalization: apply this during setup after the normal opening draw and before mulligans."
@@ -218,10 +180,7 @@ leaders:
     source_set: base_game
     ability_kind: horn_own_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: ranged
-    target_side: self
-    persists_until: round_end
     blocked_if_row_already_affected_by_horn: true
     rule_text: "Doubles the strength of all your Ranged Combat units (unless a Commander's Horn is also present on that row)."
     implementation_notes: "Create a Horn effect on your own Ranged row for the rest of the current round. If that row is already affected by any Horn source, the leader ability should not add a second Horn effect."
@@ -232,11 +191,8 @@ leaders:
     source_set: base_game
     ability_kind: scorch_opponent_row
     ability_mode: active
-    uses_per_match: 1
     affected_row: close
-    target_side: opponent
     minimum_opponent_row_total: 10
-    destroy_all_tied_strongest: true
     rule_text: "Destroy your enemy's strongest Close Combat unit(s) if the combined strength of all his or her Close Combat units is 10 or more."
     implementation_notes: "Check only the opponent Close row. Use effective row strength, not just printed base strength. Destroy all tied strongest eligible non-hero units on that row."
 
@@ -246,11 +202,6 @@ leaders:
     source_set: hearts_of_stone
     ability_kind: optimize_agile_rows
     ability_mode: active
-    uses_per_match: 1
-    target_scope: all_battlefield_agile_units
-    optimization_goal: maximize_effective_strength
-    do_not_move_if_already_optimal: true
-    tie_policy: keep_current_row_on_tie
     rule_text: "Move agile units to whichever valid row maximizes their strength (don't move units already in optimal row)."
     implementation_notes: "The public card text does not limit this to one side, so the safest normalization is to evaluate all Agile units currently on the battlefield and move each one, on its current controller's side, to the valid row that maximizes its effective strength under current effects. If both valid rows are equally good, leave the unit where it is."
 
@@ -260,8 +211,6 @@ leaders:
     source_set: blood_and_wine
     ability_kind: shuffle_all_discards_into_decks
     ability_mode: active
-    uses_per_match: 1
-    target_scope: both_players
     rule_text: "Shuffle all cards from each player's graveyard back into their decks."
     implementation_notes: "Move every card from each player's discard pile back into that same player's deck, then shuffle both decks."
 
@@ -271,7 +220,5 @@ leaders:
     source_set: blood_and_wine
     ability_kind: halve_weather_penalty
     ability_mode: passive
-    target_side: self
-    persists_until: match_end
     rule_text: "Units only lose half their Strength in bad weather conditions."
     implementation_notes: "Continuous own-side weather mitigation. The public card text specifies that affected units lose only half their Strength under bad weather rather than being reduced to 1; keep the rounding policy explicit and consistent in engine code."

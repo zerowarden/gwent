@@ -71,7 +71,6 @@ def build_decision_plan(
     candidate_pool = build_candidate_pool(
         observation,
         candidate_actions,
-        assessment,
         config=config,
         card_registry=card_registry,
         leader_registry=leader_registry,
@@ -95,7 +94,7 @@ def build_decision_plan(
         assessment=assessment,
         context=context,
         card_registry=card_registry,
-        config=config,
+        pass_config=profile.pass_config,
         viewer_hand_definitions=viewer_hand_definitions,
     )
     chosen_action = (

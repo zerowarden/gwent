@@ -9,10 +9,12 @@ description = "Reproducible evaluation infrastructure for the Witcher 3 Gwent en
 requires-python = ">=3.12"
 dependencies = [
     "gwent-engine",
+    "gwent-shared",
 ]
 
 [tool.uv.sources]
 gwent-engine = { workspace = true }
+gwent-shared = { workspace = true }
 
 [tool.setuptools.package-dir]
 "" = "src"

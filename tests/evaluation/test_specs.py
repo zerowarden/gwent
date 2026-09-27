@@ -12,20 +12,25 @@ from gwent_evaluation import (
     load_agent_catalog,
     load_suite_catalog,
 )
-from gwent_evaluation.models import SUPPORTED_SCHEMA_VERSION, BotFamily, SchedulingPolicy
+from gwent_evaluation.models import (
+    AGENT_SPEC_VERSION,
+    SUITE_SPEC_VERSION,
+    BotFamily,
+    SchedulingPolicy,
+)
 from gwent_evaluation.specs import AgentResolver, SpecError, parse_agent_spec, parse_suite_spec
 
 
 def _stub_resolver(reference: str) -> AgentSpec:
     return parse_agent_spec(
-        {"schema_version": SUPPORTED_SCHEMA_VERSION, "agent_id": reference, "family": "random"},
+        {"schema_version": AGENT_SPEC_VERSION, "agent_id": reference, "family": "random"},
         context=reference,
     )
 
 
 def _agent_payload(agent_id: str = "random", **overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "schema_version": SUPPORTED_SCHEMA_VERSION,
+        "schema_version": AGENT_SPEC_VERSION,
         "agent_id": agent_id,
         "family": "random",
     }
@@ -35,7 +40,7 @@ def _agent_payload(agent_id: str = "random", **overrides: object) -> dict[str, o
 
 def _suite_payload(**overrides: object) -> dict[str, object]:
     payload: dict[str, object] = {
-        "schema_version": SUPPORTED_SCHEMA_VERSION,
+        "schema_version": SUITE_SPEC_VERSION,
         "suite_id": "smoke-v1",
         "purpose": "smoke",
         "candidate": "heuristic-neutral",
@@ -61,7 +66,7 @@ def _write_json(path: Path, payload: object) -> Path:
 def test_parse_suite_resolves_catalog_agent_ids() -> None:
     suite = _parse_suite(_suite_payload())
 
-    assert suite.schema_version == SUPPORTED_SCHEMA_VERSION
+    assert suite.schema_version == SUITE_SPEC_VERSION
     assert suite.suite_id == "smoke-v1"
     assert suite.purpose is SuitePurpose.SMOKE
     assert suite.candidate.agent_id == "heuristic-neutral"
@@ -79,7 +84,7 @@ def test_agent_catalog_loads_entries_and_rejects_duplicate_ids(tmp_path: Path) -
     agents_path = _write_json(
         tmp_path / "agents.json",
         {
-            "schema_version": 1,
+            "schema_version": 2,
             "agents": [
                 _agent_payload("greedy", family="greedy"),
                 _agent_payload("heuristic-neutral", family="heuristic", profile="neutral"),
@@ -95,7 +100,7 @@ def test_agent_catalog_loads_entries_and_rejects_duplicate_ids(tmp_path: Path) -
 
     duplicate_path = _write_json(
         tmp_path / "duplicates.json",
-        {"schema_version": 1, "agents": [_agent_payload("greedy"), _agent_payload("greedy")]},
+        {"schema_version": 2, "agents": [_agent_payload("greedy"), _agent_payload("greedy")]},
     )
     with pytest.raises(SpecError, match="duplicate agent id"):
         _ = load_agent_catalog(duplicate_path)
@@ -104,7 +109,7 @@ def test_agent_catalog_loads_entries_and_rejects_duplicate_ids(tmp_path: Path) -
 def test_suite_catalog_resolves_agent_ids_and_rejects_unknown_ids(tmp_path: Path) -> None:
     agents_path = _write_json(
         tmp_path / "agents.json",
-        {"schema_version": 1, "agents": [_agent_payload()]},
+        {"schema_version": 2, "agents": [_agent_payload()]},
     )
     agents = load_agent_catalog(agents_path)
     suites_path = _write_json(
@@ -132,7 +137,7 @@ def test_rejects_unrecognized_profile_ids(profile_id: str) -> None:
     with pytest.raises(SpecError, match="not a recognized profile"):
         _ = parse_agent_spec(
             {
-                "schema_version": SUPPORTED_SCHEMA_VERSION,
+                "schema_version": AGENT_SPEC_VERSION,
                 "agent_id": "heuristic-unknown",
                 "family": "heuristic",
                 "profile": profile_id,
@@ -179,7 +184,7 @@ def test_rejects_unknown_agent_field() -> None:
     with pytest.raises(SpecError, match="unknown field"):
         _ = parse_agent_spec(
             {
-                "schema_version": SUPPORTED_SCHEMA_VERSION,
+                "schema_version": AGENT_SPEC_VERSION,
                 "agent_id": "random",
                 "family": "random",
                 "config": {},
@@ -192,7 +197,7 @@ def test_rejects_profile_override_for_profileless_family() -> None:
     with pytest.raises(SpecError, match="does not support a profile override"):
         _ = parse_agent_spec(
             {
-                "schema_version": SUPPORTED_SCHEMA_VERSION,
+                "schema_version": AGENT_SPEC_VERSION,
                 "agent_id": "random",
                 "family": "random",
                 "profile": "neutral",
@@ -212,7 +217,7 @@ def test_rejects_unsupported_agent_schema_version() -> None:
 def test_rejects_non_finite_json_constant(tmp_path: Path) -> None:
     path = tmp_path / "agents.json"
     _ = path.write_text(
-        '{"schema_version": 1, "agents": [{"schema_version": 1, "agent_id": "a", '
+        '{"schema_version": 2, "agents": [{"schema_version": 1, "agent_id": "a", '
         + '"family": "random"}], "extra": NaN}',
         encoding="utf-8",
     )
@@ -224,7 +229,7 @@ def test_rejects_non_finite_json_constant(tmp_path: Path) -> None:
 def test_rejects_duplicate_json_keys(tmp_path: Path) -> None:
     path = tmp_path / "agents.json"
     _ = path.write_text(
-        '{"schema_version": 1, "agents": [], "agents": []}',
+        '{"schema_version": 2, "agents": [], "agents": []}',
         encoding="utf-8",
     )
 

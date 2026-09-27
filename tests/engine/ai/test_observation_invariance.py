@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
+import pytest
 from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.actions import enumerate_legal_actions
+from gwent_engine.ai.arena import create_seeded_bot
 from gwent_engine.ai.hashing import observation_fingerprint
+from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.core.state import GameState
 
@@ -125,3 +130,57 @@ def test_hidden_permutations_do_not_change_offered_legal_action_ids() -> None:
     assert expected
     assert legal_action_ids(hidden_mutated) == expected
     assert legal_action_ids(viewer_reordered) == expected
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "random",
+        "greedy",
+        "heuristic",
+        "heuristic:conservative",
+        "heuristic:aggressive",
+        "search",
+        "explicit",
+    ],
+)
+def test_hidden_permutations_do_not_change_bot_decisions(spec: str) -> None:
+    original = _build_state()
+    mutated = _build_state(
+        opponent_hand=(card("p2_hidden_z", "skellige_kambi"),),
+        opponent_deck=(card("p2_deck_z", "neutral_mysterious_elf"),),
+        viewer_deck=tuple(reversed(_DEFAULT_VIEWER_DECK)),
+    )
+    configuration = None
+    if spec == "explicit":
+        spec = "heuristic"
+        default = HeuristicConfiguration()
+        configuration = replace(
+            default,
+            baseline=replace(
+                default.baseline,
+                weights=replace(default.baseline.weights, immediate_points=3.0, card_advantage=7.0),
+            ),
+        )
+
+    def choose(state: GameState) -> str:
+        # Fresh instances hold policy randomness fixed for each paired decision.
+        bot = create_seeded_bot(
+            spec, bot_id="invariance", seed=17, heuristic_configuration=configuration
+        )
+        actions = enumerate_legal_actions(
+            state,
+            player_id=PLAYER_ONE_ID,
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        )
+        chosen = bot.choose_action(
+            build_player_observation(state, PLAYER_ONE_ID),
+            actions,
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        )
+        assert chosen in actions
+        return action_to_id(chosen)
+
+    assert choose(original) == choose(mutated)

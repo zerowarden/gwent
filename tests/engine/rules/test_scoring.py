@@ -125,3 +125,40 @@ def test_row_score_context_is_cached_per_state_and_registry_pair() -> None:
     second = _row_score_context(state, card_registry, None)
 
     assert second is first
+
+
+def test_scoring_ignores_units_carrying_the_special_horn_ability() -> None:
+    card_registry = CARD_REGISTRY
+    war_longship_card_id = CardInstanceId("p1_siege_war_longship")
+    state = (
+        scenario("scoring_special_horn_on_a_unit")
+        .player(
+            PLAYER_ONE_ID,
+            board=rows(
+                siege=[
+                    card(war_longship_card_id, "skellige_war_longship"),
+                    card("p1_siege_draig_bon_dhu", "skellige_clan_draig_bon_dhu"),
+                ]
+            ),
+        )
+        .build()
+    )
+
+    assert calculate_effective_strength(state, card_registry, war_longship_card_id) == 6
+
+    with_dandelion = (
+        scenario("scoring_unit_horn_on_a_unit")
+        .player(
+            PLAYER_ONE_ID,
+            board=rows(
+                siege=[
+                    card(war_longship_card_id, "skellige_war_longship"),
+                    card("p1_siege_draig_bon_dhu", "skellige_clan_draig_bon_dhu"),
+                    card("p1_siege_dandelion", "neutral_dandelion"),
+                ]
+            ),
+        )
+        .build()
+    )
+
+    assert calculate_effective_strength(with_dandelion, card_registry, war_longship_card_id) == 12

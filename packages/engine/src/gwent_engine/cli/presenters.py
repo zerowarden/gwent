@@ -115,9 +115,6 @@ def _(
     if action.target_card_instance_id is not None:
         target_card = context.card_ref(action.target_card_instance_id)
         parts.append(f"targeting {target_card}")
-    if action.secondary_target_card_instance_id is not None:
-        secondary_target_card = context.card_ref(action.secondary_target_card_instance_id)
-        parts.append(f"then {secondary_target_card}")
     return " ".join(parts)
 
 
@@ -145,8 +142,7 @@ def _(
     selected_targets = ", ".join(
         context.card_ref(card_id) for card_id in action.selected_card_instance_ids
     )
-    selected_row_text = ", ".join(row.value for row in action.selected_rows)
-    selection_text = selected_targets or selected_row_text or "no explicit selections"
+    selection_text = selected_targets or "no explicit selections"
     return f"{action.player_id} resolves {action.choice_id} -> {selection_text}"
 
 
@@ -156,16 +152,9 @@ def _(
     context: _SummaryCardContext,
 ) -> str:
     parts = [f"{action.player_id} uses their leader ability"]
-    if action.target_row is not None:
-        parts.append(f"on {action.target_row.value}")
-    if action.target_player is not None:
-        parts.append(f"against {action.target_player}")
     if action.target_card_instance_id is not None:
         target_card = context.card_ref(action.target_card_instance_id)
         parts.append(f"targeting {target_card}")
-    if action.secondary_target_card_instance_id is not None:
-        secondary_target_card = context.card_ref(action.secondary_target_card_instance_id)
-        parts.append(f"then {secondary_target_card}")
     if action.selected_card_instance_ids:
         selected = ", ".join(
             context.card_ref(card_id) for card_id in action.selected_card_instance_ids

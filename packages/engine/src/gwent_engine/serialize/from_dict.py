@@ -736,16 +736,6 @@ def _parse_pending_choice(raw_value: object, *, context: str) -> PendingChoice |
                 entry.get("legal_target_card_instance_ids"),
                 context=f"{context}.legal_target_card_instance_ids",
             ),
-            legal_rows=tuple(
-                _parse_enum(
-                    Row,
-                    _require_str(row, context=context),
-                    context=f"{context}.legal_rows",
-                )
-                for row in _require_sequence(
-                    entry.get("legal_rows"), context=f"{context}.legal_rows"
-                )
-            ),
             min_selections=_require_int(entry, "min_selections", context=context),
             max_selections=_require_int(entry, "max_selections", context=context),
             source_row=_parse_optional_enum(

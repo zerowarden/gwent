@@ -6,11 +6,13 @@ from collections.abc import Mapping
 from typing import cast
 
 from gwent_engine.ai.arena.models import (
+    MatchDecisionKind,
     MatchFailure,
     MatchFailureStage,
     MatchStepKind,
     TerminationReason,
 )
+from gwent_engine.ai.observation_records import player_observation_from_dict
 from gwent_engine.ai.observations import player_observation_to_dict
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.errors import GwentEngineError
@@ -18,6 +20,7 @@ from gwent_engine.core.ids import GameId, PlayerId, player_id
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import game_state_from_dict, game_state_to_dict
 from gwent_shared.extract import (
+    expect_finite_float,
     expect_int,
     expect_mapping,
     expect_optional_str,
@@ -39,10 +42,11 @@ from gwent_shared.json_payloads import parse_json_document, to_canonical
 
 from gwent_evaluation.models import (
     RECORD_SCHEMA_VERSION,
-    SUPPORTED_SCHEMA_VERSION,
+    SUITE_SPEC_VERSION,
     AgentIdentity,
     AgentSpec,
     AssetIdentities,
+    BotFamily,
     DecisionSample,
     EvidenceRefs,
     MatchResult,
@@ -87,6 +91,42 @@ def decision_sample_to_dict(sample: DecisionSample) -> dict[str, object]:
         "duration_seconds": sample.duration_seconds,
         "failure": None if sample.failure is None else record_to_dict(sample.failure),
     }
+
+
+def decision_sample_from_dict(payload: object) -> DecisionSample:
+    context = "decision sample"
+    mapping = expect_mapping(payload, context=context, error_factory=CorruptRecordError)
+    try:
+        observation = player_observation_from_dict(
+            require_field(mapping, "observation", context=context, error_factory=CorruptRecordError)
+        )
+        sample = DecisionSample(
+            index=require_int_field(
+                mapping, "index", context=context, error_factory=CorruptRecordError
+            ),
+            kind=require_enum_field(
+                mapping,
+                "kind",
+                MatchDecisionKind,
+                context=context,
+                error_factory=CorruptRecordError,
+            ),
+            actor=_require_player_id(mapping, "actor", context=context),
+            observation=observation,
+            legal_option_ids=require_str_sequence_field(
+                mapping, "legal_option_ids", context=context, error_factory=CorruptRecordError
+            ),
+            chosen_option_id=optional_str_field(
+                mapping, "chosen_option_id", context=context, error_factory=CorruptRecordError
+            ),
+            duration_seconds=_require_float(mapping, "duration_seconds", context=context),
+            failure=_failure_from_dict(mapping, context=context),
+        )
+    except (ValueError, GwentEngineError) as error:
+        raise CorruptRecordError(f"Invalid decision sample: {error}") from error
+    if sample.index < 1 or sample.actor != observation.viewer_player_id:
+        raise CorruptRecordError("Decision sample index/viewer mismatch.")
+    return sample
 
 
 def trajectory_step_to_dict(step: TrajectoryStep) -> dict[str, object]:
@@ -262,7 +302,7 @@ def suite_spec_from_dict(payload: object, *, context: str = "suite spec") -> Sui
     schema_version = _require_record_schema_version(
         mapping,
         context=context,
-        expected=SUPPORTED_SCHEMA_VERSION,
+        expected=SUITE_SPEC_VERSION,
     )
     return SuiteSpec(
         schema_version=schema_version,
@@ -454,7 +494,10 @@ def trajectory_step_from_dict(
 
 def _agent_spec_from_dict(payload: object, *, context: str) -> AgentSpec:
     try:
-        return parse_agent_spec(payload, context=context)
+        spec = parse_agent_spec(payload, context=context)
+        if spec.family is BotFamily.HEURISTIC and spec.heuristic_configuration is None:
+            raise SpecError("Persisted heuristic agents require a complete configuration snapshot.")
+        return spec
     except SpecError as error:
         raise CorruptRecordError(str(error)) from error
 
@@ -536,9 +579,12 @@ def _optional_float(
 
 
 def _as_float(value: object, *, context: str, label: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        raise StorageError(f"{context} field {label!r} must be numeric.")
-    return float(value)
+    return expect_finite_float(
+        value,
+        context=context,
+        label=label,
+        error_factory=StorageError,
+    )
 
 
 def _require_text(

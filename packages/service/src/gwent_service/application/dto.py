@@ -62,7 +62,6 @@ class PendingChoiceView(FrozenModel):
     source_card: CardView | None = None
     source_leader_id: str | None = None
     legal_target_cards: tuple[CardView, ...] = Field(default_factory=tuple)
-    legal_rows: tuple[str, ...] = Field(default_factory=tuple)
     min_selections: int
     max_selections: int
     source_row: str | None = None
@@ -130,7 +129,6 @@ class PlayCardRequest(FrozenModel):
     card_instance_id: NonBlankStr
     target_row: RowName | None = None
     target_card_instance_id: NonBlankStr | None = None
-    secondary_target_card_instance_id: NonBlankStr | None = None
 
 
 class PassTurnRequest(FrozenModel):
@@ -143,10 +141,7 @@ class LeaveMatchRequest(FrozenModel):
 
 class UseLeaderAbilityRequest(FrozenModel):
     service_player_id: NonBlankStr
-    target_row: RowName | None = None
-    target_player: NonBlankStr | None = None
     target_card_instance_id: NonBlankStr | None = None
-    secondary_target_card_instance_id: NonBlankStr | None = None
     selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
 
 
@@ -154,4 +149,3 @@ class ResolveChoiceRequest(FrozenModel):
     service_player_id: NonBlankStr
     choice_id: NonBlankStr
     selected_card_instance_ids: tuple[NonBlankStr, ...] = Field(default_factory=tuple)
-    selected_rows: tuple[RowName, ...] = Field(default_factory=tuple)

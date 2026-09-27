@@ -20,7 +20,6 @@ class LeaderDefinition:
     faction: FactionId
     ability_kind: LeaderAbilityKind
     ability_mode: LeaderAbilityMode
-    uses_per_match: int = 1
     selection_mode: LeaderSelectionMode | None = None
     weather_ability_kind: AbilityKind | None = None
     affected_row: Row | None = None
@@ -35,7 +34,6 @@ class LeaderDefinition:
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise ValueError("LeaderDefinition name cannot be blank.")
-        _require_non_negative(self.uses_per_match, "uses_per_match")
         _require_non_negative(self.cards_to_draw, "cards_to_draw")
         _require_non_negative(self.hand_discard_count, "hand_discard_count")
         _require_non_negative(self.deck_pick_count, "deck_pick_count")

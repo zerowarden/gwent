@@ -7,6 +7,7 @@ from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.assessment import DecisionAssessment, PlayerAssessment, RowSummary
 from gwent_engine.ai.baseline.context import DecisionContext, PressureMode, TacticalMode, TempoState
 from gwent_engine.ai.baseline.features import weather_row_delta
+from gwent_engine.ai.baseline.pass_logic import required_pass_lead
 from gwent_engine.ai.baseline.pending_choice import (
     UnsupportedPendingChoiceError,
     explain_pending_choice_score_components,
@@ -1046,15 +1047,12 @@ def _combined_speculative_sensitivity(profile: HeuristicProfile) -> float:
 
 
 def _is_tactical_special(definition: CardDefinition) -> bool:
-    return special_ability_kind(definition) in {
+    ability_kind = special_ability_kind(definition)
+    return is_weather_ability(ability_kind) or ability_kind in {
         AbilityKind.MARDROEME,
         AbilityKind.COMMANDERS_HORN,
         AbilityKind.SCORCH,
         AbilityKind.CLEAR_WEATHER,
-        AbilityKind.BITING_FROST,
-        AbilityKind.IMPENETRABLE_FOG,
-        AbilityKind.TORRENTIAL_RAIN,
-        AbilityKind.SKELLIGE_STORM,
     }
 
 
@@ -1143,14 +1141,7 @@ def _required_pass_lead(
     context: DecisionContext,
     profile: HeuristicProfile,
 ) -> int:
-    tempo_per_card = _estimated_opponent_tempo_per_card(
-        context=context,
-        profile=profile,
-    )
-    return max(
-        profile.pass_lead_margin,
-        assessment.opponent.hand_count * tempo_per_card,
-    )
+    return required_pass_lead(assessment, context=context, config=profile.pass_config)
 
 
 def _can_safely_preserve_resources_on_pass(

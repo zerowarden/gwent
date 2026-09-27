@@ -140,12 +140,15 @@ class BoardProjectionContext(PublicPlayerContext):
         self,
         battlefield_side: PlayerId,
     ) -> tuple[ProjectedRowState, ProjectedRowState, ProjectedRowState]:
+        halve_weather_penalty = battlefield_side in self.halve_weather_penalty_sides
         rows = tuple(
             _row_projection(
                 row,
                 self.cards_for(battlefield_side, row),
                 weathered=row in self.active_weather_row_set,
                 horn_active=self.horn_active_for_row(battlefield_side, row),
+                halve_weather_penalty=halve_weather_penalty,
+                double_spy_strength=self.double_spy_strength_global,
             )
             for row in Row
         )
@@ -225,6 +228,8 @@ def _row_projection(
     *,
     weathered: bool,
     horn_active: bool,
+    halve_weather_penalty: bool,
+    double_spy_strength: bool,
 ) -> ProjectedRowState:
     morale_count = sum(
         AbilityKind.MORALE_BOOST in card.definition.ability_kinds
@@ -250,7 +255,9 @@ def _row_projection(
             continue
         strength = definition.base_strength
         if weathered and not definition.is_hero:
-            strength = 1
+            strength = (strength + 1) // 2 if halve_weather_penalty else 1
+        if double_spy_strength and AbilityKind.SPY in definition.ability_kinds:
+            strength *= 2
         if AbilityKind.TIGHT_BOND in definition.ability_kinds and definition.bond_group is not None:
             strength *= max(1, bond_counts[definition.bond_group])
         morale_bonus = morale_count - (
@@ -280,6 +287,8 @@ def effective_card_strength(
     *,
     weather_rows: set[Row],
     horn_rows: set[tuple[PlayerId, Row]],
+    halve_weather_penalty: bool = False,
+    double_spy_strength: bool = False,
 ) -> int:
     card = cards[index]
     definition = card.definition
@@ -306,7 +315,9 @@ def effective_card_strength(
     )
     strength = definition.base_strength
     if card.row in weather_rows and not definition.is_hero:
-        strength = 1
+        strength = (strength + 1) // 2 if halve_weather_penalty else 1
+    if double_spy_strength and AbilityKind.SPY in definition.ability_kinds:
+        strength *= 2
     if AbilityKind.TIGHT_BOND in definition.ability_kinds and definition.bond_group is not None:
         strength *= max(1, bond_count)
     morale_bonus = morale_count - (1 if AbilityKind.MORALE_BOOST in definition.ability_kinds else 0)

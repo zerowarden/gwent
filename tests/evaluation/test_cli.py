@@ -25,15 +25,15 @@ def _write_tiny_catalogs(
     _ = agents_path.write_text(
         json.dumps(
             {
-                "schema_version": 1,
+                "schema_version": 2,
                 "agents": [
                     {
-                        "schema_version": 1,
+                        "schema_version": 2,
                         "agent_id": "heuristic-neutral",
                         "family": "heuristic",
                         "profile": "neutral",
                     },
-                    {"schema_version": 1, "agent_id": "random", "family": "random"},
+                    {"schema_version": 2, "agent_id": "random", "family": "random"},
                 ],
             }
         ),

@@ -1,6 +1,6 @@
 from typing import cast
 
-from tests.api.support import api_client, create_match_payload
+from tests.api.support import api_client, complete_mulligans, create_match_payload
 
 
 def test_play_card_flow_works_via_http() -> None:
@@ -13,14 +13,7 @@ def test_play_card_flow_works_via_http() -> None:
                 player_two_deck="monsters_muster_swarm_strict",
             ),
         )
-        _ = client.post(
-            "/matches/api_play_card/mulligan",
-            json={"service_player_id": "alice", "card_instance_ids": []},
-        )
-        _ = client.post(
-            "/matches/api_play_card/mulligan",
-            json={"service_player_id": "bob", "card_instance_ids": []},
-        )
+        complete_mulligans(client, "api_play_card")
         response = client.post(
             "/matches/api_play_card/actions/play-card",
             json={

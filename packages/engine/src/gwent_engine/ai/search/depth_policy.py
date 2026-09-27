@@ -6,6 +6,7 @@ from gwent_engine.ai.baseline import DecisionAssessment, build_assessment
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.policy import SearchConfig
 from gwent_engine.cards import CardRegistry
+from gwent_engine.core import GameStatus
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
@@ -30,7 +31,7 @@ def should_search_opponent_reply(
     assessment = build_assessment(observation, card_registry)
     opponent_id = opponent_player_id_from_state(state, viewer_player_id)
 
-    if state.status.value == "match_ended":
+    if state.status == GameStatus.MATCH_ENDED:
         decision = ReplySearchDecision(enabled=False, reason="match_ended")
     elif state.current_player != opponent_id:
         decision = ReplySearchDecision(enabled=False, reason="control_not_with_opponent")
