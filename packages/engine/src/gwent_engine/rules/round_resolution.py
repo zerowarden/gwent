@@ -3,8 +3,10 @@ from dataclasses import dataclass, replace
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.events import GameEvent, RoundEndedEvent
 from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.rules.round_continuation import can_continue_round
 from gwent_engine.rules.scoring import PlayerScore, calculate_round_scores
 
 
@@ -19,8 +21,23 @@ class RoundOutcome:
         return self.winner is None
 
 
-def is_round_effectively_over(state: GameState) -> bool:
-    return all(player.is_done_for_round for player in state.players)
+def is_round_effectively_over(
+    state: GameState,
+    *,
+    card_registry: CardRegistry | None,
+    leader_registry: LeaderRegistry | None,
+    rng: SupportsRandom | None = None,
+) -> bool:
+    return not any(
+        can_continue_round(
+            state,
+            player.player_id,
+            card_registry=card_registry,
+            leader_registry=leader_registry,
+            rng=rng,
+        )
+        for player in state.players
+    )
 
 
 def determine_round_outcome(

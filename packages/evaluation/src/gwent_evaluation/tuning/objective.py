@@ -8,10 +8,9 @@ from pathlib import Path
 
 from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 
-from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.execution import (
     EvidencePolicy,
-    agent_identity,
+    candidate_manifest,
     execute_run,
     validate_run_environment,
 )
@@ -125,13 +124,7 @@ def _candidate_manifest(
     _ = encode_parameters(
         study.parameter_space, configuration, frozen_configuration=study.incumbent
     )
-    candidate = replace(study.optimization.suite.candidate, heuristic_configuration=configuration)
-    return replace(
-        study.optimization,
-        run_id=run_id,
-        suite=replace(study.optimization.suite, candidate=candidate),
-        candidate=agent_identity(resolve_agent(candidate)),
-    )
+    return candidate_manifest(study.optimization, configuration, run_id=run_id)
 
 
 def _require_objective_preflight(

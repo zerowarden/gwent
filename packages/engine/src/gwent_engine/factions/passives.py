@@ -241,7 +241,9 @@ class SkelligePassive(FactionPassive):
         eligible_card_ids = tuple(
             card_id
             for card_id in owner.discard
-            if card_registry.get(state.card(card_id).definition_id).card_type == CardType.UNIT
+            if (definition := card_registry.get(state.card(card_id).definition_id)).card_type
+            == CardType.UNIT
+            and not definition.is_hero
         )
         if not eligible_card_ids:
             return state, ()

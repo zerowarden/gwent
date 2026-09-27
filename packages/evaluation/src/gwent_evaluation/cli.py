@@ -9,13 +9,15 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
+from gwent_engine.ai.policy_artifacts import PolicyArtifactError
 from gwent_shared.json_payloads import dump_pretty_json
 
-from gwent_evaluation.agents import AgentResolutionError
+from gwent_evaluation.agents import AgentResolutionError, candidate_from_artifact
 from gwent_evaluation.execution import EvidencePolicy, execute_run
 from gwent_evaluation.models import SuiteSpec
 from gwent_evaluation.output import write_output_index, write_run_guide, write_sensitivity_guide
@@ -49,6 +51,7 @@ EXIT_DIVERGENCE = 1
 EXIT_ERROR = 2
 
 _USER_ERRORS = (
+    PolicyArtifactError,
     AgentResolutionError,
     ReportError,
     ReplayError,
@@ -96,6 +99,16 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = sensitivity_parser.add_argument("--output", type=Path, default=None)
     sensitivity_parser.set_defaults(handler=_cmd_tune_sensitivity)
 
+    for command, help_text in (
+        ("select", "Freeze finalists and select a challenger using validation only."),
+        ("verify", "Run repository correctness checks for the frozen challenger."),
+        ("finalize", "Confirm the frozen challenger on held-out cases and export its policy."),
+    ):
+        stage_parser = tune_commands.add_parser(command, help=help_text)
+        _ = stage_parser.add_argument("study", type=Path, help="Completed optimization directory.")
+        _ = stage_parser.add_argument("--recover-lock", action="store_true")
+        stage_parser.set_defaults(handler=_cmd_tune_stage)
+
     run_parser = subparsers.add_parser("run", help="Execute a suite and persist a run directory.")
     _ = run_parser.add_argument(
         "catalog",
@@ -133,6 +146,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Which cases persist privileged trajectory evidence.",
     )
     run_parser.set_defaults(handler=_cmd_run)
+    _ = run_parser.add_argument("--candidate-artifact", type=Path, default=None)
 
     report_parser = subparsers.add_parser(
         "report", help="Rebuild and print the report of a run directory."
@@ -174,6 +188,30 @@ def _cmd_tune_pilot(args: argparse.Namespace) -> int:
         notify=print,
     )
     print(f"Read: {output / 'README.md'}")
+    return EXIT_OK
+
+
+def _cmd_tune_stage(args: argparse.Namespace) -> int:
+    from gwent_evaluation.tuning.selection import (
+        finalize_study,
+        select_challenger,
+        verify_selection,
+    )
+
+    root = cast(Path, args.study)
+    repository = _repository_root()
+    recover = cast(bool, args.recover_lock)
+    command = cast(str, args.tune_command)
+    if command == "select":
+        result = select_challenger(root, repository_root=repository, recover_lock=recover)
+        print(dump_pretty_json(result.to_dict()), end="")
+    elif command == "verify":
+        evidence = verify_selection(root, repository_root=repository, recover_lock=recover)
+        print(dump_pretty_json(evidence), end="")
+        return EXIT_OK if evidence["passed"] else EXIT_DIVERGENCE
+    else:
+        confirmation = finalize_study(root, repository_root=repository, recover_lock=recover)
+        print(dump_pretty_json(confirmation.to_dict()), end="")
     return EXIT_OK
 
 
@@ -220,6 +258,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     agents_path = cast(Path | None, args.agents_catalog) or _default_agents_path()
     suites = load_suite_catalog(suites_path, agents=load_agent_catalog(agents_path))
     suite = _select_suite(suites, suite_id=cast(str | None, args.suite), catalog=suites_path)
+    artifact = cast(Path | None, args.candidate_artifact)
+    if artifact is not None:
+        suite = replace(suite, candidate=candidate_from_artifact(suite.candidate, artifact))
     run_id = cast(str | None, args.run_id)
     execution = execute_run(
         suite=suite,

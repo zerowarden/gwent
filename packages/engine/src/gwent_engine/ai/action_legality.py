@@ -70,7 +70,13 @@ def _validate_action(
                 rng=rng,
             )
         case PassAction():
-            validate_pass_action(state, action)
+            validate_pass_action(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                rng=rng,
+            )
         case LeaveAction():
             validate_leave_action(state, action)
         case UseLeaderAbilityAction():

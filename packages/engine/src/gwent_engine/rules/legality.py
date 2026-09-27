@@ -9,6 +9,7 @@ from gwent_engine.rules.battlefield_effects import is_weather_ability
 from gwent_engine.rules.card_abilities import definition_has_ability
 from gwent_engine.rules.effect_applicability import can_target_for_decoy
 from gwent_engine.rules.leader_effects import restore_selection_is_randomized
+from gwent_engine.rules.round_continuation import can_continue_round
 from gwent_engine.rules.row_effects import (
     row_has_commanders_horn,
     row_has_special_commanders_horn,
@@ -17,11 +18,27 @@ from gwent_engine.rules.row_effects import (
 )
 
 
-def validate_in_round_player_can_act(state: GameState, player: PlayerState) -> None:
-    if player.is_done_for_round:
-        if player.has_passed:
-            raise IllegalActionError("Passed players cannot act again in the same round.")
-        raise IllegalActionError("Players with an empty hand cannot act in the same round.")
+def validate_in_round_player_can_act(
+    state: GameState,
+    player: PlayerState,
+    *,
+    card_registry: CardRegistry | None = None,
+    leader_registry: LeaderRegistry | None = None,
+    rng: SupportsRandom | None = None,
+) -> None:
+    if player.has_passed:
+        raise IllegalActionError("Passed players cannot act again in the same round.")
+    if not can_continue_round(
+        state,
+        player.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+    ):
+        raise IllegalActionError(
+            "Players with an empty hand and no available leader action cannot act "
+            "in the same round."
+        )
     if state.current_player != player.player_id:
         raise IllegalActionError("Only the current player may act.")
 

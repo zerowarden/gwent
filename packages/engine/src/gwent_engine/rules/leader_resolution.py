@@ -30,10 +30,10 @@ from gwent_engine.rules.leader_effects import (
     leader_definition_for_player,
 )
 from gwent_engine.rules.players import other_player_from_pair, replace_player
+from gwent_engine.rules.round_continuation import advance_turn_after_action
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.scoring import calculate_effective_strength
 from gwent_engine.rules.state_ops import (
-    advance_turn_after_action,
     append_to_row,
     card_in_zone,
     draw_cards_into_hand,
@@ -103,6 +103,9 @@ def apply_use_leader_ability(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return final_state, events
 

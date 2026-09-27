@@ -72,11 +72,10 @@ def _check_current_player(state: GameState) -> None:
 
     if state.phase == Phase.IN_ROUND and state.current_player is not None:
         current_player = state.player(state.current_player)
-        resolving_choice = (
-            state.pending_choice is not None
-            and state.pending_choice.player_id == current_player.player_id
-        )
-        if current_player.has_passed or (not current_player.hand and not resolving_choice):
+        # An empty hand does not by itself end a player's round: an unused
+        # active leader ability still counts as an action. Whether a specific
+        # player can continue is a rules-layer question.
+        if current_player.has_passed:
             raise InvariantError("The current player cannot be done for the round.")
 
 

@@ -93,11 +93,12 @@ def test_invariants_fail_when_current_player_has_already_passed() -> None:
         check_game_state_invariants(state)
 
 
-def test_invariants_reject_empty_handed_current_player() -> None:
+def test_invariants_allow_empty_handed_current_player() -> None:
+    # An empty hand does not end a round: an unused active leader still counts
+    # as an action, and PlayerState alone cannot decide continuation.
     state = scenario("empty_handed_current_player").build()
 
-    with pytest.raises(InvariantError, match="current player cannot be done"):
-        check_game_state_invariants(state)
+    check_game_state_invariants(state)
 
 
 def test_spy_card_may_live_on_the_opponent_battlefield_side() -> None:

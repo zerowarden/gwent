@@ -163,10 +163,6 @@ class PlayerState:
     def all_card_ids(self) -> tuple[CardInstanceId, ...]:
         return self.deck + self.hand + self.discard + self.rows.all_cards()
 
-    @property
-    def is_done_for_round(self) -> bool:
-        return self.has_passed or not self.hand
-
 
 @dataclass(frozen=True, slots=True)
 class GameState:

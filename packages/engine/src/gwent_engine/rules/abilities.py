@@ -40,9 +40,9 @@ from gwent_engine.rules.players import (
     opponent_player_id_from_state,
     other_player_from_state,
 )
+from gwent_engine.rules.round_continuation import advance_turn_after_action
 from gwent_engine.rules.row_effects import horn_source_for_row
 from gwent_engine.rules.state_ops import (
-    advance_turn_after_action,
     append_to_row,
     card_in_zone,
     draw_cards_into_hand,
@@ -138,7 +138,13 @@ def _finish_unit_resolution(
     )
     if next_state.pending_choice is not None:
         return replace(next_state, current_player=player_id, phase=Phase.IN_ROUND)
-    return advance_turn_after_action(next_state, player_id)
+    return advance_turn_after_action(
+        next_state,
+        player_id,
+        card_registry=context.card_registry,
+        leader_registry=context.leader_registry,
+        rng=context.rng,
+    )
 
 
 def strongest_eligible_unit_card_ids(

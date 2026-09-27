@@ -12,7 +12,6 @@ from gwent_engine.rules.leader_common import (
     selected_weather_card_in_deck,
 )
 from gwent_engine.rules.leader_effects import leader_definition_for_player
-from gwent_engine.rules.legality import validate_in_round_player_can_act
 from gwent_engine.rules.row_effects import row_has_commanders_horn
 
 
@@ -27,7 +26,26 @@ def validate_use_leader_ability_legality(
     assert leader_registry is not None
     assert card_registry is not None
     player = state.player(action.player_id)
-    validate_in_round_player_can_act(state, player)
+    validate_leader_ability_availability(
+        state,
+        player,
+        action,
+        leader_registry=leader_registry,
+        card_registry=card_registry,
+        rng=rng,
+    )
+
+
+def validate_leader_ability_availability(
+    state: GameState,
+    player: PlayerState,
+    action: UseLeaderAbilityAction,
+    *,
+    leader_registry: LeaderRegistry,
+    card_registry: CardRegistry,
+    rng: SupportsRandom | None,
+) -> None:
+    """Leader-specific availability checks, excluding the turn/current-player gate."""
     leader_definition = leader_definition_for_player(player, leader_registry)
     if player.leader.disabled:
         raise IllegalActionError("Disabled leaders cannot use their active ability.")

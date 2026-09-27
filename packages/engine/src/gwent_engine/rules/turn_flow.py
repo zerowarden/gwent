@@ -34,9 +34,9 @@ from gwent_engine.rules.battlefield_effects import (
 )
 from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
 from gwent_engine.rules.players import replace_player
+from gwent_engine.rules.round_continuation import advance_turn_after_action
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.state_ops import (
-    advance_turn_after_action,
     append_to_row,
     card_in_zone,
     replace_card_instance,
@@ -108,6 +108,10 @@ def apply_play_card(
 def apply_pass(
     state: GameState,
     action: PassAction,
+    *,
+    card_registry: CardRegistry | None,
+    leader_registry: LeaderRegistry | None,
+    rng: SupportsRandom | None = None,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     player = state.player(action.player_id)
     updated_player = replace(player, has_passed=True)
@@ -126,6 +130,9 @@ def apply_pass(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -203,7 +210,6 @@ def _apply_commanders_horn(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del card_registry, leader_registry, rng
     base_state, events = _apply_row_targeted_special_base(state, action, player, ability_kind)
     next_state = advance_turn_after_action(
         replace(
@@ -212,6 +218,9 @@ def _apply_commanders_horn(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -225,7 +234,6 @@ def _apply_weather_card(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del card_registry, leader_registry, rng
     affected_row = weather_row_for(ability_kind)
     updated_player = replace(
         player,
@@ -254,6 +262,9 @@ def _apply_weather_card(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -267,7 +278,6 @@ def _apply_special_mardroeme(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del leader_registry, rng
     target_row = action.target_row
     assert target_row is not None
     base_state, base_events = _apply_row_targeted_special_base(
@@ -291,6 +301,9 @@ def _apply_special_mardroeme(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -304,7 +317,7 @@ def _apply_clear_weather(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del player, card_registry, leader_registry, rng
+    del player
     cleared_weather_ids = state.battlefield_weather.all_cards()
     updated_players, updated_cards = clear_weather_cards(state, cleared_weather_ids)
     updated_players = (
@@ -327,6 +340,9 @@ def _apply_clear_weather(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -340,7 +356,7 @@ def _apply_scorch(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del player, rng
+    del player
     killed_card_ids = strongest_battlefield_unit_card_ids(
         state,
         card_registry,
@@ -378,6 +394,9 @@ def _apply_scorch(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 
@@ -391,7 +410,6 @@ def _apply_decoy(
     rng: SupportsRandom | None,
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    del leader_registry, rng
     assert action.target_card_instance_id is not None
     target_card = state.card(action.target_card_instance_id)
     assert target_card.row is not None
@@ -460,6 +478,9 @@ def _apply_decoy(
             event_counter=state.event_counter + len(events),
         ),
         action.player_id,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
     )
     return next_state, events
 

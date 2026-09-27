@@ -18,6 +18,7 @@ from tests.engine.support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
     NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID,
+    NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
     PLAYER_ONE_ID,
     PLAYER_TWO_ID,
     IdentityShuffle,
@@ -134,7 +135,52 @@ def test_validate_in_round_player_can_act_accepts_current_unpassed_player() -> N
         .build()
     )
 
-    validate_in_round_player_can_act(state, state.player(PLAYER_ONE_ID))
+    validate_in_round_player_can_act(
+        state,
+        state.player(PLAYER_ONE_ID),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+
+def test_validate_in_round_player_can_act_accepts_empty_hand_with_usable_leader() -> None:
+    state = (
+        scenario("legality_accept_empty_hand_with_leader")
+        .player(
+            "p1",
+            faction="northern_realms",
+            leader_id=NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
+        )
+        .build()
+    )
+
+    validate_in_round_player_can_act(
+        state,
+        state.player(PLAYER_ONE_ID),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+
+def test_validate_in_round_player_can_act_rejects_empty_hand_without_leader() -> None:
+    state = (
+        scenario("legality_reject_empty_hand_without_leader")
+        .player(
+            "p1",
+            faction="northern_realms",
+            leader_id=NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
+            leader_used=True,
+        )
+        .build()
+    )
+
+    with pytest.raises(IllegalActionError, match="no available leader action"):
+        validate_in_round_player_can_act(
+            state,
+            state.player(PLAYER_ONE_ID),
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        )
 
 
 def test_validate_play_card_legality_rejects_card_not_in_hand() -> None:

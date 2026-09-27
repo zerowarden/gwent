@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
+from pathlib import Path
 from types import MappingProxyType
 from typing import Protocol, cast
 
@@ -22,6 +23,7 @@ from gwent_engine.ai.policy import (
     BaselineConfig,
     SearchConfig,
 )
+from gwent_engine.ai.policy_artifacts import PolicyArtifact
 from gwent_engine.ai.search import SearchBot
 
 
@@ -284,6 +286,12 @@ def create_bot(
         heuristic_configuration=heuristic_configuration,
         seed=seed,
     )
+
+
+def load_policy_bot(path: Path, *, bot_id: str) -> BotAgent:
+    """Build an ordinary bot from a complete, validated artifact snapshot."""
+    artifact = PolicyArtifact.load(path)
+    return create_bot("heuristic", bot_id=bot_id, heuristic_configuration=artifact.configuration)
 
 
 def create_seeded_bot(

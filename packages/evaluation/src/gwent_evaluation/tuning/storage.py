@@ -86,8 +86,9 @@ def exclusive_writer(root: Path, *, recover_lock: bool = False) -> Generator[Non
 
 @final
 class StudyStore:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, verification_only: bool = False) -> None:
         self.root = root
+        self.verification_only = verification_only
         self._locked = False
         self._entries: list[JournalEntry] = []
         self._cursor = 0
@@ -114,6 +115,8 @@ class StudyStore:
             if canonical_json(read_checked_document(path)) != canonical_json(payload):
                 raise RunConflictError("Study snapshot differs from its frozen inputs.")
         else:
+            if self.verification_only:
+                raise RunConflictError("A completed study snapshot is required.")
             runs = self.root / "runs"
             if any((self.root / "journal").glob("*.json")) or (
                 runs.exists() and any(runs.iterdir())
@@ -161,6 +164,8 @@ class StudyStore:
             return existing.digest
         if self._previous is None:
             raise RunConflictError("Prepare the study before journaling.")
+        if self.verification_only:
+            raise RunConflictError("The study is incomplete; verification cannot append events.")
         document = {
             "schema_version": 1,
             "index": self._cursor,
@@ -179,7 +184,7 @@ class StudyStore:
 
     def finish(self) -> None:
         if self.next_entry is not None:
-            raise RunConflictError("Study journal contains events after optimization completion.")
+            raise RunConflictError("Study journal contains events after stage completion.")
 
     def write_report(self, report: Mapping[str, object]) -> None:
         self._require_writer()

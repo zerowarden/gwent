@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import cast
 
 from gwent_engine.ai.agents import BotAgent
@@ -9,6 +10,7 @@ from gwent_engine.ai.baseline import BaseProfileDefinition, get_base_profile_def
 from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_engine.ai.policy import BaselineConfig
+from gwent_engine.ai.policy_artifacts import PolicyArtifact
 
 from gwent_evaluation.models import AgentSpec, BotFamily, SuiteSpec
 from gwent_evaluation.provenance import canonical_digest
@@ -16,6 +18,15 @@ from gwent_evaluation.provenance import canonical_digest
 
 class AgentResolutionError(ValueError):
     """Raised when an agent spec cannot be resolved to an engine implementation."""
+
+
+def candidate_from_artifact(candidate: AgentSpec, path: Path) -> AgentSpec:
+    """Keep benchmark labels and opponents while binding the artifact's exact values."""
+    if candidate.family is not BotFamily.HEURISTIC:
+        raise AgentResolutionError("A policy artifact requires a heuristic candidate.")
+    return replace(
+        candidate, profile=None, heuristic_configuration=PolicyArtifact.load(path).configuration
+    )
 
 
 @dataclass(frozen=True, slots=True)

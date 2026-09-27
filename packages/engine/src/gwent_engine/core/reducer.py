@@ -163,8 +163,20 @@ def _dispatch_action(
                 rng=rng,
             )
         case PassAction():
-            validate_pass_action(state, action)
-            return apply_pass(state, action)
+            validate_pass_action(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                rng=rng,
+            )
+            return apply_pass(
+                state,
+                action,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+                rng=rng,
+            )
         case LeaveAction():
             validate_leave_action(state, action)
             return apply_leave(state, action)

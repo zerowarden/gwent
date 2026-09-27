@@ -13,7 +13,7 @@ from gwent_evaluation.records import (
     decision_sample_from_dict,
     decision_sample_to_dict,
 )
-from gwent_evaluation.storage import RunConflictError, RunStore
+from gwent_evaluation.storage import RunConflictError, RunStore, read_record_mapping
 from gwent_evaluation.tuning import sensitivity
 from gwent_evaluation.tuning.models import StudySpec
 from gwent_evaluation.tuning.sensitivity import (
@@ -95,6 +95,10 @@ def test_tiny_panel_persists_reproducible_evidence_and_blocks_flat_sensitivity(
     assert report.observation_count == 32
     assert len(report.dimensions) == 11
     assert all(item.witness is not None for item in report.dimensions)
+    assert (
+        sensitivity.SensitivityReport.from_dict(read_record_mapping(output / "report.json"))
+        == report
+    )
     assert report.match_execution_seconds > 0
     assert report.disk_bytes > 0
 

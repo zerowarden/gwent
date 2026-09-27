@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 import pytest
-from gwent_engine.core import FactionId, PassiveKind, Phase, Row, Zone
+from gwent_engine.core import FactionId, PassiveKind, Phase, Zone
 from gwent_engine.core.actions import PassAction
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import (
@@ -9,7 +9,7 @@ from gwent_engine.core.events import (
     MatchEndedEvent,
     NextRoundStartedEvent,
 )
-from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.factions.passives import resolve_round_start_passives
 
@@ -24,8 +24,26 @@ from ..support import (
 )
 
 
-def test_skellige_summons_two_random_discard_units_at_start_of_third_round() -> None:
+def test_skellige_never_summons_heroes_from_discard_on_round_three() -> None:
     card_registry = CARD_REGISTRY
+    hero_card_ids = (
+        CardInstanceId("p1_cerys_discard_hero"),
+        CardInstanceId("p1_hjalmar_discard_hero"),
+        CardInstanceId("p1_ermion_discard_hero"),
+    )
+    normal_card_ids = (
+        CardInstanceId("p1_birna_bran_discard_unit"),
+        CardInstanceId("p1_madman_lugos_discard_unit"),
+        CardInstanceId("p1_war_longship_discard_unit"),
+    )
+    assert all(
+        card_registry.get(CardDefinitionId(f"skellige_{name}")).is_hero
+        for name in ("cerys", "hjalmar", "ermion")
+    )
+    assert not any(
+        card_registry.get(CardDefinitionId(f"skellige_{name}")).is_hero
+        for name in ("birna_bran", "madman_lugos")
+    )
     base_state = (
         scenario("skellige_summons_two_from_discard")
         .player(
@@ -33,9 +51,12 @@ def test_skellige_summons_two_random_discard_units_at_start_of_third_round() -> 
             faction=FactionId.SKELLIGE,
             leader_id=SKELLIGE_KING_BRAN_LEADER_ID,
             discard=(
+                card("p1_cerys_discard_hero", "skellige_cerys"),
+                card("p1_hjalmar_discard_hero", "skellige_hjalmar"),
+                card("p1_ermion_discard_hero", "skellige_ermion"),
                 card("p1_birna_bran_discard_unit", "skellige_birna_bran"),
                 card("p1_madman_lugos_discard_unit", "skellige_madman_lugos"),
-                card("p1_ermion_discard_hero", "skellige_ermion"),
+                card("p1_war_longship_discard_unit", "skellige_war_longship"),
             ),
         )
         .player(
@@ -48,36 +69,70 @@ def test_skellige_summons_two_random_discard_units_at_start_of_third_round() -> 
         )
         .build()
     )
-    state = replace(base_state, round_number=3)
+
+    for choice_index in range(len(normal_card_ids) * 2):
+        state = replace(base_state, round_number=3)
+
+        next_state, events = resolve_round_start_passives(
+            state,
+            card_registry=card_registry,
+            rng=IndexedRandom(choice_index=choice_index),
+        )
+
+        summoned_card_ids = {
+            card_id
+            for card_id in normal_card_ids
+            if next_state.card(card_id).zone == Zone.BATTLEFIELD
+        }
+        assert len(summoned_card_ids) == 2
+        for hero_card_id in hero_card_ids:
+            assert next_state.card(hero_card_id).zone == Zone.DISCARD
+            assert hero_card_id not in next_state.player(PLAYER_ONE_ID).rows.all_cards()
+        assert len(events) == 2
+        triggered_card_ids = {
+            event.card_instance_id
+            for event in events
+            if isinstance(event, FactionPassiveTriggeredEvent)
+        }
+        assert triggered_card_ids == summoned_card_ids
+        assert all(
+            not card_registry.get(
+                next_state.card(card_id).definition_id
+            ).is_hero
+            for card_id in triggered_card_ids
+        )
+
+
+def test_skellige_does_not_trigger_when_only_heroes_are_in_discard() -> None:
+    card_registry = CARD_REGISTRY
+    state = replace(
+        scenario("skellige_only_heroes_in_discard")
+        .player(
+            PLAYER_ONE_ID,
+            faction=FactionId.SKELLIGE,
+            leader_id=SKELLIGE_KING_BRAN_LEADER_ID,
+            discard=(
+                card("p1_cerys_discard_hero", "skellige_cerys"),
+                card("p1_ermion_discard_hero", "skellige_ermion"),
+            ),
+        )
+        .player(
+            PLAYER_TWO_ID,
+            faction=FactionId.SCOIATAEL,
+            leader_id=SCOIATAEL_RANGED_HORN_LEADER_ID,
+        )
+        .build(),
+        round_number=3,
+    )
 
     next_state, events = resolve_round_start_passives(
         state,
         card_registry=card_registry,
-        rng=IndexedRandom(choice_index=1),
+        rng=None,
     )
 
-    assert next_state.player(PLAYER_ONE_ID).discard == (
-        CardInstanceId("p1_birna_bran_discard_unit"),
-    )
-    assert next_state.player(PLAYER_ONE_ID).rows.close == (
-        CardInstanceId("p1_madman_lugos_discard_unit"),
-    )
-    assert next_state.player(PLAYER_ONE_ID).rows.ranged == (
-        CardInstanceId("p1_ermion_discard_hero"),
-    )
-    assert next_state.card(CardInstanceId("p1_madman_lugos_discard_unit")).zone == Zone.BATTLEFIELD
-    assert next_state.card(CardInstanceId("p1_madman_lugos_discard_unit")).row == Row.CLOSE
-    assert next_state.card(CardInstanceId("p1_ermion_discard_hero")).zone == Zone.BATTLEFIELD
-    assert next_state.card(CardInstanceId("p1_ermion_discard_hero")).row == Row.RANGED
-    assert [type(event).__name__ for event in events] == [
-        "FactionPassiveTriggeredEvent",
-        "FactionPassiveTriggeredEvent",
-    ]
-    assert isinstance(events[0], FactionPassiveTriggeredEvent)
-    assert isinstance(events[1], FactionPassiveTriggeredEvent)
-    assert events[0].passive_kind == PassiveKind.SKELLIGE_SUMMON_TWO_FROM_DISCARD_ON_ROUND_THREE
-    assert events[0].card_instance_id == CardInstanceId("p1_madman_lugos_discard_unit")
-    assert events[1].card_instance_id == CardInstanceId("p1_ermion_discard_hero")
+    assert next_state == state
+    assert events == ()
 
 
 def test_skellige_does_not_trigger_before_third_round() -> None:

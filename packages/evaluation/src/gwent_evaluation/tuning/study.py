@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import NoReturn, final
 
 from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_shared.extract import expect_mapping
 
 from gwent_evaluation.execution import EvidencePolicy, validate_run_environment
 from gwent_evaluation.models import SpecError
@@ -40,7 +41,8 @@ from gwent_evaluation.tuning.optimizers import (
 )
 from gwent_evaluation.tuning.parameters import encode_parameters
 from gwent_evaluation.tuning.sensitivity import SensitivityReport, require_sensitivity
-from gwent_evaluation.tuning.storage import StudyStore
+from gwent_evaluation.tuning.specs import study_from_dict
+from gwent_evaluation.tuning.storage import StudyStore, read_checked_document
 
 
 class StudyStoppedError(SpecError):
@@ -120,6 +122,7 @@ def run_study(
     repository_root: Path,
     sensitivity_report: SensitivityReport,
     recover_lock: bool = False,
+    verification_only: bool = False,
 ) -> StudyResult:
     """Run or resume optimization, stopping before any validation/test execution.
 
@@ -131,7 +134,7 @@ def run_study(
     if study.evidence_policy is not EvidencePolicy.NONE:
         raise SpecError("Study optimization requires summary recording.")
     validate_run_environment(study.optimization, repository_root=repository_root)
-    store = StudyStore(output_root)
+    store = StudyStore(output_root, verification_only=verification_only)
     with store.writer(recover_lock=recover_lock):
         # Recomputing preflight from verified existing runs changes operational
         # costs, not its scientific evidence. Freeze the latter for recovery.
@@ -143,8 +146,33 @@ def run_study(
         result = runner.run()
         _ = store.record("complete", result.to_dict())
         store.finish()
-        store.write_report(result.to_dict())
+        if not verification_only:
+            store.write_report(result.to_dict())
         return result
+
+
+def load_completed_study(
+    root: Path, *, repository_root: Path, recover_lock: bool = False
+) -> tuple[StudySpec, StudyResult]:
+    """Verify frozen inputs and every committed optimization trial without playing games."""
+    raw = read_checked_document(root / "snapshot.json")
+    snapshot = expect_mapping(
+        raw.get("snapshot"), context="study snapshot", error_factory=SpecError
+    )
+    try:
+        study = study_from_dict(snapshot.get("study"))
+        preflight = SensitivityReport.from_dict(snapshot.get("sensitivity"))
+    except (KeyError, TypeError, ValueError) as error:
+        raise SpecError(f"Invalid frozen study inputs: {error}") from error
+    result = run_study(
+        study,
+        output_root=root,
+        repository_root=repository_root,
+        sensitivity_report=preflight,
+        recover_lock=recover_lock,
+        verification_only=True,
+    )
+    return study, result
 
 
 @final
@@ -222,6 +250,8 @@ class _StudyRunner:
         if current != candidate.identity:
             raise RunConflictError("Candidate evaluation identity changed after proposal.")
         entry = self.store.next_entry
+        if entry is None and self.store.verification_only:
+            raise RunConflictError("Optimization has an uncommitted trial.")
         slot = {
             "method": None if method is None else method.value,
             "index": candidate.proposal.index,

@@ -18,13 +18,13 @@ from gwent_engine.rules.round_cleanup import (
     end_match,
     start_next_round,
 )
+from gwent_engine.rules.round_continuation import assign_round_priority
 from gwent_engine.rules.round_resolution import (
     apply_round_outcome,
     determine_round_outcome,
     is_round_effectively_over,
     next_round_starter,
 )
-from gwent_engine.rules.state_ops import assign_round_priority
 
 
 def resolve_post_action_transitions(
@@ -34,7 +34,12 @@ def resolve_post_action_transitions(
     rng: SupportsRandom | None,
     leader_registry: LeaderRegistry | None,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
-    if not _should_resolve_round(state):
+    if not _should_resolve_round(
+        state,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+    ):
         return state, ()
     if card_registry is None:
         raise IllegalActionError("Round resolution requires a card registry.")
@@ -93,7 +98,13 @@ def resolve_post_action_transitions(
         card_registry=card_registry,
         rng=rng,
     )
-    final_state = assign_round_priority(final_state, starting_player)
+    final_state = assign_round_priority(
+        final_state,
+        starting_player,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+    )
     events = (
         modifier_events
         + round_events
@@ -114,12 +125,24 @@ def resolve_post_action_transitions(
     return final_state, events
 
 
-def _should_resolve_round(state: GameState) -> bool:
+def _should_resolve_round(
+    state: GameState,
+    *,
+    card_registry: CardRegistry | None,
+    leader_registry: LeaderRegistry | None,
+    rng: SupportsRandom | None,
+) -> bool:
     """
     Checks whether a round should trigger round resolution mechanism
     """
     return state.phase == state.phase.ROUND_RESOLUTION or (
-        state.phase == state.phase.IN_ROUND and is_round_effectively_over(state)
+        state.phase == state.phase.IN_ROUND
+        and is_round_effectively_over(
+            state,
+            card_registry=card_registry,
+            leader_registry=leader_registry,
+            rng=rng,
+        )
     )
 
 

@@ -6,6 +6,7 @@ from gwent_engine.ai.arena.catalog import (
     bot_family,
     create_bot,
     create_seeded_bot,
+    load_policy_bot,
     parse_bot_spec,
     supported_bot_families,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "create_bot",
     "create_seeded_bot",
     "execute_match",
+    "load_policy_bot",
     "parse_bot_spec",
     "supported_bot_families",
 ]

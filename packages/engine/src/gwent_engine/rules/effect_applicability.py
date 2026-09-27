@@ -59,6 +59,20 @@ def can_target_for_medic(
     )
 
 
+def can_target_for_discard_retrieval(
+    state: GameState,
+    card_registry: CardRegistry,
+    *,
+    target_card_id: CardInstanceId,
+) -> bool:
+    definition = card_registry.get(state.card(target_card_id).definition_id)
+    return definition.card_type == CardType.UNIT and can_affect_card(
+        state,
+        card_registry,
+        target_card_id=target_card_id,
+    )
+
+
 def eligible_destroyable_unit_ids(
     state: GameState,
     card_registry: CardRegistry,

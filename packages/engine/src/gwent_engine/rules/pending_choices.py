@@ -1,4 +1,4 @@
-from dataclasses import dataclass, replace
+from dataclasses import replace
 
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import (
@@ -6,7 +6,6 @@ from gwent_engine.core import (
     CardType,
     ChoiceKind,
     ChoiceSourceKind,
-    LeaderAbilityKind,
     Row,
     Zone,
 )
@@ -23,27 +22,18 @@ from gwent_engine.rules.choice_classification import (
     leader_requires_pending_choice,
 )
 from gwent_engine.rules.effect_applicability import (
-    can_affect_card,
     can_target_for_decoy,
 )
 from gwent_engine.rules.leader_abilities import apply_use_leader_ability
-from gwent_engine.rules.leader_common import discard_and_choose_selection_required
+from gwent_engine.rules.leader_choice_targets import leader_pending_choice_targets
 from gwent_engine.rules.leader_effects import (
     leader_definition_for_player,
     restore_selection_is_randomized,
 )
 from gwent_engine.rules.medic_choices import pending_medic_choice
-from gwent_engine.rules.players import other_player_from_state
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.selection_validation import validate_selection_count
 from gwent_engine.rules.turn_flow import apply_play_card
-
-
-@dataclass(frozen=True, slots=True)
-class _LeaderPendingChoiceTargets:
-    legal_target_ids: tuple[CardInstanceId, ...]
-    min_selections: int = 1
-    max_selections: int = 1
 
 
 def create_pending_choice_for_decoy(
@@ -112,7 +102,7 @@ def create_pending_choice_for_leader(
     if not leader_requires_pending_choice(leader_definition.ability_kind):
         return None
 
-    targets = _leader_pending_choice_targets(
+    targets = leader_pending_choice_targets(
         state,
         player,
         card_registry=card_registry,
@@ -133,68 +123,6 @@ def create_pending_choice_for_leader(
         min_selections=targets.min_selections,
         max_selections=targets.max_selections,
     )
-
-
-def _leader_pending_choice_targets(
-    state: GameState,
-    player: PlayerState,
-    *,
-    card_registry: CardRegistry,
-    ability_kind: LeaderAbilityKind,
-    hand_discard_count: int,
-    deck_pick_count: int,
-) -> _LeaderPendingChoiceTargets | None:
-    match ability_kind:
-        case LeaderAbilityKind.DISCARD_AND_CHOOSE_FROM_DECK:
-            return _discard_and_choose_targets(
-                player,
-                hand_discard_count=hand_discard_count,
-                deck_pick_count=deck_pick_count,
-            )
-        case LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND:
-            return _discard_retrieval_targets(state, card_registry, player.discard)
-        case LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND:
-            opponent = other_player_from_state(state, player.player_id)
-            return _discard_retrieval_targets(state, card_registry, opponent.discard)
-        case _:
-            raise IllegalActionError(f"Unsupported pending-choice leader ability: {ability_kind!r}")
-
-
-def _discard_and_choose_targets(
-    player: PlayerState,
-    *,
-    hand_discard_count: int,
-    deck_pick_count: int,
-) -> _LeaderPendingChoiceTargets | None:
-    if not discard_and_choose_selection_required(
-        player,
-        hand_discard_count=hand_discard_count,
-        deck_pick_count=deck_pick_count,
-    ):
-        return None
-    selection_count = hand_discard_count + deck_pick_count
-    return _LeaderPendingChoiceTargets(
-        legal_target_ids=player.hand + player.deck,
-        min_selections=selection_count,
-        max_selections=selection_count,
-    )
-
-
-def _discard_retrieval_targets(
-    state: GameState,
-    card_registry: CardRegistry,
-    discard: tuple[CardInstanceId, ...],
-) -> _LeaderPendingChoiceTargets | None:
-    legal_target_ids = tuple(
-        card_id
-        for card_id in discard
-        if _can_target_for_discard_retrieval_leader(
-            state,
-            card_registry,
-            target_card_id=card_id,
-        )
-    )
-    return _LeaderPendingChoiceTargets(legal_target_ids) if legal_target_ids else None
 
 
 def maybe_create_pending_choice_for_play(
@@ -281,20 +209,6 @@ def maybe_create_pending_choice_for_leader(
         player,
         card_registry=card_registry,
         leader_registry=leader_registry,
-    )
-
-
-def _can_target_for_discard_retrieval_leader(
-    state: GameState,
-    card_registry: CardRegistry,
-    *,
-    target_card_id: CardInstanceId,
-) -> bool:
-    definition = card_registry.get(state.card(target_card_id).definition_id)
-    return definition.card_type == CardType.UNIT and can_affect_card(
-        state,
-        card_registry,
-        target_card_id=target_card_id,
     )
 
 

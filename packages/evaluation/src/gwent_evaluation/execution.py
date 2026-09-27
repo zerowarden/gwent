@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 from time import perf_counter
 
 from gwent_engine.ai.arena import MatchExecution, execute_match
 from gwent_engine.ai.hashing import state_fingerprint
+from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 from gwent_engine.core.randomness import SeededRandom
@@ -197,6 +198,21 @@ def agent_identity(resolved: ResolvedAgent) -> AgentIdentity:
         family=resolved.family_id,
         profile=resolved.profile_id,
         digest=resolved.digest(),
+    )
+
+
+def candidate_manifest(
+    manifest: RunManifest, configuration: HeuristicConfiguration, *, run_id: str
+) -> RunManifest:
+    """Bind complete candidate values while preserving the frozen benchmark conditions."""
+    candidate = replace(
+        manifest.suite.candidate, profile=None, heuristic_configuration=configuration
+    )
+    return replace(
+        manifest,
+        run_id=run_id,
+        suite=replace(manifest.suite, candidate=candidate),
+        candidate=agent_identity(resolve_agent(candidate)),
     )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -11,6 +12,13 @@ from gwent_engine.ai.baseline.decision_plan import build_decision_plan
 from gwent_engine.ai.baseline.evaluation import explain_ranked_actions
 from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.serialize.actions import action_from_id
+from gwent_shared.extract import (
+    expect_finite_float,
+    expect_int,
+    expect_mapping,
+    expect_sequence,
+    expect_str,
+)
 from gwent_shared.json_payloads import dump_pretty_json
 
 from gwent_evaluation.agents import resolve_agent
@@ -141,6 +149,143 @@ class SensitivityReport:
     def to_dict(self) -> dict[str, object]:
         payload = {**record_to_dict(self), "status": self.status}
         return {**payload, "report_digest": canonical_digest(payload)}
+
+    @classmethod
+    def from_dict(cls, value: object) -> SensitivityReport:
+        """Decode a frozen report, checking its complete canonical representation."""
+        raw = _report_mapping(value)
+        payload = dict(raw)
+        digest = payload.pop("report_digest", None)
+        if canonical_digest(payload) != digest:
+            raise SpecError("Sensitivity report digest mismatch.")
+        dimensions = tuple(
+            _dimension_from_dict(item) for item in _report_sequence(raw["dimensions"])
+        )
+        controls = tuple(_control_from_dict(item) for item in _report_sequence(raw["controls"]))
+        report = cls(
+            schema_version=_report_int(raw["schema_version"]),
+            study_digest=_report_string(raw["study_digest"]),
+            implementation_digest=None
+            if raw["implementation_digest"] is None
+            else _report_string(raw["implementation_digest"]),
+            incumbent_digest=_report_string(raw["incumbent_digest"]),
+            parameter_space_digest=_report_string(raw["parameter_space_digest"]),
+            suite_digests=tuple(
+                _report_string(item) for item in _report_sequence(raw["suite_digests"])
+            ),
+            observations_digest=_report_string(raw["observations_digest"]),
+            observation_count=_report_int(raw["observation_count"]),
+            dimensions=dimensions,
+            controls=controls,
+            planned_matches=_report_int(raw["planned_matches"]),
+            executed_matches=_report_int(raw["executed_matches"]),
+            match_execution_seconds=_report_float(raw["match_execution_seconds"]),
+            disk_bytes=_report_int(raw["disk_bytes"]),
+            reasons=tuple(_report_string(item) for item in _report_sequence(raw["reasons"])),
+        )
+        canonical = report.to_dict()
+        del canonical["report_digest"]
+        if canonical != payload:
+            raise SpecError("Sensitivity report fields or digest differ from canonical evidence.")
+        return report
+
+
+def _report_mapping(value: object) -> Mapping[str, object]:
+    return expect_mapping(value, context="sensitivity report", error_factory=SpecError)
+
+
+def _report_sequence(value: object) -> tuple[object, ...]:
+    return tuple(expect_sequence(value, context="sensitivity report", error_factory=SpecError))
+
+
+def _report_string(value: object) -> str:
+    return expect_str(value, context="sensitivity report", error_factory=SpecError)
+
+
+def _report_int(value: object) -> int:
+    return expect_int(value, context="sensitivity report", error_factory=SpecError)
+
+
+def _report_float(value: object) -> float:
+    return expect_finite_float(value, context="sensitivity report", error_factory=SpecError)
+
+
+def _diagnostic_from_dict(value: object) -> DecisionDiagnostic:
+    raw = _report_mapping(value)
+
+    def scores(name: str) -> tuple[tuple[str, float], ...]:
+        pairs = tuple(_report_sequence(item) for item in _report_sequence(raw[name]))
+        if any(len(pair) != 2 for pair in pairs):
+            raise SpecError("Sensitivity scores require action/value pairs.")
+        return tuple((_report_string(pair[0]), _report_float(pair[1])) for pair in pairs)
+
+    return DecisionDiagnostic(
+        scores("scores"),
+        scores("all_scores"),
+        _report_string(raw["chosen_action"]),
+        None if raw["override_reason"] is None else _report_string(raw["override_reason"]),
+        _report_int(raw["legal_count"]),
+        _report_int(raw["retained_count"]),
+        _report_int(raw["shortlisted_count"]),
+    )
+
+
+def _dimension_from_dict(value: object) -> DimensionSensitivity:
+    raw = _report_mapping(value)
+    witness = None
+    if raw["witness"] is not None:
+        item = _report_mapping(raw["witness"])
+        gap = _report_mapping(item["gap"])
+        witness = SensitivityWitness(
+            _report_string(item["case_id"]),
+            _report_int(item["sample_index"]),
+            _report_string(item["observation_digest"]),
+            _report_float(item["coordinate"]),
+            ScoreGapWitness(
+                _report_string(gap["first_action"]),
+                _report_string(gap["second_action"]),
+                _report_float(gap["reference_gap"]),
+                _report_float(gap["changed_gap"]),
+            ),
+            _diagnostic_from_dict(item["reference"]),
+            _diagnostic_from_dict(item["changed"]),
+        )
+    return DimensionSensitivity(
+        _report_string(raw["name"]),
+        _report_int(raw["observations"]),
+        _report_int(raw["relative_score_witnesses"]),
+        _report_int(raw["all_action_witnesses"]),
+        _report_int(raw["ranking_changes"]),
+        _report_int(raw["all_action_ranking_changes"]),
+        _report_int(raw["final_action_changes"]),
+        _report_int(raw["overridden_rank_changes"]),
+        _report_int(raw["best_action_omitted"]),
+        _report_int(raw["maximum_omitted_actions"]),
+        tuple(_report_string(item) for item in _report_sequence(raw["override_reasons"])),
+        witness,
+    )
+
+
+def _control_from_dict(value: object) -> ControlResult:
+    raw = _report_mapping(value)
+    pairs = tuple(_report_sequence(item) for item in _report_sequence(raw["block_scores"]))
+    if any(len(pair) != 2 for pair in pairs):
+        raise SpecError("Sensitivity blocks require identity/score pairs.")
+    return ControlResult(
+        _report_string(raw["name"]),
+        _report_string(raw["configuration_digest"]),
+        _report_string(raw["execution_identity"]),
+        _report_int(raw["planned"]),
+        _report_int(raw["completed"]),
+        None if raw["balanced_score"] is None else _report_float(raw["balanced_score"]),
+        tuple(
+            (_report_string(pair[0]), None if pair[1] is None else _report_float(pair[1]))
+            for pair in pairs
+        ),
+        _report_int(raw["changed_action_traces"]),
+        _report_int(raw["changed_match_outcomes"]),
+        _report_int(raw["changed_blocks"]),
+    )
 
 
 def diagnose_decision(

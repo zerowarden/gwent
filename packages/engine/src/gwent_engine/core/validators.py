@@ -114,7 +114,13 @@ def validate_play_card_action(
 
     player = state.player(action.player_id)
     try:
-        validate_in_round_player_can_act(state, player)
+        validate_in_round_player_can_act(
+            state,
+            player,
+            card_registry=card_registry,
+            leader_registry=leader_registry,
+            rng=rng,
+        )
         validate_play_card_legality(
             state,
             player,
@@ -129,11 +135,24 @@ def validate_play_card_action(
         ) from exc
 
 
-def validate_pass_action(state: GameState, action: PassAction) -> None:
+def validate_pass_action(
+    state: GameState,
+    action: PassAction,
+    *,
+    card_registry: CardRegistry | None = None,
+    leader_registry: LeaderRegistry | None = None,
+    rng: SupportsRandom | None = None,
+) -> None:
     _require_in_round_action_phase(state, "PassAction")
 
     player = state.player(action.player_id)
-    validate_in_round_player_can_act(state, player)
+    validate_in_round_player_can_act(
+        state,
+        player,
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+    )
 
 
 def validate_leave_action(state: GameState, action: LeaveAction) -> None:
@@ -186,6 +205,13 @@ def validate_use_leader_ability_action(
         raise IllegalActionError("UseLeaderAbilityAction requires a leader registry.")
     if card_registry is None:
         raise IllegalActionError("UseLeaderAbilityAction requires a card registry.")
+    validate_in_round_player_can_act(
+        state,
+        state.player(action.player_id),
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+    )
     validate_use_leader_ability_legality(
         state,
         action,

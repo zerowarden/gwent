@@ -223,7 +223,7 @@ This tiny example executes four synthetic smoke matches. It returns
 also requires `sensitivity_report=<matching SensitivityReport>` from a clean
 study; missing, stale, or insufficient preflight evidence fails before games.
 Seeded random and bounded CMA proposal backends are available in Python. Durable
-study orchestration and a CLI for complete optimization runs remain future work.
+study orchestration is available through `run_study()` and `tune pilot` below.
 
 `TrialEvaluation` includes configuration/candidate identities, suite and benchmark
 identities, verified result paths/checksums, coverage counts, status/reasons, and
@@ -454,6 +454,90 @@ incumbent once; each method's comparison counts also include that incumbent,
 so method totals must not be added together. This differs from the objective
 adapter's per-invocation `fresh_matches` counter. Timings and preflight disk usage
 do not enter the frozen scientific evidence used for journal replay.
+
+## Validation, confirmation, and portable policies
+
+Run these commands from the same clean checkout and pinned environment as the
+pilot. The argument is the completed **optimization directory**, not the pilot
+root. `select` verifies the optimization journal and match evidence without
+generating additional proposals, then runs validation only:
+
+```bash
+make pilot PILOT_OUTPUT=.output/pilot-current
+uv run --locked --group tuning python -m gwent_evaluation tune select .output/pilot-current/data/optimization
+```
+
+Selection freezes up to the declared number of distinct configurations that beat
+the optimization incumbent, preserving the existing deterministic ranking. It
+evaluates those finalists and the incumbent on the separate validation suite.
+A challenger qualifies only with positive paired improvement, a bootstrap lower
+endpoint above zero, and no opponent/deck point-estimate decline beyond the
+declared limit. Equal best qualifying finalist scores retain the incumbent.
+Missing or failed evidence, insufficient blocks, and inconclusive comparisons
+also retain it, with structured reasons. Validation intervals are affected by
+selection and are not independent evidence of improvement.
+
+Read `selection/report.json` for the outcome. A selected configuration is frozen
+in `selection/selection.json` and exported as `selection/selected-policy.json`
+with status `unpromoted`. If no challenger qualifies, no test games or challenger
+artifact are produced. The source defaults and opponent catalog are unchanged.
+
+When a challenger is selected, record the repository's correctness checks, then
+explicitly consume held-out evidence:
+
+```bash
+uv run --locked --group tuning python -m gwent_evaluation tune verify .output/pilot-current/data/optimization
+uv run --locked --group tuning python -m gwent_evaluation tune finalize .output/pilot-current/data/optimization
+```
+
+`verify` runs `make check` (pytest, Ruff, mypy, and basedpyright), including the
+legality, information-invariance, recovery, and artifact tests. Its captured
+output is `selection/verification.log`; a checksummed receipt binds the outcome
+and log digest to the study and selected policy. Finalization requires passing,
+unchanged verification evidence before playing test games. A failed verification
+returns exit code 1 and leaves test cases untouched. A code or dependency fix
+requires a new study; verification cannot carry across implementations.
+
+`finalize` evaluates only the frozen challenger and incumbent on the study's
+test suite. Promotion requires complete valid evidence, the declared minimum
+paired improvement, a bootstrap lower endpoint above zero, and all predeclared
+opponent/deck regression guards. These subgroup guards are descriptive, not a
+simultaneous statistical guarantee. A rejected challenger never causes a runner-up
+to be tested. `selection/confirmation/report.json` records the decision and
+reasons. `selection/confirmation/policy.json` contains the confirmed configuration
+with an explicit `promoted` or `unpromoted` status; it never changes defaults.
+
+Repeating `select` or `finalize` verifies committed records and resumes only
+uncommitted work. Interrupted confirmation always retains the same selection,
+thresholds, and verification receipt. Both commands accept `--recover-lock`
+after process death. Tampered artifacts, missing committed results, changed
+inputs, and mismatched digests are conflicts, not reasons to restart or repair
+the experiment. Reusing the same completed command does not consume more games.
+
+An artifact embeds the entire configuration and can be copied outside its study.
+Use it through ordinary evaluation or the engine factory:
+
+```bash
+uv run --locked python -m gwent_evaluation run --suite smoke-v1 \
+  --candidate-artifact .output/pilot-current/data/optimization/selection/confirmation/policy.json
+```
+
+```python
+from pathlib import Path
+from gwent_engine.ai.arena import load_policy_bot
+
+bot = load_policy_bot(Path("policy.json"), bot_id="candidate")
+```
+
+The artifact has schema, family, observation/configuration compatibility versions,
+configuration and content digests, promotion status, and provenance/evidence
+digests. Runtime loading needs neither the study directory nor the tuning extra.
+Unpromoted artifacts are usable for diagnostics. Loading a compatible artifact
+on a later engine does not renew its historical strength claim. Ordinary runs
+embed its configuration, so later reproduction does not require the artifact file.
+
+Genuine test outcomes are reserved for the frozen confirmation. Once observed,
+they must not guide another candidate selection on the same test partition.
 
 ## Reproducibility rules
 

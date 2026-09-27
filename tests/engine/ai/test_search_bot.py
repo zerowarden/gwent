@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline.profile_catalog import DEFAULT_BASE_PROFILE
 from gwent_engine.ai.observations import (
@@ -29,7 +31,12 @@ from gwent_engine.ai.simulation import (
 )
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import ChoiceSourceKind, FactionId, GameStatus, Phase, Row
-from gwent_engine.core.actions import PassAction, PlayCardAction, ResolveChoiceAction
+from gwent_engine.core.actions import (
+    PassAction,
+    PlayCardAction,
+    ResolveChoiceAction,
+    UseLeaderAbilityAction,
+)
 from gwent_engine.core.ids import (
     CardDefinitionId,
     CardInstanceId,
@@ -317,6 +324,7 @@ def test_search_engine_does_not_expect_a_reply_from_an_exhausted_opponent() -> N
             "p2",
             faction="northern_realms",
             leader_id=str(NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID),
+            leader_used=True,
             board=rows(siege=[card("p2_catapult", "northern_realms_catapult")]),
         )
         .build()
@@ -346,6 +354,49 @@ def test_search_engine_does_not_expect_a_reply_from_an_exhausted_opponent() -> N
         player_id=PLAYER_ONE_ID,
         card_instance_id=CardInstanceId("p1_catapult"),
         target_row=Row.SIEGE,
+    )
+
+
+def test_search_engine_expects_leader_reply_from_empty_handed_opponent() -> None:
+    state = (
+        scenario("search_empty_handed_opponent_with_leader")
+        .player(
+            "p1",
+            hand=[card("p1_catapult", "northern_realms_catapult")],
+            board=rows(siege=[card("p1_trebuchet", "northern_realms_trebuchet")]),
+        )
+        .player(
+            "p2",
+            faction="northern_realms",
+            leader_id=str(NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID),
+            board=rows(siege=[card("p2_catapult", "northern_realms_catapult")]),
+        )
+        .current_player(PLAYER_TWO_ID)
+        .build()
+    )
+    state = replace(state, round_number=3)
+
+    decision = should_search_opponent_reply(
+        state,
+        viewer_player_id=PLAYER_ONE_ID,
+        config=DEFAULT_SEARCH_CONFIG,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert decision.enabled is True
+
+    candidates = generate_opponent_reply_candidates(
+        state,
+        viewer_player_id=PLAYER_ONE_ID,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        config=DEFAULT_SEARCH_CONFIG,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert any(
+        isinstance(candidate.action, UseLeaderAbilityAction) for candidate in candidates
     )
 
 
