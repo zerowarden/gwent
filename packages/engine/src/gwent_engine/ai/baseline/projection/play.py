@@ -72,14 +72,29 @@ class PlayProjectionResolver(ProjectionResolverContext):
         )
 
     @cached_property
-    def remaining_hand(self) -> list[CardDefinition]:
-        return list(
-            remaining_hand_definitions(
-                self.observation,
-                self.card_registry,
-                self.action.card_instance_id,
+    def mustered_hand_definitions(self) -> tuple[CardDefinition, ...]:
+        definition = self.definition
+        if definition is None or AbilityKind.MUSTER not in definition.ability_kinds:
+            return ()
+        muster_group = definition.resolved_musters_group
+        return tuple(
+            card
+            for card in remaining_hand_definitions(
+                self.observation, self.card_registry, self.action.card_instance_id
             )
+            if card.muster_group == muster_group
         )
+
+    @cached_property
+    def remaining_hand(self) -> list[CardDefinition]:
+        mustered = set(self.mustered_hand_definitions)
+        return [
+            card
+            for card in remaining_hand_definitions(
+                self.observation, self.card_registry, self.action.card_instance_id
+            )
+            if card not in mustered
+        ]
 
     def resolve(self) -> PlayActionProjection:
         current_horn_option_value = reachable_horn_option_value(
@@ -277,6 +292,16 @@ class PlayProjectionResolver(ProjectionResolverContext):
             viewer_hand_count_after += immediate_draw_count
         muster_group = definition.resolved_musters_group
         if AbilityKind.MUSTER in definition.ability_kinds and muster_group is not None:
+            viewer_hand_count_after -= len(self.mustered_hand_definitions)
+            projected_cards.extend(
+                ProjectedBattlefieldCard(
+                    definition=card,
+                    owner=self.observation.viewer_player_id,
+                    battlefield_side=battlefield_side,
+                    row=row,
+                )
+                for card in self.mustered_hand_definitions
+            )
             projected_cards.extend(
                 projected_muster_cards_from_viewer_deck(
                     self.observation,

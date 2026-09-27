@@ -96,11 +96,6 @@ def test_agile_unit_cleans_up_like_a_normal_unit() -> None:
         PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
     )
-    next_state, _ = apply_action(
-        state,
-        PassAction(player_id=PLAYER_ONE_ID),
-        card_registry=card_registry,
-    )
 
-    assert agile_card_id in next_state.player(PLAYER_ONE_ID).discard
-    assert next_state.player(PLAYER_ONE_ID).rows.all_cards() == ()
+    assert agile_card_id in state.player(PLAYER_ONE_ID).discard
+    assert state.player(PLAYER_ONE_ID).rows.all_cards() == ()

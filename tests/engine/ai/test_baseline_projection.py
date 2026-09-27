@@ -294,6 +294,38 @@ def test_project_play_action_counts_visible_muster_from_deck() -> None:
     assert projection.viewer_hand_count_after == 0
 
 
+def test_project_play_action_consumes_matching_muster_cards_in_hand() -> None:
+    brewess_id = CardInstanceId("p1_crone_brewess")
+    state = (
+        scenario("projection_muster_from_hand_and_deck")
+        .player(
+            "p1",
+            hand=[
+                card(brewess_id, "monsters_crone_brewess"),
+                card("p1_crone_weavess", "monsters_crone_weavess"),
+            ],
+            deck=[card("p1_crone_whispess", "monsters_crone_whispess")],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    action = _play_action_for(
+        state,
+        card_registry=CARD_REGISTRY,
+        card_instance_id=brewess_id,
+    )
+
+    projection = project_play_action(
+        action,
+        observation=observation,
+        card_registry=CARD_REGISTRY,
+    )
+
+    assert projection.projected_net_board_swing == 18
+    assert projection.viewer_hand_count_after == 0
+    assert projection.post_action_hand_value == 0
+
+
 def test_project_play_action_only_values_horn_when_draw_reachable() -> None:
     spy_card_id = CardInstanceId("p1_spy")
     state = (
@@ -708,7 +740,7 @@ def test_project_play_action_transforms_new_berserker_on_active_mardroeme_row() 
         .player(
             "p1",
             hand=[card(young_berserker_card_id, "skellige_young_berserker")],
-            board=rows(close=[card("p1_ermion", "skellige_ermion")]),
+            board=rows(ranged=[card("p1_ermion", "skellige_ermion")]),
         )
         .build()
     )

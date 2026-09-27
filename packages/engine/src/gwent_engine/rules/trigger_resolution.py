@@ -24,6 +24,7 @@ from gwent_engine.rules.round_resolution import (
     is_round_effectively_over,
     next_round_starter,
 )
+from gwent_engine.rules.state_ops import assign_round_priority
 
 
 def resolve_post_action_transitions(
@@ -82,25 +83,35 @@ def resolve_post_action_transitions(
             + match_events,
         )
 
+    starting_player = next_round_starter(state, modified_outcome)
     next_state, round_start_events = start_next_round(
         reward_state,
-        starting_player=next_round_starter(state, modified_outcome),
+        starting_player=starting_player,
     )
     final_state, round_start_passive_events = resolve_round_start_passives(
         next_state,
         card_registry=card_registry,
         rng=rng,
     )
-    return (
-        final_state,
+    final_state = assign_round_priority(final_state, starting_player)
+    events = (
         modifier_events
         + round_events
         + cleanup_modifier_events
         + cleanup_events
         + reward_events
         + round_start_events
-        + round_start_passive_events,
+        + round_start_passive_events
     )
+    if final_state.phase == final_state.phase.ROUND_RESOLUTION:
+        final_state, empty_round_events = resolve_post_action_transitions(
+            final_state,
+            card_registry=card_registry,
+            rng=rng,
+            leader_registry=leader_registry,
+        )
+        events += empty_round_events
+    return final_state, events
 
 
 def _should_resolve_round(state: GameState) -> bool:

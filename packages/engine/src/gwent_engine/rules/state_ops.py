@@ -1,6 +1,6 @@
 from dataclasses import replace
 
-from gwent_engine.core import Row, Zone
+from gwent_engine.core import Phase, Row, Zone
 from gwent_engine.core.config import MAX_HAND_SIZE
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
@@ -68,11 +68,19 @@ def replace_card_instances(
     return tuple(updated_cards.get(card.instance_id, card) for card in card_instances)
 
 
-def next_player_after_non_pass_action(state: GameState, acting_player_id: PlayerId) -> PlayerId:
+def advance_turn_after_action(state: GameState, acting_player_id: PlayerId) -> GameState:
     opponent = other_player_from_pair(state.players, acting_player_id)
-    if opponent.has_passed:
-        return acting_player_id
-    return opponent.player_id
+    return assign_round_priority(state, opponent.player_id)
+
+
+def assign_round_priority(state: GameState, preferred_player_id: PlayerId) -> GameState:
+    preferred = state.player(preferred_player_id)
+    if not preferred.is_done_for_round:
+        return replace(state, current_player=preferred_player_id, phase=Phase.IN_ROUND)
+    alternate = other_player_from_pair(state.players, preferred_player_id)
+    if not alternate.is_done_for_round:
+        return replace(state, current_player=alternate.player_id, phase=Phase.IN_ROUND)
+    return replace(state, current_player=None, phase=Phase.ROUND_RESOLUTION)
 
 
 def drawable_card_ids(player: PlayerState, requested_count: int) -> tuple[CardInstanceId, ...]:

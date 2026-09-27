@@ -5,7 +5,6 @@ from gwent_engine.core import (
     GameStatus,
     LeaderAbilityKind,
     LeaderAbilityMode,
-    Phase,
     Zone,
 )
 from gwent_engine.core.actions import UseLeaderAbilityAction
@@ -34,10 +33,10 @@ from gwent_engine.rules.players import other_player_from_pair, replace_player
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.scoring import calculate_effective_strength
 from gwent_engine.rules.state_ops import (
+    advance_turn_after_action,
     append_to_row,
     card_in_zone,
     draw_cards_into_hand,
-    next_player_after_non_pass_action,
     replace_card_instance,
     replace_card_instances,
 )
@@ -96,13 +95,14 @@ def apply_use_leader_ability(
         resolved_player,
         leader=replace(resolved_player.leader, used=True),
     )
-    final_state = replace(
-        next_state,
-        players=replace_player(next_state.players, updated_player),
-        current_player=next_player_after_non_pass_action(next_state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    final_state = advance_turn_after_action(
+        replace(
+            next_state,
+            players=replace_player(next_state.players, updated_player),
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return final_state, events
 

@@ -8,7 +8,6 @@ from gwent_engine.core import (
     AbilityKind,
     CardType,
     GameStatus,
-    Phase,
     Zone,
 )
 from gwent_engine.core.actions import PassAction, PlayCardAction
@@ -34,12 +33,12 @@ from gwent_engine.rules.battlefield_effects import (
     weather_row_for,
 )
 from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
-from gwent_engine.rules.players import other_player_from_pair, replace_player
+from gwent_engine.rules.players import replace_player
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.state_ops import (
+    advance_turn_after_action,
     append_to_row,
     card_in_zone,
-    next_player_after_non_pass_action,
     replace_card_instance,
     replace_card_instances,
     replace_row_card,
@@ -113,28 +112,20 @@ def apply_pass(
     player = state.player(action.player_id)
     updated_player = replace(player, has_passed=True)
     updated_players = replace_player(state.players, updated_player)
-    opponent = other_player_from_pair(updated_players, action.player_id)
-
-    if opponent.has_passed:
-        next_phase = Phase.ROUND_RESOLUTION
-        next_current_player = None
-    else:
-        next_phase = Phase.IN_ROUND
-        next_current_player = opponent.player_id
-
     events: tuple[GameEvent, ...] = (
         PlayerPassedEvent(
             event_id=state.event_counter + 1,
             player_id=action.player_id,
         ),
     )
-    next_state = replace(
-        state,
-        players=updated_players,
-        current_player=next_current_player,
-        phase=next_phase,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            state,
+            players=updated_players,
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -214,12 +205,13 @@ def _apply_commanders_horn(
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del card_registry, leader_registry, rng
     base_state, events = _apply_row_targeted_special_base(state, action, player, ability_kind)
-    next_state = replace(
-        base_state,
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            base_state,
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -252,15 +244,16 @@ def _apply_weather_card(
             target_row=affected_row,
         ),
     )
-    next_state = replace(
-        state,
-        players=replace_player(state.players, updated_player),
-        card_instances=replace_card_instance(state.card_instances, updated_card),
-        weather=append_to_row(state.weather, affected_row, action.card_instance_id),
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            state,
+            players=replace_player(state.players, updated_player),
+            card_instances=replace_card_instance(state.card_instances, updated_card),
+            weather=append_to_row(state.weather, affected_row, action.card_instance_id),
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -291,12 +284,13 @@ def _apply_special_mardroeme(
         event_id_start=state.event_counter + len(base_events) + 1,
     )
     events = (*base_events, *transform_events)
-    next_state = replace(
-        transformed_state,
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            transformed_state,
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -323,15 +317,16 @@ def _apply_clear_weather(
     )
     discarded_card_ids = (*cleared_weather_ids, action.card_instance_id)
     events = _special_card_discard_events(state, action, ability_kind, discarded_card_ids)
-    next_state = replace(
-        state,
-        players=updated_players,
-        card_instances=replace_card_instances(state.card_instances, updated_cards),
-        weather=RowState(),
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            state,
+            players=updated_players,
+            card_instances=replace_card_instances(state.card_instances, updated_cards),
+            weather=RowState(),
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -374,14 +369,15 @@ def _apply_scorch(
         *_special_card_discard_events(state, action, ability_kind, discarded_card_ids),
         *destroy_events,
     )
-    next_state = replace(
-        scorched_state,
-        players=replace_player(scorched_state.players, updated_player),
-        card_instances=replace_card_instances(scorched_state.card_instances, updated_cards),
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            scorched_state,
+            players=replace_player(scorched_state.players, updated_player),
+            card_instances=replace_card_instances(scorched_state.card_instances, updated_cards),
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 
@@ -457,12 +453,13 @@ def _apply_decoy(
         queue_for_next_round=False,
     )
     events = (*base_events, *avenger_events)
-    next_state = replace(
-        next_state,
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(events),
+    next_state = advance_turn_after_action(
+        replace(
+            next_state,
+            status=GameStatus.IN_PROGRESS,
+            event_counter=state.event_counter + len(events),
+        ),
+        action.player_id,
     )
     return next_state, events
 

@@ -30,7 +30,7 @@ cards:
     card_type: unit
     base_strength: 2
     allowed_rows: [close, ranged]
-    ability_kinds: []
+    ability_kinds: [agile]
   - definition_id: monsters_cockatrice
     name: Cockatrice 
     faction: monsters
@@ -229,7 +229,7 @@ cards:
     name: "Vampire: Katakan"
     faction: monsters
     card_type: unit
-    base_strength: 4
+    base_strength: 5
     allowed_rows: [close]
     ability_kinds: [muster]
     muster_group: vampire
@@ -304,8 +304,8 @@ cards:
     card_type: unit
     base_strength: 3
     allowed_rows: [close]
-    ability_kinds: [muster]
-    muster_group: brigade_guard
+    ability_kinds: [tight_bond]
+    bond_group: brigade_guard
     max_copies_per_deck: 4
   - definition_id: nilfgaard_letho
     name: Letho of Gulet
@@ -344,8 +344,8 @@ cards:
     card_type: unit
     base_strength: 2
     allowed_rows: [close]
-    ability_kinds: [muster]
-    muster_group: nausicaa_cavalry
+    ability_kinds: [tight_bond]
+    bond_group: nausicaa_cavalry
   - definition_id: nilfgaard_puttkammer
     name: Puttkammer
     faction: nilfgaard
@@ -444,8 +444,8 @@ cards:
     card_type: unit
     base_strength: 5
     allowed_rows: [close]
-    ability_kinds: [muster]
-    muster_group: young_emissary
+    ability_kinds: [tight_bond]
+    bond_group: young_emissary
   - definition_id: nilfgaard_zerrikanian_fire_scorpion
     name: Zerrikanian Fire Scorpion
     faction: nilfgaard
@@ -638,7 +638,6 @@ cards:
     base_strength: 5
     allowed_rows: [close]
     ability_kinds: []
-    is_hero: true
   - definition_id: northern_realms_yarpen_zigrin
     name: Yarpen Zigrin
     faction: northern_realms
@@ -901,7 +900,7 @@ cards:
     card_type: unit
     base_strength: 2
     allowed_rows: [siege]
-    ability_kinds: [commanders_horn]
+    ability_kinds: [unit_commanders_horn]
   - definition_id: skellige_ermion
     name: Ermion
     faction: skellige
@@ -945,8 +944,8 @@ cards:
     name: Light Longship
     faction: skellige
     card_type: unit
-    base_strength: 2
-    allowed_rows: [siege]
+    base_strength: 4
+    allowed_rows: [ranged]
     ability_kinds: [muster]
     muster_group: light_longship
   - definition_id: skellige_madman_lugos
@@ -969,7 +968,7 @@ cards:
     card_type: unit
     base_strength: 12
     allowed_rows: [close, ranged]
-    ability_kinds: [morale_boost]
+    ability_kinds: [agile, morale_boost]
   - definition_id: skellige_svanrige
     name: Svanrige
     faction: skellige
@@ -997,8 +996,8 @@ cards:
     name: Young Berserker
     faction: skellige
     card_type: unit
-    base_strength: 4
-    allowed_rows: [close]
+    base_strength: 2
+    allowed_rows: [ranged]
     ability_kinds: [berserker]
     transforms_into_definition_id: skellige_transformed_young_vildkaarl
     max_copies_per_deck: 3
@@ -1090,7 +1089,7 @@ cards:
     base_strength: 2
     allowed_rows: [siege]
     ability_kinds: [muster]
-    muster_group: darkness
+    musters_group: darkness
   - definition_id: neutral_gaunter_darkness
     name: "Gaunter O'Dimm: Darkness"
     faction: neutral
@@ -1130,7 +1129,7 @@ cards:
     card_type: unit
     base_strength: 6
     allowed_rows: [close, ranged]
-    ability_kinds: [morale_boost]
+    ability_kinds: [agile, morale_boost]
   - definition_id: neutral_scorch
     name: Scorch
     faction: neutral

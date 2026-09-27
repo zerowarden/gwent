@@ -55,6 +55,38 @@ def test_unit_horn_activates_and_doubles_non_hero_units_on_its_row() -> None:
     assert calculate_effective_strength(next_state, card_registry, hero_card_id) == 15
 
 
+def test_draig_bon_dhu_activates_siege_horn_when_played() -> None:
+    draig_id = CardInstanceId("p1_draig")
+    siege_unit_id = CardInstanceId("p1_siege_unit")
+    state = (
+        scenario("draig_activates_siege_horn")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card(draig_id, "skellige_clan_draig_bon_dhu")],
+            board=rows(siege=[card(siege_unit_id, "skellige_war_longship")]),
+        )
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_reserve", "scoiatael_mahakaman_defender")],
+        )
+        .build()
+    )
+
+    next_state, events = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=draig_id,
+            target_row=Row.SIEGE,
+        ),
+        card_registry=CARD_REGISTRY,
+    )
+
+    assert any(isinstance(event, UnitHornActivatedEvent) for event in events)
+    assert row_has_commanders_horn(next_state, CARD_REGISTRY, PLAYER_ONE_ID, Row.SIEGE)
+    assert calculate_effective_strength(next_state, CARD_REGISTRY, siege_unit_id) == 12
+
+
 def test_unit_horn_is_suppressed_when_special_horn_already_affects_the_row() -> None:
     card_registry = CARD_REGISTRY
     horn_unit_card_id = CardInstanceId("p1_hornmaster_troubadour")

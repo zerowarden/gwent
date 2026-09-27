@@ -109,12 +109,14 @@ def test_passive_event_order_is_deterministic_when_multiple_passives_trigger() -
             "p1",
             faction=FactionId.MONSTERS,
             leader_id=MONSTERS_CLOSE_HORN_LEADER_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
             board=rows(close=[card("p1_monsters_frontliner", "monsters_griffin")]),
         )
         .player(
             "p2",
             faction=FactionId.NORTHERN_REALMS,
             leader_id=NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID,
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
             deck=[card("p2_northern_realms_deck_top", "northern_realms_ballista")],
             board=rows(siege=[card("p2_northern_realms_sieger", "northern_realms_catapult")]),
         )
@@ -139,10 +141,12 @@ def test_passive_event_order_is_deterministic_when_multiple_passives_trigger() -
         "RoundEndedEvent",
         "FactionPassiveTriggeredEvent",
         "CardsMovedToDiscardEvent",
+        "FactionPassiveTriggeredEvent",
+        "CardsDrawnEvent",
         "NextRoundStartedEvent",
     ]
-    assert isinstance(events[4], NextRoundStartedEvent)
-    assert next_state.current_player == PlayerId("p1")
+    assert isinstance(events[6], NextRoundStartedEvent)
+    assert next_state.current_player == PlayerId("p2")
 
 
 def _hand_card_for_row(

@@ -3,8 +3,9 @@ PYTEST := uv run pytest
 RUFF := uv run ruff
 MYPY := uv run mypy
 BASEDPYRIGHT := uv run basedpyright
+PILOT_OUTPUT ?= .output/pilot
 
-.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play ai-eval-smoke ai-eval-core service service-sqlite
+.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play ai-eval-smoke ai-eval-core pilot service service-sqlite
 
 ## Sync workspace environment
 sync:
@@ -89,7 +90,11 @@ check: test ruff mypy basedpyright
 ai-play:
 	$(PYTHON) -m gwent_engine.cli.main --mode bot-match
 
-## Run the smoke evaluation suite into .output/experiments
+## Run or resume the complete pilot from a clean committed checkout
+pilot:
+	uv run --locked --group tuning python -m gwent_evaluation tune pilot --output "$(PILOT_OUTPUT)"
+
+## Run the smoke evaluation suite into .output/manual/evaluations
 ai-eval-smoke:
 	$(PYTHON) -m gwent_evaluation run --suite smoke-v1
 

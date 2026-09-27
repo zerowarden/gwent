@@ -30,22 +30,22 @@ from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.avenger import resolve_leave_battlefield_triggers
 from gwent_engine.rules.effect_applicability import (
-    can_target_for_medic,
     eligible_destroyable_unit_ids,
 )
 from gwent_engine.rules.event_builder import EventBuilder
 from gwent_engine.rules.leader_effects import restore_selection_is_randomized
 from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
+from gwent_engine.rules.medic_choices import eligible_medic_target_ids, pending_medic_choice
 from gwent_engine.rules.players import (
     opponent_player_id_from_state,
     other_player_from_state,
 )
 from gwent_engine.rules.row_effects import horn_source_for_row
 from gwent_engine.rules.state_ops import (
+    advance_turn_after_action,
     append_to_row,
     card_in_zone,
     draw_cards_into_hand,
-    next_player_after_non_pass_action,
     remove_from_play_source_zone,
     replace_card_instance,
     replace_card_instances,
@@ -99,14 +99,46 @@ def apply_unit_card(
         preferred_row=action.target_row,
         context=context,
     )
-    next_state = replace(
-        next_state,
-        current_player=next_player_after_non_pass_action(state, action.player_id),
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
-        event_counter=state.event_counter + len(context.event_builder.build()),
-    )
+    next_state = _finish_unit_resolution(next_state, action.player_id, context)
     return next_state, context.event_builder.build()
+
+
+def resolve_played_medic_choice(
+    state: GameState,
+    *,
+    player_id: PlayerId,
+    medic_card_id: CardInstanceId,
+    target_card_id: CardInstanceId,
+    card_registry: CardRegistry,
+    leader_registry: LeaderRegistry | None,
+    rng: SupportsRandom | None,
+) -> tuple[GameState, tuple[GameEvent, ...]]:
+    context = AbilityResolutionContext(
+        card_registry=card_registry,
+        leader_registry=leader_registry,
+        rng=rng,
+        event_builder=EventBuilder(base_event_counter=state.event_counter),
+        medic_targets={medic_card_id: target_card_id},
+        reserved_muster_card_ids=set(),
+    )
+    next_state = _resolve_medic_after_play(state, medic_card_id, player_id, context)
+    next_state = _finish_unit_resolution(next_state, player_id, context)
+    return next_state, context.event_builder.build()
+
+
+def _finish_unit_resolution(
+    state: GameState,
+    player_id: PlayerId,
+    context: AbilityResolutionContext,
+) -> GameState:
+    next_state = replace(
+        state,
+        status=GameStatus.IN_PROGRESS,
+        event_counter=context.event_builder.base_event_counter + len(context.event_builder.build()),
+    )
+    if next_state.pending_choice is not None:
+        return replace(next_state, current_player=player_id, phase=Phase.IN_ROUND)
+    return advance_turn_after_action(next_state, player_id)
 
 
 def strongest_eligible_unit_card_ids(
@@ -347,6 +379,8 @@ def _resolve_after_unit_played(
     definition = context.card_registry.get(state.card(card_instance_id).definition_id)
     next_state = state
     for ability_kind in definition.ability_kinds:
+        if next_state.pending_choice is not None:
+            break
         handler = AFTER_UNIT_PLAYED_HANDLERS.get(ability_kind)
         if handler is not None:
             next_state = handler(
@@ -395,10 +429,8 @@ def _resolve_medic_after_play(
 ) -> GameState:
     current_state = state
     resurrected_card_id: CardInstanceId | None = None
-    eligible_target_ids = _eligible_medic_target_ids(
-        current_state,
-        card_registry=context.card_registry,
-        player_id=played_by_player_id,
+    eligible_target_ids = eligible_medic_target_ids(
+        current_state, context.card_registry, played_by_player_id
     )
     target_card_id = _select_medic_target_after_play(
         current_state,
@@ -406,6 +438,19 @@ def _resolve_medic_after_play(
         eligible_target_ids,
         context,
     )
+    if target_card_id is None and eligible_target_ids:
+        source_row = current_state.card(card_instance_id).row
+        assert source_row is not None
+        pending_choice = pending_medic_choice(
+            current_state,
+            card_registry=context.card_registry,
+            player_id=played_by_player_id,
+            source_card_instance_id=card_instance_id,
+            source_row=source_row,
+            event_counter=_next_event_id(context) - 1,
+        )
+        assert pending_choice is not None
+        return replace(current_state, pending_choice=pending_choice)
     if target_card_id is not None and target_card_id in eligible_target_ids:
         resurrected_card_id = target_card_id
         current_state = _play_unit_card_instance(
@@ -435,13 +480,14 @@ def _select_medic_target_after_play(
     eligible_target_ids: tuple[CardInstanceId, ...],
     context: AbilityResolutionContext,
 ) -> CardInstanceId | None:
-    if restore_selection_is_randomized(state, context.leader_registry):
+    if restore_selection_is_randomized(
+        state,
+        context.leader_registry,
+        card_registry=context.card_registry,
+        medic_card_id=card_instance_id,
+    ):
         return _select_randomized_medic_target(eligible_target_ids, context)
-    return _select_explicit_or_fallback_medic_target(
-        card_instance_id,
-        eligible_target_ids,
-        context,
-    )
+    return context.medic_targets.pop(card_instance_id, None)
 
 
 def _select_randomized_medic_target(
@@ -455,19 +501,6 @@ def _select_randomized_medic_target(
     return context.rng.choice(eligible_target_ids)
 
 
-def _select_explicit_or_fallback_medic_target(
-    card_instance_id: CardInstanceId,
-    eligible_target_ids: tuple[CardInstanceId, ...],
-    context: AbilityResolutionContext,
-) -> CardInstanceId | None:
-    target_card_id = context.medic_targets.pop(card_instance_id, None)
-    if target_card_id is not None or not eligible_target_ids:
-        return target_card_id
-    # Internal recursive Medic chains use a deterministic first-eligible fallback
-    # until the engine grows a richer multi-choice payload.
-    return eligible_target_ids[0]
-
-
 def _resolve_muster_after_play(
     state: GameState,
     card_instance_id: CardInstanceId,
@@ -478,14 +511,15 @@ def _resolve_muster_after_play(
     muster_group = definition.resolved_musters_group
     assert muster_group is not None
 
+    player = state.player(played_by_player_id)
     mustered_card_ids = tuple(
-        deck_card_id
-        for deck_card_id in state.player(played_by_player_id).deck
-        if deck_card_id not in context.reserved_muster_card_ids
+        candidate_card_id
+        for candidate_card_id in (*player.hand, *player.deck)
+        if candidate_card_id not in context.reserved_muster_card_ids
         if _belongs_to_muster_group(
             state,
             context.card_registry,
-            deck_card_id,
+            candidate_card_id,
             muster_group,
         )
     )
@@ -494,12 +528,13 @@ def _resolve_muster_after_play(
     played_card_ids: list[CardInstanceId] = []
     context.reserved_muster_card_ids.update(mustered_card_ids)
     for mustered_card_id in mustered_card_ids:
-        if current_state.card(mustered_card_id).zone != Zone.DECK:
+        source_zone = current_state.card(mustered_card_id).zone
+        if source_zone not in (Zone.HAND, Zone.DECK):
             continue
         current_state = _play_unit_card_instance(
             current_state,
             card_instance_id=mustered_card_id,
-            source_zone=Zone.DECK,
+            source_zone=source_zone,
             played_by_player_id=played_by_player_id,
             target_row=None,
             preferred_row=preferred_row,
@@ -517,24 +552,6 @@ def _resolve_muster_after_play(
         ),
     )
     return current_state
-
-
-def _eligible_medic_target_ids(
-    state: GameState,
-    *,
-    card_registry: CardRegistry,
-    player_id: PlayerId,
-) -> tuple[CardInstanceId, ...]:
-    return tuple(
-        card_id
-        for card_id in state.player(player_id).discard
-        if can_target_for_medic(
-            state,
-            card_registry,
-            player=state.player(player_id),
-            target_card_id=card_id,
-        )
-    )
 
 
 def _resolve_unit_horn_after_play(

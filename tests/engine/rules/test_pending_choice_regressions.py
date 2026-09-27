@@ -70,6 +70,7 @@ def test_simple_one_shot_leader_does_not_create_pending_choice() -> None:
             PLAYER_ONE_ID,
             faction=FactionId.NORTHERN_REALMS,
             leader_id=NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
         )
         .build()
     )

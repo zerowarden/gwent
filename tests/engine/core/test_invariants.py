@@ -27,6 +27,7 @@ from gwent_engine.core.state import (
     RowState,
 )
 
+from tests.engine.scenario_builder import scenario
 from tests.engine.support import CARD_REGISTRY
 
 
@@ -57,8 +58,8 @@ def test_invariants_fail_when_current_player_has_already_passed() -> None:
         player_id=PlayerId("p1"),
         faction=FactionId.MONSTERS,
         leader=LeaderState(leader_id=LeaderId("monsters_eredin_commander_of_the_red_riders")),
-        deck=(CardInstanceId("card_1"),),
-        hand=(),
+        deck=(),
+        hand=(CardInstanceId("card_1"),),
         discard=(),
         rows=RowState(),
         has_passed=True,
@@ -80,7 +81,7 @@ def test_invariants_fail_when_current_player_has_already_passed() -> None:
                 instance_id=CardInstanceId("card_1"),
                 definition_id=CardDefinitionId("monsters_griffin"),
                 owner=PlayerId("p1"),
-                zone=Zone.DECK,
+                zone=Zone.HAND,
             ),
         ),
         current_player=PlayerId("p1"),
@@ -89,6 +90,13 @@ def test_invariants_fail_when_current_player_has_already_passed() -> None:
     )
 
     with pytest.raises(InvariantError, match="current player"):
+        check_game_state_invariants(state)
+
+
+def test_invariants_reject_empty_handed_current_player() -> None:
+    state = scenario("empty_handed_current_player").build()
+
+    with pytest.raises(InvariantError, match="current player cannot be done"):
         check_game_state_invariants(state)
 
 
@@ -125,10 +133,10 @@ def test_spy_card_may_live_on_the_opponent_battlefield_side() -> None:
                 battlefield_side=PlayerId("p2"),
             ),
         ),
-        current_player=PlayerId("p1"),
+        current_player=None,
         starting_player=PlayerId("p1"),
         round_starter=PlayerId("p1"),
-        phase=Phase.IN_ROUND,
+        phase=Phase.ROUND_RESOLUTION,
         status=GameStatus.IN_PROGRESS,
     )
 

@@ -109,6 +109,10 @@ def test_game_state_serialization_roundtrip_with_pending_choice() -> None:
 def test_game_state_serialization_roundtrip_with_battlefield_weather() -> None:
     weathered_state = (
         scenario("serialization_roundtrip_with_battlefield_weather")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
+        )
         .weather(
             rows(
                 close=[card("p1_biting_frost_weather", "neutral_biting_frost")],
@@ -129,6 +133,7 @@ def test_game_state_serialization_roundtrip_with_opponent_side_spy() -> None:
         scenario("serialization_roundtrip_with_opponent_side_spy")
         .player(
             PLAYER_ONE_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
             board=rows(
                 close=[
                     card(

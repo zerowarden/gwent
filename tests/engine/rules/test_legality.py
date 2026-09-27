@@ -323,7 +323,7 @@ def test_pending_choice_medic_legality_rejects_explicit_targets(
     )
 
 
-def test_medic_legality_requires_valid_non_hero_unit_in_discard() -> None:
+def test_medic_legality_allows_play_without_valid_resurrection_target() -> None:
     state = (
         scenario("legality_medic_requires_non_hero_unit")
         .player(
@@ -337,11 +337,10 @@ def test_medic_legality_requires_valid_non_hero_unit_in_discard() -> None:
         .build()
     )
 
-    with pytest.raises(IllegalActionError, match="valid non-hero unit card in your discard pile"):
-        _validate_play(
-            state,
-            _play_action("p1_field_surgeon_in_hand", target_row=Row.RANGED),
-        )
+    _validate_play(
+        state,
+        _play_action("p1_field_surgeon_in_hand", target_row=Row.RANGED),
+    )
 
 
 def test_medic_legality_accepts_pending_choice_with_valid_discard_target() -> None:

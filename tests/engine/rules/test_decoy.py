@@ -75,6 +75,10 @@ def test_resolving_decoy_choice_swaps_cards_and_advances_turn() -> None:
             hand=[card(decoy_card_id, "neutral_decoy")],
             board=rows(close=[card(frontliner_card_id, "scoiatael_mahakaman_defender")]),
         )
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
+        )
         .build()
     )
 

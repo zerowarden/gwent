@@ -1,9 +1,11 @@
 """Shared helpers for enabled leader definitions and passive leader modifiers."""
 
+from gwent_engine.cards import CardRegistry
 from gwent_engine.core import LeaderAbilityKind, LeaderAbilityMode
-from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
+from gwent_engine.rules.effect_applicability import is_hero
 
 
 def leader_definition_for_player(
@@ -51,11 +53,16 @@ def any_enabled_passive_leader_has_ability(
 def restore_selection_is_randomized(
     state: GameState,
     leader_registry: LeaderRegistry | None,
+    *,
+    card_registry: CardRegistry,
+    medic_card_id: CardInstanceId,
 ) -> bool:
-    return any_enabled_passive_leader_has_ability(
-        state,
-        leader_registry,
-        LeaderAbilityKind.RANDOMIZE_RESTORE_TO_BATTLEFIELD_SELECTION,
+    return not is_hero(state, card_registry, medic_card_id) and (
+        any_enabled_passive_leader_has_ability(
+            state,
+            leader_registry,
+            LeaderAbilityKind.RANDOMIZE_RESTORE_TO_BATTLEFIELD_SELECTION,
+        )
     )
 
 

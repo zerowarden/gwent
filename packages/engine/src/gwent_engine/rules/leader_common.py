@@ -16,6 +16,7 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
+from gwent_engine.rules.effect_applicability import can_affect_card
 from gwent_engine.rules.players import replace_player
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.selection_validation import (
@@ -150,7 +151,11 @@ def is_agile_battlefield_unit(
     card_id: CardInstanceId,
 ) -> bool:
     definition = card_registry.get(state.card(card_id).definition_id)
-    return definition.is_unit_with(AbilityKind.AGILE)
+    return definition.is_unit_with(AbilityKind.AGILE) and can_affect_card(
+        state,
+        card_registry,
+        target_card_id=card_id,
+    )
 
 
 def move_battlefield_card_to_row(

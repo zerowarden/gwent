@@ -8,6 +8,7 @@ from gwent_engine.core import (
     ChoiceSourceKind,
     LeaderAbilityKind,
     Row,
+    Zone,
 )
 from gwent_engine.core.actions import PlayCardAction, ResolveChoiceAction, UseLeaderAbilityAction
 from gwent_engine.core.errors import IllegalActionError
@@ -16,6 +17,7 @@ from gwent_engine.core.ids import CardInstanceId, ChoiceId, LeaderId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PendingChoice, PlayerState
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.rules.abilities import resolve_played_medic_choice
 from gwent_engine.rules.choice_classification import (
     card_requires_pending_choice,
     leader_requires_pending_choice,
@@ -23,7 +25,6 @@ from gwent_engine.rules.choice_classification import (
 from gwent_engine.rules.effect_applicability import (
     can_affect_card,
     can_target_for_decoy,
-    can_target_for_medic,
 )
 from gwent_engine.rules.leader_abilities import apply_use_leader_ability
 from gwent_engine.rules.leader_common import discard_and_choose_selection_required
@@ -31,6 +32,7 @@ from gwent_engine.rules.leader_effects import (
     leader_definition_for_player,
     restore_selection_is_randomized,
 )
+from gwent_engine.rules.medic_choices import pending_medic_choice
 from gwent_engine.rules.players import other_player_from_state
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.selection_validation import validate_selection_count
@@ -82,27 +84,20 @@ def create_pending_choice_for_medic(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None,
 ) -> PendingChoice | None:
-    if restore_selection_is_randomized(state, leader_registry):
-        return None
-    legal_target_ids = tuple(
-        card_id
-        for card_id in player.discard
-        if can_target_for_medic(
-            state,
-            card_registry,
-            player=player,
-            target_card_id=card_id,
-        )
-    )
-    if not legal_target_ids:
-        raise IllegalActionError("Medic requires a valid unit card in your discard pile.")
-    return _build_pending_choice(
+    if restore_selection_is_randomized(
         state,
-        player=player,
-        source_kind=ChoiceSourceKind.MEDIC,
+        leader_registry,
+        card_registry=card_registry,
+        medic_card_id=source_card_instance_id,
+    ):
+        return None
+    return pending_medic_choice(
+        state,
+        card_registry=card_registry,
+        player_id=player.player_id,
         source_card_instance_id=source_card_instance_id,
-        legal_target_card_instance_ids=legal_target_ids,
         source_row=source_row,
+        event_counter=state.event_counter,
     )
 
 
@@ -394,12 +389,25 @@ def _resolve_pending_medic(
     if card_registry is None:
         raise IllegalActionError("Pending Medic resolution requires a card registry.")
     assert pending_choice.source_card_instance_id is not None
+    source_card_id = pending_choice.source_card_instance_id
+    if base_state.card(source_card_id).zone == Zone.BATTLEFIELD:
+        return resolve_played_medic_choice(
+            base_state,
+            player_id=action.player_id,
+            medic_card_id=source_card_id,
+            target_card_id=action.selected_card_instance_ids[0],
+            card_registry=card_registry,
+            leader_registry=leader_registry,
+            rng=rng,
+        )
+    if base_state.card(source_card_id).zone != Zone.HAND:
+        raise IllegalActionError("Pending Medic source must be in hand or on the battlefield.")
     assert pending_choice.source_row is not None
     return apply_play_card(
         base_state,
         PlayCardAction(
             player_id=action.player_id,
-            card_instance_id=pending_choice.source_card_instance_id,
+            card_instance_id=source_card_id,
             target_row=pending_choice.source_row,
             target_card_instance_id=action.selected_card_instance_ids[0],
         ),

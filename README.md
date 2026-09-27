@@ -57,12 +57,25 @@ make ai-play
 
 ## Evaluation
 
+From a clean committed checkout, recreate or resume the complete tuning pilot:
+
+```bash
+make pilot
+```
+
+Start reading at `.output/README.md`, then `.output/pilot/README.md`. The command
+runs smoke, sensitivity, both optimizers, recovery verification, and reports.
+It uses `experiments/tuning/pilot.json` and never runs validation or test matches.
+Repeated invocations reuse verified matches. All executable logic is tracked in
+the evaluation package; `.output/` contains disposable results only.
+
+
 Run reproducible agent benchmarks:
 
 ```bash
 uv run python -m gwent_evaluation run --suite smoke-v1
-uv run python -m gwent_evaluation report .output/experiments/<run-id>
-uv run python -m gwent_evaluation replay .output/experiments/<run-id> --case <case-id>
+uv run python -m gwent_evaluation report .output/manual/evaluations/<run-id>
+uv run python -m gwent_evaluation replay .output/manual/evaluations/<run-id> --case <case-id>
 uv run python -m gwent_evaluation compare <reference-run> <candidate-run>
 ```
 

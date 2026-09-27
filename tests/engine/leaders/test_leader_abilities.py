@@ -7,9 +7,10 @@ from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import LeaderAbilityResolvedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.rules.leader_common import is_agile_battlefield_unit
 from gwent_engine.rules.scoring import calculate_row_score
 
-from tests.engine.scenario_builder import card, rows, scenario
+from tests.engine.scenario_builder import ScenarioBuilder, card, rows, scenario
 from tests.engine.support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
@@ -33,6 +34,19 @@ from tests.engine.support import (
     build_sample_game_state,
 )
 
+_RESERVE_CARD_ID = CardInstanceId("p1_leader_action_reserve")
+
+
+def leader_scenario(name: str) -> ScenarioBuilder:
+    return (
+        scenario(name)
+        .player(PLAYER_ONE_ID, hand=[card(_RESERVE_CARD_ID, "scoiatael_mahakaman_defender")])
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_leader_action_reserve", "scoiatael_mahakaman_defender")],
+        )
+    )
+
 
 def test_players_have_exactly_one_face_up_leader_state_separate_from_card_zones() -> None:
     state = scenario("leaders_are_face_up_state").build()
@@ -49,7 +63,7 @@ def test_active_clear_weather_leader_consumes_turn_and_cannot_be_used_twice() ->
     frost = card("p2_biting_frost_weather", "neutral_biting_frost", owner=PLAYER_TWO_ID)
     reserve = card("p2_reserve_skirmisher_unit", "scoiatael_vrihedd_brigade_recruit")
     state = (
-        scenario("clear_weather_leader_consumes_turn")
+        leader_scenario("clear_weather_leader_consumes_turn")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NORTHERN_REALMS,
@@ -97,7 +111,7 @@ def test_specific_weather_from_deck_leader_auto_plays_matching_weather_card() ->
     reserve = card("p1_deck_reserve_vanguard_unit", "scoiatael_mahakaman_defender")
     opponent_hand = card("p2_hand_reserve_skirmisher_unit", "scoiatael_vrihedd_brigade_recruit")
     state = (
-        scenario("specific_weather_from_deck_leader")
+        leader_scenario("specific_weather_from_deck_leader")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.SCOIATAEL,
@@ -132,7 +146,7 @@ def test_any_weather_leader_requires_explicit_choice_with_multiple_weather_cards
     reserve = card("p1_deck_reserve_griffin_unit", "monsters_griffin")
     opponent_hand = card("p2_hand_reserve_archer_unit", "scoiatael_dol_blathanna_archer")
     state = (
-        scenario("any_weather_leader_requires_choice")
+        leader_scenario("any_weather_leader_requires_choice")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -179,7 +193,7 @@ def test_horn_own_row_leader_marks_leader_horn_row_and_doubles_row_score() -> No
     ranged_skirmisher = card("p1_ranged_skirmisher_unit", "scoiatael_vrihedd_brigade_recruit")
     opponent_hand = card("p2_hand_reserve_vanguard_unit", "scoiatael_mahakaman_defender")
     state = (
-        scenario("horn_own_row_leader")
+        leader_scenario("horn_own_row_leader")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.SCOIATAEL,
@@ -219,7 +233,7 @@ def test_row_scorch_leader_respects_hero_immunity() -> None:
     second_close = card("p2_close_vanguard_beta", "scoiatael_mahakaman_defender")
     opponent_hand = card("p2_hand_reserve_archer_unit", "scoiatael_dol_blathanna_archer")
     state = (
-        scenario("row_scorch_leader_respects_hero_immunity")
+        leader_scenario("row_scorch_leader_respects_hero_immunity")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.SCOIATAEL,
@@ -260,7 +274,7 @@ def test_discard_and_choose_from_deck_leader_resolves_through_pending_choice() -
     chosen_foglet = card("p1_deck_foglet_to_draw", "monsters_foglet")
     reserve_griffin = card("p1_deck_reserve_griffin", "monsters_griffin")
     state = (
-        scenario("discard_and_choose_from_deck_leader")
+        leader_scenario("discard_and_choose_from_deck_leader")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -330,7 +344,7 @@ def test_discard_and_choose_from_deck_leader_consumes_as_noop_without_discard_ta
     leader_registry = LEADER_REGISTRY
     only_deck_card = card("p1_deck_foglet_without_discard_target", "monsters_foglet")
     state = (
-        scenario("discard_and_choose_no_discard_target")
+        leader_scenario("discard_and_choose_no_discard_target")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -350,7 +364,7 @@ def test_discard_and_choose_from_deck_leader_consumes_as_noop_without_discard_ta
 
     assert next_state.pending_choice is None
     assert next_state.player(PLAYER_ONE_ID).leader.used is True
-    assert next_state.player(PLAYER_ONE_ID).hand == ()
+    assert next_state.player(PLAYER_ONE_ID).hand == (_RESERVE_CARD_ID,)
     assert next_state.player(PLAYER_ONE_ID).deck == (CardInstanceId(only_deck_card.instance_id),)
     assert next_state.player(PLAYER_ONE_ID).discard == ()
     leader_event = next(event for event in events if isinstance(event, LeaderAbilityResolvedEvent))
@@ -367,7 +381,7 @@ def test_discard_and_choose_from_deck_leader_rejects_wrong_zone_composition() ->
     first_deck = card("p1_deck_foglet_pending_pick", "monsters_foglet")
     second_deck = card("p1_deck_griffin_pending_reserve", "monsters_griffin")
     state = (
-        scenario("discard_and_choose_wrong_zone_composition")
+        leader_scenario("discard_and_choose_wrong_zone_composition")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -413,7 +427,7 @@ def test_return_card_from_own_discard_to_hand_leader_moves_selected_card() -> No
     leader_registry = LEADER_REGISTRY
     target_card = card("p1_discard_gargoyle_to_return", "monsters_gargoyle")
     state = (
-        scenario("return_card_from_own_discard")
+        leader_scenario("return_card_from_own_discard")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -449,7 +463,10 @@ def test_return_card_from_own_discard_to_hand_leader_moves_selected_card() -> No
         leader_registry=leader_registry,
     )
 
-    assert next_state.player(PLAYER_ONE_ID).hand == (CardInstanceId(target_card.instance_id),)
+    assert next_state.player(PLAYER_ONE_ID).hand == (
+        _RESERVE_CARD_ID,
+        CardInstanceId(target_card.instance_id),
+    )
     assert next_state.player(PLAYER_ONE_ID).discard == ()
     assert next_state.player(PLAYER_ONE_ID).leader.used is True
     leader_event = next(event for event in events if isinstance(event, LeaderAbilityResolvedEvent))
@@ -462,7 +479,7 @@ def test_return_card_from_own_discard_to_hand_leader_excludes_hero_targets() -> 
     hero_card = card("p1_discard_geralt_illegal_return", "neutral_geralt")
     unit_card = card("p1_discard_catapult_legal_return", "northern_realms_catapult")
     state = (
-        scenario("return_leader_excludes_hero")
+        leader_scenario("return_leader_excludes_hero")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -491,7 +508,7 @@ def test_return_leader_consumes_as_noop_when_only_hero_exists() -> None:
     leader_registry = LEADER_REGISTRY
     hero_card = card("p1_discard_geralt_only_return", "neutral_geralt")
     state = (
-        scenario("return_leader_noop_with_only_hero")
+        leader_scenario("return_leader_noop_with_only_hero")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
@@ -511,7 +528,7 @@ def test_return_leader_consumes_as_noop_when_only_hero_exists() -> None:
 
     assert next_state.pending_choice is None
     assert next_state.player(PLAYER_ONE_ID).leader.used is True
-    assert next_state.player(PLAYER_ONE_ID).hand == ()
+    assert next_state.player(PLAYER_ONE_ID).hand == (_RESERVE_CARD_ID,)
     assert next_state.player(PLAYER_ONE_ID).discard == (CardInstanceId(hero_card.instance_id),)
     assert any(isinstance(event, LeaderAbilityResolvedEvent) for event in events)
 
@@ -526,7 +543,7 @@ def test_reveal_random_opponent_hand_cards_leader_is_deterministic() -> None:
         card("p2_hand_skirmisher_reveal_four", "scoiatael_vrihedd_brigade_recruit"),
     )
     state = (
-        scenario("reveal_random_opponent_hand_cards")
+        leader_scenario("reveal_random_opponent_hand_cards")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NILFGAARD,
@@ -560,7 +577,7 @@ def test_take_card_from_opponent_discard_to_hand_leader_transfers_ownership() ->
         owner=PLAYER_TWO_ID,
     )
     state = (
-        scenario("take_card_from_opponent_discard")
+        leader_scenario("take_card_from_opponent_discard")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NILFGAARD,
@@ -596,7 +613,10 @@ def test_take_card_from_opponent_discard_to_hand_leader_transfers_ownership() ->
         leader_registry=leader_registry,
     )
 
-    assert next_state.player(PLAYER_ONE_ID).hand == (CardInstanceId(stolen_card.instance_id),)
+    assert next_state.player(PLAYER_ONE_ID).hand == (
+        _RESERVE_CARD_ID,
+        CardInstanceId(stolen_card.instance_id),
+    )
     assert next_state.player(PLAYER_TWO_ID).discard == ()
     assert next_state.card(CardInstanceId(stolen_card.instance_id)).owner == PLAYER_ONE_ID
     assert next_state.player(PLAYER_ONE_ID).leader.used is True
@@ -612,7 +632,7 @@ def test_take_card_from_opponent_discard_to_hand_leader_excludes_hero_targets() 
         owner=PLAYER_TWO_ID,
     )
     state = (
-        scenario("take_discard_leader_excludes_hero")
+        leader_scenario("take_discard_leader_excludes_hero")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NILFGAARD,
@@ -641,7 +661,7 @@ def test_take_discard_leader_consumes_as_noop_when_only_hero_exists() -> None:
     leader_registry = LEADER_REGISTRY
     hero_card = card("p2_discard_geralt_only_steal", "neutral_geralt", owner=PLAYER_TWO_ID)
     state = (
-        scenario("take_discard_leader_noop_with_only_hero")
+        leader_scenario("take_discard_leader_noop_with_only_hero")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NILFGAARD,
@@ -661,7 +681,7 @@ def test_take_discard_leader_consumes_as_noop_when_only_hero_exists() -> None:
 
     assert next_state.pending_choice is None
     assert next_state.player(PLAYER_ONE_ID).leader.used is True
-    assert next_state.player(PLAYER_ONE_ID).hand == ()
+    assert next_state.player(PLAYER_ONE_ID).hand == (_RESERVE_CARD_ID,)
     assert next_state.player(PLAYER_TWO_ID).discard == (CardInstanceId(hero_card.instance_id),)
     assert any(isinstance(event, LeaderAbilityResolvedEvent) for event in events)
 
@@ -674,7 +694,7 @@ def test_optimize_agile_rows_leader_moves_all_battlefield_agile_units_and_keeps_
     ranged_horn = card("p1_ranged_commanders_horn", "neutral_commanders_horn")
     opponent_hand = card("p2_hand_reserve_ballista_unit", "northern_realms_ballista")
     state = (
-        scenario("optimize_agile_rows_leader")
+        leader_scenario("optimize_agile_rows_leader")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.SCOIATAEL,
@@ -707,6 +727,67 @@ def test_optimize_agile_rows_leader_moves_all_battlefield_agile_units_and_keeps_
     assert leader_event.moved_card_instance_ids == (CardInstanceId(moving_agile.instance_id),)
 
 
+@pytest.mark.parametrize(
+    "definition_id",
+    [
+        "monsters_celaeno_harpy",
+        "neutral_olgierd_von_everec",
+        "skellige_olaf",
+    ],
+)
+def test_hope_of_the_aen_seidhe_moves_newly_tagged_agile_units(definition_id: str) -> None:
+    agile_id = CardInstanceId("p1_agile_unit")
+    state = (
+        leader_scenario("hope_moves_agile_unit")
+        .player(
+            PLAYER_ONE_ID,
+            faction=FactionId.SCOIATAEL,
+            leader_id=SCOIATAEL_AGILE_OPTIMIZER_LEADER_ID,
+            board=rows(
+                close=[card(agile_id, definition_id)],
+                ranged=[card("p1_ranged_horn", "neutral_commanders_horn")],
+            ),
+        )
+        .build()
+    )
+
+    next_state, events = apply_action(
+        state,
+        UseLeaderAbilityAction(player_id=PLAYER_ONE_ID),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert next_state.card(agile_id).row == Row.RANGED
+    leader_event = next(event for event in events if isinstance(event, LeaderAbilityResolvedEvent))
+    assert leader_event.moved_card_instance_ids == (agile_id,)
+
+
+def test_hope_of_the_aen_seidhe_excludes_agile_heroes() -> None:
+    kayran_id = CardInstanceId("p1_kayran")
+    state = (
+        leader_scenario("hope_excludes_agile_hero")
+        .player(
+            PLAYER_ONE_ID,
+            faction=FactionId.SCOIATAEL,
+            leader_id=SCOIATAEL_AGILE_OPTIMIZER_LEADER_ID,
+            board=rows(close=[card(kayran_id, "monsters_kayran")]),
+        )
+        .build()
+    )
+
+    assert not is_agile_battlefield_unit(state, CARD_REGISTRY, kayran_id)
+    next_state, events = apply_action(
+        state,
+        UseLeaderAbilityAction(player_id=PLAYER_ONE_ID),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert next_state.card(kayran_id).row == Row.CLOSE
+    leader_event = next(event for event in events if isinstance(event, LeaderAbilityResolvedEvent))
+    assert leader_event.moved_card_instance_ids == ()
+
+
 def test_shuffle_all_discards_into_decks_leader_moves_both_discards_back_into_decks() -> None:
     card_registry = CARD_REGISTRY
     leader_registry = LEADER_REGISTRY
@@ -715,7 +796,7 @@ def test_shuffle_all_discards_into_decks_leader_moves_both_discards_back_into_de
     player_two_deck_card = card("p2_existing_deck_archer", "scoiatael_dol_blathanna_archer")
     player_two_discard_card = card("p2_discard_ballista_to_shuffle", "northern_realms_ballista")
     state = (
-        scenario("shuffle_all_discards_into_decks")
+        leader_scenario("shuffle_all_discards_into_decks")
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.SKELLIGE,

@@ -31,6 +31,7 @@ def test_commanders_horn_doubles_a_row_and_is_limited_to_one_per_row() -> None:
         )
         .player(
             PLAYER_TWO_ID,
+            hand=(card("p2_reserve_card", "scoiatael_mahakaman_defender"),),
             board=rows(ranged=[card("p2_ranged_archer", "scoiatael_dol_blathanna_archer")]),
         )
         .build()

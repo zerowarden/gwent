@@ -319,6 +319,7 @@ def test_explain_action_score_surfaces_return_leader_value_terms() -> None:
             "p1",
             faction="monsters",
             leader_id="monsters_eredin_bringer_of_death",
+            hand=[card("p1_reserve_weather", "neutral_clear_weather")],
             discard=[card("p1_return_catapult", "northern_realms_catapult")],
         )
         .player("p2", leader_used=True, hand=[card("p2_hidden", "scoiatael_dol_blathanna_archer")])
@@ -534,7 +535,7 @@ def test_explain_action_score_uses_trickery_allowance_before_open_round_overcomm
         scenario("explain_open_round_trickery_allowance")
         .player(
             "p1",
-            hand=[card("p1_small_commit", "skellige_clan_draig_bon_dhu")],
+            hand=[card("p1_small_commit", "nilfgaard_vreemde")],
             board=rows(close=[card("p1_existing_board", "skellige_clan_an_craie_warrior")]),
         )
         .player(

@@ -3,8 +3,9 @@ from gwent_engine.core import FactionId, Row
 from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import CardTransformedEvent, SpecialCardResolvedEvent
-from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.rules.scoring import calculate_effective_strength
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
@@ -34,6 +35,7 @@ def test_special_mardroeme_transforms_existing_berserker_on_row() -> None:
             "p2",
             faction=FactionId.NILFGAARD,
             leader_id=NILFGAARD_RAIN_FROM_DECK_LEADER_ID,
+            hand=(card("p2_reserve_card", "scoiatael_mahakaman_defender"),),
         )
         .build()
     )
@@ -66,7 +68,7 @@ def test_special_mardroeme_transforms_existing_berserker_on_row() -> None:
 def test_berserker_played_into_special_mardroeme_row_transforms_immediately() -> None:
     card_registry = CARD_REGISTRY
     leader_registry = LEADER_REGISTRY
-    active_mardroeme_id = CardInstanceId("p1_skellige_mardroeme_active_on_close_row")
+    active_mardroeme_id = CardInstanceId("p1_skellige_mardroeme_active_on_ranged_row")
     young_berserker_id = CardInstanceId("p1_skellige_young_berserker_reinforcement")
     state = (
         scenario("berserker_played_into_active_mardroeme_row")
@@ -75,22 +77,24 @@ def test_berserker_played_into_special_mardroeme_row_transforms_immediately() ->
             faction=FactionId.SKELLIGE,
             leader_id=SKELLIGE_KING_BRAN_LEADER_ID,
             hand=(card(young_berserker_id, "skellige_young_berserker"),),
-            board=rows(close=[card(active_mardroeme_id, "skellige_mardroeme")]),
+            board=rows(ranged=[card(active_mardroeme_id, "skellige_mardroeme")]),
         )
         .player(
             "p2",
             faction=FactionId.NILFGAARD,
             leader_id=NILFGAARD_RAIN_FROM_DECK_LEADER_ID,
+            hand=(card("p2_reserve_card", "scoiatael_mahakaman_defender"),),
         )
         .build()
     )
+    assert card_registry.get(CardDefinitionId("skellige_young_berserker")).base_strength == 2
 
     next_state, events = apply_action(
         state,
         PlayCardAction(
             player_id=PLAYER_ONE_ID,
             card_instance_id=young_berserker_id,
-            target_row=Row.CLOSE,
+            target_row=Row.RANGED,
         ),
         card_registry=card_registry,
         leader_registry=leader_registry,
@@ -100,6 +104,8 @@ def test_berserker_played_into_special_mardroeme_row_transforms_immediately() ->
         next_state.card(young_berserker_id).definition_id == "skellige_transformed_young_vildkaarl"
     )
     assert next_state.card(young_berserker_id).instance_id == young_berserker_id
+    assert next_state.card(young_berserker_id).row == Row.RANGED
+    assert calculate_effective_strength(next_state, card_registry, young_berserker_id) == 8
     assert any(
         isinstance(event, CardTransformedEvent)
         and event.card_instance_id == young_berserker_id

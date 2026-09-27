@@ -170,6 +170,7 @@ def make_clear_weather_leader_state() -> GameState:
             "p1",
             faction="northern_realms",
             leader_id=NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
             board=rows(
                 ranged=[
                     card("p1_archer_a", "scoiatael_dol_blathanna_archer"),
@@ -178,7 +179,11 @@ def make_clear_weather_leader_state() -> GameState:
                 ]
             ),
         )
-        .player("p2", board=rows(close=[card("p2_defender", "scoiatael_mahakaman_defender")]))
+        .player(
+            "p2",
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
+            board=rows(close=[card("p2_defender", "scoiatael_mahakaman_defender")]),
+        )
         .weather(rows(ranged=[card("weather_fog", "neutral_impenetrable_fog")]))
         .build()
     )

@@ -117,6 +117,7 @@ def test_northern_realms_does_not_draw_above_max_hand_size() -> None:
             PLAYER_TWO_ID,
             faction=FactionId.SCOIATAEL,
             leader_id=SCOIATAEL_RANGED_HORN_LEADER_ID,
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
         )
         .build()
     )

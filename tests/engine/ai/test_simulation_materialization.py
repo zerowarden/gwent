@@ -251,8 +251,10 @@ def test_translated_viewer_deck_action_applies_to_simulation() -> None:
             "p1",
             faction="northern_realms",
             leader_id="northern_realms_foltest_king_of_temeria",
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
             deck=[card("p1_deck_fog", "neutral_impenetrable_fog")],
         )
+        .player("p2", hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")])
         .build()
     )
     observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)

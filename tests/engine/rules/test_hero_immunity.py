@@ -2,9 +2,14 @@ import pytest
 from gwent_engine.core import FactionId, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction
 from gwent_engine.core.errors import IllegalActionError
-from gwent_engine.core.events import SpecialCardResolvedEvent
+from gwent_engine.core.events import MedicResolvedEvent, SpecialCardResolvedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.rules.effect_applicability import (
+    can_target_for_decoy,
+    can_target_for_medic,
+    eligible_destroyable_unit_ids,
+)
 from gwent_engine.rules.scoring import calculate_effective_strength, calculate_row_score
 
 from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
@@ -128,22 +133,57 @@ def test_hero_cannot_be_targeted_by_medic() -> None:
             hand=[card("p1_field_surgeon", "scoiatael_havekar_healer")],
             discard=[card("p1_discarded_iorveth_hero", "neutral_geralt")],
         )
+        .player(
+            PLAYER_TWO_ID,
+            hand=[card("p2_reserve_unit", "scoiatael_mahakaman_defender")],
+        )
         .build()
     )
 
-    with pytest.raises(
-        IllegalActionError,
-        match="valid non-hero unit card in your discard pile",
-    ):
-        _ = apply_action(
-            state,
-            PlayCardAction(
-                player_id=PLAYER_ONE_ID,
-                card_instance_id=CardInstanceId("p1_field_surgeon"),
-                target_row=Row.RANGED,
-            ),
-            card_registry=CARD_REGISTRY,
+    next_state, events = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=CardInstanceId("p1_field_surgeon"),
+            target_row=Row.RANGED,
+        ),
+        card_registry=CARD_REGISTRY,
+    )
+    assert next_state.pending_choice is None
+    assert next_state.player(PLAYER_ONE_ID).rows.ranged == (CardInstanceId("p1_field_surgeon"),)
+    assert next_state.player(PLAYER_ONE_ID).discard == (
+        CardInstanceId("p1_discarded_iorveth_hero"),
+    )
+    assert isinstance(events[-1], MedicResolvedEvent)
+    assert events[-1].resurrected_card_instance_id is None
+
+
+def test_ves_is_affected_and_targetable_as_an_ordinary_unit() -> None:
+    battlefield_ves_id = CardInstanceId("p1_battlefield_ves")
+    discarded_ves_id = CardInstanceId("p1_discarded_ves")
+    state = (
+        scenario("ves_is_not_a_hero")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card("p1_reserve", "scoiatael_mahakaman_defender")],
+            discard=[card(discarded_ves_id, "northern_realms_ves")],
+            board=rows(close=[card(battlefield_ves_id, "northern_realms_ves")]),
         )
+        .weather(rows(close=[card("frost", "neutral_biting_frost")]))
+        .build()
+    )
+    player = state.player(PLAYER_ONE_ID)
+
+    assert calculate_effective_strength(state, CARD_REGISTRY, battlefield_ves_id) == 1
+    assert can_target_for_decoy(
+        state, CARD_REGISTRY, player=player, target_card_id=battlefield_ves_id
+    )
+    assert can_target_for_medic(
+        state, CARD_REGISTRY, player=player, target_card_id=discarded_ves_id
+    )
+    assert eligible_destroyable_unit_ids(state, CARD_REGISTRY, (battlefield_ves_id,)) == (
+        battlefield_ves_id,
+    )
 
 
 def test_monsters_passive_discards_heroes_and_opposing_units() -> None:
@@ -157,12 +197,14 @@ def test_monsters_passive_discards_heroes_and_opposing_units() -> None:
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
             leader_id=SCOIATAEL_CLOSE_SCORCH_LEADER_ID,
+            hand=[card("p1_reserve_card", "scoiatael_mahakaman_defender")],
             board=rows(close=[card(hero_card_id, "monsters_imlerith")]),
         )
         .player(
             PLAYER_TWO_ID,
             faction=FactionId.SCOIATAEL,
             leader_id=SCOIATAEL_RANGED_HORN_LEADER_ID,
+            passed=True,
             board=rows(close=[card(opponent_unit_card_id, "scoiatael_mahakaman_defender")]),
         )
         .build()

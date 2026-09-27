@@ -296,6 +296,7 @@ def test_heuristic_bot_uses_return_from_discard_leader_over_passing() -> None:
             "p1",
             faction="monsters",
             leader_id="monsters_eredin_bringer_of_death",
+            hand=[card("p1_reserve_weather", "neutral_clear_weather")],
             discard=[card("p1_return_catapult", "northern_realms_catapult")],
         )
         .player("p2", leader_used=True, hand=[card("p2_hidden", "scoiatael_dol_blathanna_archer")])
@@ -469,7 +470,11 @@ def test_heuristic_bot_does_not_choose_leave_when_pass_is_available() -> None:
     state = (
         scenario("heuristic_no_leave")
         .round(3)
-        .player("p1", gems_remaining=1)
+        .player(
+            "p1",
+            gems_remaining=1,
+            hand=[card("p1_reserve_weather", "neutral_clear_weather")],
+        )
         .player(
             "p2",
             gems_remaining=1,
@@ -487,7 +492,8 @@ def test_heuristic_bot_does_not_choose_leave_when_pass_is_available() -> None:
     )
 
     assert LeaveAction(player_id=PLAYER_ONE_ID) in legal_actions
-    assert selected == PassAction(player_id=PLAYER_ONE_ID)
+    assert selected in legal_actions
+    assert selected != LeaveAction(player_id=PLAYER_ONE_ID)
 
 
 def test_heuristic_bot_does_not_waste_scorch_on_empty_opponent_board() -> None:

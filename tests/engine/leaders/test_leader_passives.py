@@ -2,7 +2,12 @@ from dataclasses import replace
 
 import pytest
 from gwent_engine.core import FactionId, LeaderAbilityKind, Row, Zone
-from gwent_engine.core.actions import PlayCardAction, StartGameAction, UseLeaderAbilityAction
+from gwent_engine.core.actions import (
+    PlayCardAction,
+    ResolveChoiceAction,
+    StartGameAction,
+    UseLeaderAbilityAction,
+)
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import LeaderAbilityResolvedEvent, MedicResolvedEvent
 from gwent_engine.core.ids import CardInstanceId
@@ -81,6 +86,7 @@ def test_disabled_leaders_cannot_use_active_abilities() -> None:
             PLAYER_TWO_ID,
             faction=FactionId.SCOIATAEL,
             leader_id=SCOIATAEL_RANGED_HORN_LEADER_ID,
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
         )
         .current_player(PLAYER_TWO_ID)
         .build()
@@ -156,7 +162,10 @@ def test_double_spy_strength_global_applies_to_both_players() -> None:
     )
 
 
-def test_randomize_restore_to_battlefield_selection_makes_medic_target_optional() -> None:
+@pytest.mark.parametrize("invader_on_player_one", [True, False])
+def test_randomize_restore_to_battlefield_selection_makes_medic_target_optional(
+    invader_on_player_one: bool,
+) -> None:
     card_registry = CARD_REGISTRY
     leader_registry = LEADER_REGISTRY
     medic_card = card("p1_hand_field_surgeon_medic", "scoiatael_havekar_healer")
@@ -168,11 +177,16 @@ def test_randomize_restore_to_battlefield_selection_makes_medic_target_optional(
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.NILFGAARD,
-            leader_id=NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID,
+            leader_id=NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID if invader_on_player_one else None,
             hand=(medic_card,),
             discard=(first_discard, second_discard),
         )
-        .player(PLAYER_TWO_ID, hand=(opponent_hand,))
+        .player(
+            PLAYER_TWO_ID,
+            faction=FactionId.NILFGAARD,
+            leader_id=NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID if not invader_on_player_one else None,
+            hand=(opponent_hand,),
+        )
         .current_player(PLAYER_ONE_ID)
         .build()
     )
@@ -193,6 +207,76 @@ def test_randomize_restore_to_battlefield_selection_makes_medic_target_optional(
     assert next_state.card(CardInstanceId(second_discard.instance_id)).row == Row.RANGED
     medic_event = next(event for event in events if isinstance(event, MedicResolvedEvent))
     assert medic_event.resurrected_card_instance_id == CardInstanceId(second_discard.instance_id)
+
+
+@pytest.mark.parametrize(
+    ("medic_definition_id", "medic_row", "invader_on_player_one"),
+    [
+        ("nilfgaard_menno_coehoorn", Row.CLOSE, True),
+        ("neutral_yennefer", Row.RANGED, False),
+    ],
+)
+def test_invader_does_not_randomize_hero_medic_selection(
+    medic_definition_id: str,
+    medic_row: Row,
+    invader_on_player_one: bool,
+) -> None:
+    medic_id = CardInstanceId("p1_hero_medic")
+    first_target_id = CardInstanceId("p1_first_target")
+    chosen_target_id = CardInstanceId("p1_chosen_target")
+    state = (
+        scenario("invader_hero_medic_choice")
+        .player(
+            PLAYER_ONE_ID,
+            faction=FactionId.NILFGAARD,
+            leader_id=NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID if invader_on_player_one else None,
+            hand=[card(medic_id, medic_definition_id)],
+            discard=[
+                card(first_target_id, "scoiatael_mahakaman_defender"),
+                card(chosen_target_id, "scoiatael_dol_blathanna_archer"),
+            ],
+        )
+        .player(
+            PLAYER_TWO_ID,
+            faction=FactionId.NILFGAARD,
+            leader_id=NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID if not invader_on_player_one else None,
+            hand=[card("p2_reserve", "scoiatael_mahakaman_defender")],
+        )
+        .build()
+    )
+
+    pending_state, events = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=medic_id,
+            target_row=medic_row,
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert events == ()
+    pending_choice = pending_state.pending_choice
+    assert pending_choice is not None
+    assert pending_choice.legal_target_card_instance_ids == (
+        first_target_id,
+        chosen_target_id,
+    )
+
+    next_state, resolved_events = apply_action(
+        pending_state,
+        ResolveChoiceAction(
+            player_id=PLAYER_ONE_ID,
+            choice_id=pending_choice.choice_id,
+            selected_card_instance_ids=(chosen_target_id,),
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    assert next_state.card(chosen_target_id).zone == Zone.BATTLEFIELD
+    assert next_state.card(first_target_id).zone == Zone.DISCARD
+    medic_event = next(event for event in resolved_events if isinstance(event, MedicResolvedEvent))
+    assert medic_event.resurrected_card_instance_id == chosen_target_id
 
 
 def test_king_bran_halves_weather_penalty_using_round_up_policy() -> None:

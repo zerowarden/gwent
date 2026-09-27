@@ -94,6 +94,7 @@ def _build_avenger_state(
             PLAYER_TWO_ID,
             faction=FactionId.NILFGAARD,
             leader_id=NILFGAARD_RAIN_FROM_DECK_LEADER_ID,
+            hand=(card("p2_avenger_cleanup_reserve", "scoiatael_mahakaman_defender"),),
         )
         .build()
     )

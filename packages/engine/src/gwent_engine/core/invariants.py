@@ -4,6 +4,7 @@ from gwent_engine.cards import CardRegistry
 from gwent_engine.core.enums import (
     ACTIVE_TURN_PHASES,
     AbilityKind,
+    ChoiceSourceKind,
     GameStatus,
     Phase,
     Row,
@@ -29,9 +30,9 @@ def check_game_state_invariants(
     """
     _check_card_locations(state, card_registry=card_registry)
     _check_phase_status_consistency(state)
+    _check_pending_choice(state)
     _check_current_player(state)
     _check_gem_bounds(state)
-    _check_pending_choice(state)
     _check_match_end_consistency(state)
     _check_leader_state(state)
     _check_pending_avenger_summons(state)
@@ -71,8 +72,12 @@ def _check_current_player(state: GameState) -> None:
 
     if state.phase == Phase.IN_ROUND and state.current_player is not None:
         current_player = state.player(state.current_player)
-        if current_player.has_passed:
-            raise InvariantError("The current player cannot already be marked as passed.")
+        resolving_choice = (
+            state.pending_choice is not None
+            and state.pending_choice.player_id == current_player.player_id
+        )
+        if current_player.has_passed or (not current_player.hand and not resolving_choice):
+            raise InvariantError("The current player cannot be done for the round.")
 
 
 def _check_phase_status_consistency(state: GameState) -> None:
@@ -113,7 +118,12 @@ def _check_pending_choice(state: GameState) -> None:
         source_card = state.card(pending_choice.source_card_instance_id)
         if source_card.owner != pending_choice.player_id:
             raise InvariantError("Pending-choice source cards must belong to the choosing player.")
-        if source_card.zone != Zone.HAND:
+        played_medic = (
+            pending_choice.source_kind == ChoiceSourceKind.MEDIC
+            and source_card.zone == Zone.BATTLEFIELD
+            and source_card.row == pending_choice.source_row
+        )
+        if source_card.zone != Zone.HAND and not played_medic:
             raise InvariantError("Pending-choice source cards must remain in hand until resolved.")
     if pending_choice.source_leader_id is not None:
         player = state.player(pending_choice.player_id)

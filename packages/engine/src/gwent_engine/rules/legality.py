@@ -7,7 +7,7 @@ from gwent_engine.core.state import CardInstance, GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.battlefield_effects import is_weather_ability
 from gwent_engine.rules.card_abilities import definition_has_ability
-from gwent_engine.rules.effect_applicability import can_target_for_decoy, can_target_for_medic
+from gwent_engine.rules.effect_applicability import can_target_for_decoy
 from gwent_engine.rules.leader_effects import restore_selection_is_randomized
 from gwent_engine.rules.row_effects import (
     row_has_commanders_horn,
@@ -18,8 +18,10 @@ from gwent_engine.rules.row_effects import (
 
 
 def validate_in_round_player_can_act(state: GameState, player: PlayerState) -> None:
-    if player.has_passed:
-        raise IllegalActionError("Passed players cannot act again in the same round.")
+    if player.is_done_for_round:
+        if player.has_passed:
+            raise IllegalActionError("Passed players cannot act again in the same round.")
+        raise IllegalActionError("Players with an empty hand cannot act in the same round.")
     if state.current_player != player.player_id:
         raise IllegalActionError("Only the current player may act.")
 
@@ -39,10 +41,9 @@ def validate_play_card_legality(
     if definition.card_type == CardType.UNIT:
         _validate_unit_play_legality(
             state,
-            player,
             action,
             definition,
-            card_registry,
+            card_registry=card_registry,
             leader_registry=leader_registry,
             rng=rng,
         )
@@ -74,11 +75,10 @@ def _validate_playable_hand_card(
 
 def _validate_unit_play_legality(
     state: GameState,
-    player: PlayerState,
     action: PlayCardAction,
     definition: CardDefinition,
-    card_registry: CardRegistry,
     *,
+    card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None,
     rng: SupportsRandom | None,
 ) -> None:
@@ -90,9 +90,8 @@ def _validate_unit_play_legality(
     if definition_has_ability(definition, AbilityKind.MEDIC):
         _validate_medic_play_legality(
             state,
-            player,
             action,
-            card_registry,
+            card_registry=card_registry,
             leader_registry=leader_registry,
             rng=rng,
         )
@@ -103,30 +102,23 @@ def _validate_unit_play_legality(
 
 def _validate_medic_play_legality(
     state: GameState,
-    player: PlayerState,
     action: PlayCardAction,
-    card_registry: CardRegistry,
     *,
+    card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None,
     rng: SupportsRandom | None,
 ) -> None:
-    if restore_selection_is_randomized(state, leader_registry):
+    if restore_selection_is_randomized(
+        state,
+        leader_registry,
+        card_registry=card_registry,
+        medic_card_id=action.card_instance_id,
+    ):
         _validate_randomized_medic_play_action(action, rng=rng)
         return
 
     if action.target_card_instance_id is not None:
         raise IllegalActionError("Medic discard targets are resolved through pending choice.")
-    if any(
-        can_target_for_medic(
-            state,
-            card_registry,
-            player=player,
-            target_card_id=card_id,
-        )
-        for card_id in player.discard
-    ):
-        return
-    raise IllegalActionError("Medic requires a valid non-hero unit card in your discard pile.")
 
 
 def _validate_randomized_medic_play_action(

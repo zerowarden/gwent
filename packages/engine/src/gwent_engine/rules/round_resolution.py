@@ -20,7 +20,7 @@ class RoundOutcome:
 
 
 def is_round_effectively_over(state: GameState) -> bool:
-    return all(player.has_passed or not player.hand for player in state.players)
+    return all(player.is_done_for_round for player in state.players)
 
 
 def determine_round_outcome(

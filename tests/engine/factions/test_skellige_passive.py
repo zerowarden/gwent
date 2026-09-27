@@ -197,6 +197,7 @@ def test_skellige_does_not_trigger_when_match_ends_after_round_two() -> None:
             PLAYER_TWO_ID,
             faction=FactionId.SCOIATAEL,
             leader_id=SCOIATAEL_RANGED_HORN_LEADER_ID,
+            hand=[card("p2_reserve_card", "scoiatael_mahakaman_defender")],
         )
         .current_player(PLAYER_TWO_ID)
         .build()

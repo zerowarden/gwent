@@ -302,9 +302,9 @@ def test_search_bot_pending_choice_resolves_deck_targets_via_simulation() -> Non
     assert set(selected.selected_card_instance_ids) <= set(legal_target_ids)
 
 
-def test_search_engine_avoids_public_leader_reply_trap() -> None:
+def test_search_engine_does_not_expect_a_reply_from_an_exhausted_opponent() -> None:
     state = (
-        scenario("search_public_leader_reply_trap")
+        scenario("search_exhausted_opponent")
         .player(
             "p1",
             hand=[
@@ -344,8 +344,8 @@ def test_search_engine_avoids_public_leader_reply_trap() -> None:
     assert result.used_fallback_policy is False
     assert result.chosen_action == PlayCardAction(
         player_id=PLAYER_ONE_ID,
-        card_instance_id=CardInstanceId("p1_defender"),
-        target_row=Row.CLOSE,
+        card_instance_id=CardInstanceId("p1_catapult"),
+        target_row=Row.SIEGE,
     )
 
 
@@ -354,7 +354,10 @@ def test_search_engine_skips_reply_search_when_opponent_has_passed() -> None:
         scenario("search_skip_reply_opponent_passed")
         .player(
             "p1",
-            hand=[card("p1_archer", "scoiatael_dol_blathanna_archer")],
+            hand=[
+                card("p1_archer", "scoiatael_dol_blathanna_archer"),
+                card("p1_reserve", "scoiatael_mahakaman_defender"),
+            ],
         )
         .player(
             "p2",

@@ -2,7 +2,7 @@ from gwent_engine.core import Phase, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction
 from gwent_engine.core.events import CardsMovedToDiscardEvent, RoundEndedEvent
 from gwent_engine.core.ids import CardInstanceId, PlayerId
-from gwent_engine.core.reducer import apply_action
+from gwent_engine.core.reducer import apply_action, apply_action_with_intermediate_state
 from gwent_engine.rules.round_resolution import determine_round_outcome
 from gwent_engine.rules.scoring import calculate_player_score, calculate_row_score
 
@@ -186,7 +186,7 @@ def test_playing_last_card_triggers_round_ended_event_automatically() -> None:
         .build()
     )
 
-    next_state, events = apply_action(
+    next_state, events, intermediate_state = apply_action_with_intermediate_state(
         state,
         PlayCardAction(
             player_id=PLAYER_ONE_ID,
@@ -198,6 +198,11 @@ def test_playing_last_card_triggers_round_ended_event_automatically() -> None:
 
     round_end = next(event for event in events if isinstance(event, RoundEndedEvent))
 
+    assert intermediate_state.phase == Phase.ROUND_RESOLUTION
+    assert intermediate_state.current_player is None
     assert round_end.round_number == 1
     assert round_end.winner == PLAYER_ONE_ID
     assert next_state.round_number == 2
+    assert next_state.phase == Phase.MATCH_ENDED
+    assert next_state.current_player is None
+    assert sum(isinstance(event, RoundEndedEvent) for event in events) == 2

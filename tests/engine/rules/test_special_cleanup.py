@@ -18,6 +18,7 @@ def test_round_cleanup_discards_active_weather_and_horn_cards() -> None:
     player_two_reserve_id = CardInstanceId("p2_round_cleanup_reserve_unit")
     state = (
         scenario("round_cleanup_discards_active_weather_and_horn_cards")
+        .current_player(PLAYER_TWO_ID)
         .player(
             PLAYER_ONE_ID,
             board=rows(
@@ -35,8 +36,6 @@ def test_round_cleanup_discards_active_weather_and_horn_cards() -> None:
         .weather(rows(close=[card(weather_card_id, "neutral_biting_frost")]))
         .build()
     )
-    state, _ = apply_action(state, PassAction(player_id=PLAYER_ONE_ID), card_registry=card_registry)
-
     state, events = apply_action(
         state,
         PassAction(player_id=PLAYER_TWO_ID),
