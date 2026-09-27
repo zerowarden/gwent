@@ -8,5 +8,5 @@ __pycache__/
 tests/coverage.xml
 .venv
 wheels/
-docs/
+/docs/*
 *.coverage
