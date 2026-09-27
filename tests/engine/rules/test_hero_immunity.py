@@ -146,18 +146,18 @@ def test_hero_cannot_be_targeted_by_medic() -> None:
         )
 
 
-def test_monsters_passive_can_retain_a_hero_unit() -> None:
+def test_monsters_passive_discards_heroes_and_opposing_units() -> None:
     card_registry = CARD_REGISTRY
-    retained_hero_card_id = CardInstanceId("p1_imlerith_hero")
+    hero_card_id = CardInstanceId("p1_imlerith_hero")
     opponent_unit_card_id = CardInstanceId("p2_frontline_vanguard")
     state = (
-        scenario("monsters_passive_can_retain_a_hero_unit")
+        scenario("monsters_passive_discards_heroes_and_opposing_units")
         .current_player(PLAYER_ONE_ID)
         .player(
             PLAYER_ONE_ID,
             faction=FactionId.MONSTERS,
             leader_id=SCOIATAEL_CLOSE_SCORCH_LEADER_ID,
-            board=rows(close=[card(retained_hero_card_id, "monsters_imlerith")]),
+            board=rows(close=[card(hero_card_id, "monsters_imlerith")]),
         )
         .player(
             PLAYER_TWO_ID,
@@ -175,5 +175,7 @@ def test_monsters_passive_can_retain_a_hero_unit() -> None:
         card_registry=card_registry,
     )
 
-    assert next_state.card(retained_hero_card_id).zone == Zone.BATTLEFIELD
-    assert next_state.player(PLAYER_ONE_ID).rows.close == (retained_hero_card_id,)
+    assert next_state.card(hero_card_id).zone == Zone.DISCARD
+    assert next_state.card(opponent_unit_card_id).zone == Zone.DISCARD
+    assert next_state.player(PLAYER_ONE_ID).rows.all_cards() == ()
+    assert next_state.player(PLAYER_TWO_ID).rows.all_cards() == ()

@@ -12,6 +12,9 @@ dependencies = [
     "gwent-shared",
 ]
 
+[project.optional-dependencies]
+tuning = ["cma==4.5.0", "numpy>=2.0"]
+
 [tool.uv.sources]
 gwent-engine = { workspace = true }
 gwent-shared = { workspace = true }

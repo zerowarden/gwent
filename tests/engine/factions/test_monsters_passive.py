@@ -1,3 +1,4 @@
+import pytest
 from gwent_engine.cards.registry import CardRegistry
 from gwent_engine.core import FactionId, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction
@@ -5,9 +6,11 @@ from gwent_engine.core.events import FactionPassiveTriggeredEvent, NextRoundStar
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
+from gwent_engine.factions.passives import resolve_before_round_cleanup
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
+    CARD_REGISTRY,
     MONSTERS_CLOSE_HORN_LEADER_ID,
     MONSTERS_DECK_ID,
     NORTHERN_REALMS_DECK_ID,
@@ -153,9 +156,60 @@ def _hand_card_for_row(
     candidates: list[tuple[int, CardInstanceId]] = []
     for card_instance_id in state.player(player_id).hand:
         definition = card_registry.get(state.card(card_instance_id).definition_id)
-        if row in definition.allowed_rows:
+        if row in definition.allowed_rows and not definition.is_hero:
             candidates.append((definition.base_strength, card_instance_id))
     if candidates:
         candidates.sort(key=lambda item: (item[0], str(item[1])))
         return candidates[-1][1] if strongest else candidates[0][1]
     raise AssertionError(f"No card in {player_id!r} hand can be played to {row!r}.")
+
+
+@pytest.mark.parametrize("choice_index", [0, 1, 2, 3])
+def test_monsters_retention_uses_controlled_non_hero_units_in_mirror_match(
+    choice_index: int,
+) -> None:
+    state = (
+        scenario("monsters_controlled_units")
+        .player(
+            "p1",
+            faction=FactionId.MONSTERS,
+            leader_id=MONSTERS_CLOSE_HORN_LEADER_ID,
+            board=rows(
+                close=[
+                    card("p1_hero", "monsters_imlerith"),
+                    card("incoming_spy", "nilfgaard_vattier_de_rideaux", owner="p2"),
+                    card("p1_unit", "monsters_griffin"),
+                    card("p1_horn", "neutral_commanders_horn"),
+                ]
+            ),
+        )
+        .player(
+            "p2",
+            faction=FactionId.MONSTERS,
+            leader_id=MONSTERS_CLOSE_HORN_LEADER_ID,
+            board=rows(
+                close=[
+                    card("p2_hero", "monsters_imlerith"),
+                    card("outgoing_spy", "nilfgaard_vattier_de_rideaux", owner="p1"),
+                    card("p2_unit", "monsters_griffin"),
+                ]
+            ),
+        )
+        .build()
+    )
+    retained, events = resolve_before_round_cleanup(
+        state, card_registry=CARD_REGISTRY, rng=IndexedRandom(choice_index=choice_index)
+    )
+    assert len(retained) == len(events) == 2
+    for player, eligible in (
+        (PlayerId("p1"), {"incoming_spy", "p1_unit"}),
+        (PlayerId("p2"), {"outgoing_spy", "p2_unit"}),
+    ):
+        event = next(
+            event
+            for event in events
+            if isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == player
+        )
+        assert isinstance(event, FactionPassiveTriggeredEvent)
+        assert event.card_instance_id in eligible
+        assert event.card_instance_id in retained

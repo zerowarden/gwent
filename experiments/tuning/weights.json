@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "study_id": "weights-v1",
   "mode": "scientific",
   "agents_catalog": "../agents.json",
@@ -78,7 +78,8 @@
       "batch_size": 16,
       "generations": null,
       "initial_sigma": null,
-      "protocol_version": 1
+      "protocol_version": 1,
+      "cma": null
     },
     {
       "method": "cma_es",
@@ -87,7 +88,19 @@
       "batch_size": 16,
       "generations": 8,
       "initial_sigma": 0.2,
-      "protocol_version": 1
+      "protocol_version": 1,
+      "cma": {
+        "backend_version": "4.5.0",
+        "random_generator": "numpy_pcg64",
+        "boundary_handler": "BoundTransform",
+        "termination": {
+          "function_tolerance": 1e-11,
+          "history_tolerance": 1e-12,
+          "flat_generations": 1,
+          "coordinate_tolerance": 1e-11,
+          "condition_limit": 100000000000000.0
+        }
+      }
     }
   ],
   "objective_version": 1,

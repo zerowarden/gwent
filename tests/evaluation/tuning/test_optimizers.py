@@ -11,7 +11,7 @@ from gwent_evaluation.metrics import BootstrapConfig, bootstrap_interval
 from gwent_evaluation.models import SpecError, TerminationReason
 from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.tuning import optimizers
-from gwent_evaluation.tuning.models import OptimizerMethod, OptimizerSpec
+from gwent_evaluation.tuning.models import CmaSettings, OptimizerMethod, OptimizerSpec
 from gwent_evaluation.tuning.objective import TrialEvaluation, TrialResultReference, TrialStatus
 from gwent_evaluation.tuning.optimizers import (
     CachedEvaluation,
@@ -166,7 +166,7 @@ def test_invalid_dimensions_are_rejected(dimensions: int) -> None:
 
 
 def test_wrong_method_and_tell_without_ask_are_rejected() -> None:
-    cma = OptimizerSpec(OptimizerMethod.CMA_ES, 0, 4, 2, 2, 0.2)
+    cma = OptimizerSpec(OptimizerMethod.CMA_ES, 0, 4, 2, 2, 0.2, cma=CmaSettings())
     with pytest.raises(SpecError, match="random optimizer"):
         _ = RandomSearch(cma, dimensions=2)
     with pytest.raises(SpecError, match="pending batch"):

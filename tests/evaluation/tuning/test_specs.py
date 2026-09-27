@@ -9,7 +9,13 @@ import pytest
 from gwent_evaluation import cli
 from gwent_evaluation.models import SpecError, SuitePurpose
 from gwent_evaluation.records import record_to_dict
-from gwent_evaluation.tuning.models import StudyMode, StudySpec
+from gwent_evaluation.tuning.models import (
+    CmaSettings,
+    OptimizerMethod,
+    OptimizerSpec,
+    StudyMode,
+    StudySpec,
+)
 from gwent_evaluation.tuning.specs import (
     load_study_spec,
     plan_study,
@@ -86,6 +92,7 @@ def test_scientific_stages_require_matching_purposes_without_playing_games(
         validation=manifests[1],
         test=manifests[2],
     )
+    assert plan_study(scientific)["execution_available"] is True
     assert scientific.match_counts() == study.match_counts()
     assert study_from_dict(record_to_dict(scientific)) == scientific
     with pytest.raises(SpecError, match="purpose"):
@@ -222,3 +229,70 @@ def test_json_duplicate_keys_fail_before_catalog_resolution(tmp_path: Path) -> N
     _ = path.write_text('{"study_id":"a","study_id":"b"}')
     with pytest.raises(SpecError, match="duplicate"):
         _ = load_study_spec(path, repository_root=REPOSITORY_ROOT)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("backend_version", "unrecognized"),
+        ("random_generator", "global"),
+        ("boundary_handler", "clip"),
+        ("termination", {}),
+        ("function_tolerance", -1),
+        ("history_tolerance", float("nan")),
+        ("flat_generations", True),
+        ("coordinate_tolerance", float("inf")),
+        ("condition_limit", 1),
+    ],
+)
+def test_cma_snapshot_pins_are_strict(study: StudySpec, field: str, value: object) -> None:
+    snapshot = record_to_dict(study)
+    optimizer = cast(list[dict[str, object]], snapshot["optimizers"])[1]
+    cma = cast(dict[str, object], optimizer["cma"])
+    target = cma if field in cma else cast(dict[str, object], cma["termination"])
+    target[field] = value
+    with pytest.raises(SpecError):
+        _ = study_from_dict(snapshot)
+
+
+def test_cma_pins_change_study_identity_and_survive_round_trip(study: StudySpec) -> None:
+    original = study.optimizers[1]
+    assert original.cma is not None
+    updated = replace(
+        original,
+        cma=replace(
+            original.cma, termination=replace(original.cma.termination, flat_generations=3)
+        ),
+    )
+    changed = replace(study, optimizers=(study.optimizers[0], updated))
+    assert changed.digest() != study.digest()
+    assert study_from_dict(record_to_dict(changed)) == changed
+
+
+@pytest.mark.parametrize("missing", ["cma", "backend_version", "function_tolerance"])
+def test_snapshot_pins_are_never_filled_from_defaults(study: StudySpec, missing: str) -> None:
+    snapshot = record_to_dict(study)
+    optimizer = cast(list[dict[str, object]], snapshot["optimizers"])[1]
+    cma = cast(dict[str, object], optimizer["cma"])
+    if missing == "cma":
+        del optimizer[missing]
+    elif missing == "backend_version":
+        del cma[missing]
+    else:
+        del cast(dict[str, object], cma["termination"])[missing]
+    with pytest.raises(SpecError, match="must contain exactly"):
+        _ = study_from_dict(snapshot)
+
+
+def test_old_study_schema_cannot_be_executed_with_new_defaults(study: StudySpec) -> None:
+    with pytest.raises(SpecError, match="study schema version"):
+        _ = replace(study, schema_version=1)
+
+
+def test_optimizer_settings_require_method_specific_pins(study: StudySpec) -> None:
+    with pytest.raises(SpecError, match="cannot declare CMA"):
+        _ = replace(study.optimizers[0], cma=CmaSettings())
+    with pytest.raises(SpecError, match="explicit backend settings"):
+        _ = OptimizerSpec(OptimizerMethod.CMA_ES, 0, 2, 2, 1, 0.2)
+    with pytest.raises(SpecError, match="nonnegative"):
+        _ = replace(study.optimizers[1], seed=-1)

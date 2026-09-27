@@ -84,8 +84,8 @@ Deck pairs used by the core suites:
 
 ```bash
 uv run python -m gwent_evaluation run --suite smoke-v1
-uv run python -m gwent_evaluation report .output/experiments/<run-id>
-uv run python -m gwent_evaluation replay .output/experiments/<run-id> --case <case-id>
+uv run python -m gwent_evaluation report .output/manual/evaluations/<run-id>
+uv run python -m gwent_evaluation replay .output/manual/evaluations/<run-id> --case <case-id>
 uv run python -m gwent_evaluation compare <reference-run> <candidate-run>
 ```
 
@@ -136,29 +136,23 @@ thresholds, and repository/runtime/asset identities. Catalogs are authoring
 conveniences; `study_to_dict()` snapshots reload with `study_from_dict()` without
 the original catalogs. Resolve a new study whenever pinned inputs change.
 
+Study authoring and snapshots use schema version 2, which requires explicit CMA
+backend, RNG, boundary, and stopping settings. Older snapshots are historical
+records; resolve a new study from the current authoring file instead of filling
+in missing pins. Changing the dependency environment also requires a new study
+and matching sensitivity evidence.
+
 Planning reports `sensitivity_status: "not_assessed"` because it does not load
-diagnostic evidence, and `execution_available: false` because the durable study
-runner is not implemented yet. Use the separate sensitivity command to assess the
-frozen study. A successful diagnostic does not claim policy improvement.
+diagnostic evidence. `execution_available` identifies scientific studies that
+can use the Python study runner; execution still requires clean provenance and
+passing sensitivity evidence. Smoke studies remain diagnostic only. Use the
+separate sensitivity command to assess the frozen study. A successful diagnostic does not claim policy improvement.
 
 Authoring filenames are stable names; compatibility versions remain inside the
-JSON. Generated planning previews are grouped by study:
-
-```text
-.output/tuning/
-  smoke/
-    plan.json
-    snapshot.json
-  weights/
-    plan.json
-    snapshot.json
-```
-
-`tune plan` prints its JSON to stdout. Save that output as `plan.json`, and use
-`study_to_dict()` for the corresponding full `snapshot.json`. Planning previews
-can be regenerated; recorded evaluation runs retain their unique run directories.
-Renaming an authoring file does not change the resolved study digest. Existing
-suite IDs remain fixed because they participate in case IDs and seed derivation.
+JSON. `tune plan` prints a zero-game preview to stdout. The complete pilot saves
+its plan at `.output/pilot/reports/plan.json` and its frozen inputs under
+`.output/pilot/inputs/`. Existing suite IDs stay fixed because they participate
+in case IDs and seed derivation. Historical previews are not prerequisites.
 
 ## Sensitivity diagnostics
 
@@ -186,7 +180,7 @@ also rejects mismatched studies and evidence from a dirty or non-scientific
 study before future optimizer execution. All execution uses the ordinary
 evaluator, recording, integrity checks, and block-score arithmetic.
 
-By default, artifacts live under `.output/tuning/<study>/sensitivity/`:
+By default, artifacts live under `.output/manual/sensitivity/<study>/`:
 `snapshot.json`, `report.json`, and `runs/<control>/`. The snapshot freezes inputs
 before games; the report pins study, code, incumbent, space, suites, observations,
 and control execution identities. Successful matches retain decision samples;
@@ -195,12 +189,9 @@ matches. A conflicting snapshot is rejected; use `--output <new-directory>`
 for a newly resolved study after changing inputs or code.
 
 Exit codes are `0` for sufficient sensitivity, `1` for insufficient sensitivity,
-and `2` for invalid inputs or conflicting evidence. The current 192-match pilot
-observed all eleven dimensions, final-action changes, and match-outcome variation.
-The 12-match tiny pilot found no outcome variation and correctly failed. Both
-were run on a dirty development checkout; rerun against the pinned clean
-checkout before a scientific study. See the measured counts and cost in
-[the implementation report](../docs/m2-implementation.md#sensitivity-evidence).
+and `2` for invalid inputs or conflicting evidence. Measurements belong to the
+specific recorded source, environment, and study. Generate current evidence with
+`make pilot`; historical diagnostic success cannot authorize changed inputs.
 
 ## Candidate evaluation
 
@@ -222,7 +213,7 @@ trial = evaluate_candidate(
     study,
     study.bind((0.5,) * 11),
     run_id="candidate",
-    output_root=Path(".output/tuning/smoke/objective/runs"),
+    output_root=Path(".output/manual/objective/runs"),
 )
 print(trial.status, trial.score, trial.fitness)
 ```
@@ -231,8 +222,8 @@ This tiny example executes four synthetic smoke matches. It returns
 `diagnostic_only`, a descriptive score, and `fitness=None`. A scientific call
 also requires `sensitivity_report=<matching SensitivityReport>` from a clean
 study; missing, stale, or insufficient preflight evidence fails before games.
-The seeded random proposal backend is available in Python. CMA, durable study
-orchestration, and a CLI for complete optimization runs remain future work.
+Seeded random and bounded CMA proposal backends are available in Python. Durable
+study orchestration and a CLI for complete optimization runs remain future work.
 
 `TrialEvaluation` includes configuration/candidate identities, suite and benchmark
 identities, verified result paths/checksums, coverage counts, status/reasons, and
@@ -260,7 +251,7 @@ from gwent_evaluation.replay import reproduce_case
 outcome = reproduce_case(
     Path(trial.run_root),
     trial.results[0].case_id,
-    diagnostic_root=Path(".output/tuning/smoke/objective/diagnostic"),
+    diagnostic_root=Path(".output/manual/objective/diagnostic"),
 )
 ```
 
@@ -324,11 +315,145 @@ now reports `fresh_matches` from the evaluator's executed-case list, including
 partial resumption; loading existing records reports zero.
 
 The tests include a fixed numeric objective with a known ranking and forced
-duplicates, with no game execution. A reviewable numeric demonstration and the
-current study's proposed configurations live under
-`.output/tuning/random-search/demo.json` and
-`.output/tuning/smoke/random-search/proposals.json` respectively. These are
-proposal/algorithm diagnostics; no scientific optimization has been run.
+duplicates, with no game execution. These are algorithm checks. The pilot's
+`reports/trials.csv` contains measured game results for every proposed configuration.
+
+## Bounded CMA proposals
+
+CMA-ES adapts its search using the completed population's fitness. It shares the
+random backend's `ask()` / `tell()` interface, parameter binding, and objective.
+Construct either method from its frozen study settings:
+
+```python
+from gwent_evaluation.tuning.backends import create_optimizer
+from gwent_evaluation.tuning.models import OptimizerMethod
+
+optimizer = create_optimizer(study, OptimizerMethod.CMA_ES)
+batch = optimizer.ask()
+configurations = tuple(study.bind(proposal.coordinates) for proposal in batch)
+```
+
+The CMA mean starts at the encoded incumbent. `initial_sigma: 0.2` is the initial
+spread in normalized coordinates, where every allowed weight interval maps to
+`[0, 1]`. It is neither a raw weight increment nor a maximum distance. The backend
+handles bounds; callers must evaluate the exact proposed coordinates and return
+the complete population's fitness in proposal order. Invalid tells leave the
+population pending. The backend never evaluates a final mean or other extra
+candidate outside the declared proposal budget.
+
+The study pins `cma` 4.5.0, a private NumPy PCG64 generator, `BoundTransform`, and
+termination tolerances. The lockfile and existing runtime fingerprint also pin
+NumPy. Zero is a deterministic seed; global NumPy and game RNGs are unaffected.
+Protocol 1 disables file logging, plotting, external settings input, wall-clock
+stopping, restarts, and additional stagnation/target criteria. It retains the
+declared fitness/coordinate tolerances, covariance limit, backend numerical
+limits, and population/generation cap. A tied population keeps its real scores.
+
+After stopping, `ask()` returns an empty tuple. `stop` includes the reason, number
+of proposals successfully told, backend criterion names, and any failure detail.
+`flat_objective`, `numerical_limit`, `budget_exhausted`, and `backend_failure` are
+distinct. When criteria coincide, numerical limits take precedence over flatness,
+then budget; all backend criterion names remain visible. A plateau does not
+establish optimality. Compare actual evaluated work using the shared search
+counts, including fresh matches and cache hits, rather than assuming every
+optimizer used its entire cap.
+
+Recovery must reconstruct the backend and replay each recorded `ask()` followed
+by its ordered `tell()`, checking exact proposals before advancing. A backend
+exception ends that instance; do not retry a potentially mutated optimizer.
+Durable journaling and recovery belong to the study controller.
+
+The optional `gwent-evaluation[tuning]` extra installs CMA and NumPy. Workspace
+development dependencies include it so `make sync` prepares the backend tests;
+`uv sync --no-dev --group tuning` enables tuning without developer tools. Engine,
+service, study decoding, and random proposals remain usable without that extra.
+
+## Complete pilot workflow
+
+```bash
+make pilot
+# Equivalent command:
+uv run --locked --group tuning python -m gwent_evaluation tune pilot
+```
+
+The workflow runs the smoke suite, sensitivity gates, incumbent/random/CMA
+optimization, verified study replay, and human-readable reports. It stops before
+validation, held-out confirmation, or promotion. The authored pilot spec is
+`experiments/tuning/pilot.json`; the larger `weights.json` study is not run.
+
+Use a clean committed checkout with pinned dependencies. The command does not
+copy source, create a nested environment, or commit changes. For isolation, use
+a separate checkout outside `.output/` and install from its lockfile. Pass
+`--output <directory>` (or `make pilot PILOT_OUTPUT=<directory>`) to place results
+elsewhere. The default is `.output/pilot`.
+
+```text
+.output/
+  README.md                  # generated navigation
+  pilot/
+    README.md                # status, interpretation, scores, weights, artifact guide
+    workflow.json            # derived stage status and execution counts
+    writer.lock              # ownership marker for the whole workflow
+    inputs/                  # immutable checksummed study and smoke snapshots
+    reports/                 # plan.json, trials.csv, configurations.json
+    data/
+      smoke/                 # ordinary summary-only evaluation run
+      sensitivity/           # control runs, samples, snapshot, report
+      optimization/          # durable study and candidate runs
+    logs/events.jsonl        # operational events; not scientific evidence
+  manual/                    # only separately requested standalone experiments
+```
+
+Every output family is explained in the generated reading guides. Match files
+and optimizer journals remain evidence; reports are derived. Logs are never
+used to reconstruct scientific results. A partial run records its failed or
+interrupted stage and does not claim completion. A rerun verifies existing
+inputs and evidence before reuse; it never trusts the stage-status file alone.
+
+To reset intentionally, remove `.output/` only when no writer is active, then
+run `make pilot`. No previous output is required. Generated files are not stored
+in `docs/`; that directory contains durable explanations and design only.
+
+The pilot preserves the full four-opponent, two-deck-pair panel and eleven weight
+bounds, with two optimization roots (128 matches per candidate). Random search
+gets 16 proposals; CMA gets two populations of eight. Including the incumbent,
+optimization is capped at 4,224 matches, plus a separate 192-match sensitivity
+panel. Validation/test budgets are declared but not executed by this runner.
+These small optimization results are exploratory and cannot establish promotion.
+
+Each study directory contains:
+
+```text
+snapshot.json              # frozen study and scientific preflight evidence
+writer.lock                # persistent POSIX lock inode and ownership marker
+journal/00000000.json       # ordered immutable checksummed events
+runs/trial-<identity>/      # existing evaluation run format and match records
+report.json                # derived summary; safe to regenerate by replay
+```
+
+Complete candidate populations and their full configurations are saved before
+any candidate executes. Trial events bind scores to verified result references;
+a complete ordered tell is committed before the optimizer advances. Recovery
+reconstructs each backend from its seed, checking every proposal, trial, fitness,
+and stop record against the journal. Missing results in an uncommitted trial are
+resumed; missing or altered committed evidence is a conflict. Invalid trials or
+backend failures stop the study without inventing a loss or changing its budget.
+
+Run `make pilot` again to resume the same workflow or verify completed work.
+The lower-level `run_study()` API remains available with explicit frozen inputs. No completed match is rerun. A live writer
+always excludes other writers. After process death, explicitly pass
+`tune pilot --recover-lock` (or `recover_lock=True` in Python); it only clears the abandoned marker after acquiring the
+kernel lock, so it cannot displace a live writer. The store currently requires
+POSIX `flock`. Corrupt journal/input records are never repaired automatically.
+
+Study counts describe work over the study's lifetime, including matches saved
+before an interruption. The first occurrence of an exact evaluation identity
+owns its match count; duplicate proposal slots retain their positions but count
+as cache hits with zero additional games. Overall counts include the shared
+incumbent once; each method's comparison counts also include that incumbent,
+so method totals must not be added together. This differs from the objective
+adapter's per-invocation `fresh_matches` counter. Timings and preflight disk usage
+do not enter the frozen scientific evidence used for journal replay.
 
 ## Reproducibility rules
 

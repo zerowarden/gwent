@@ -18,6 +18,7 @@ from gwent_shared.json_payloads import dump_pretty_json
 from gwent_evaluation.agents import AgentResolutionError
 from gwent_evaluation.execution import EvidencePolicy, execute_run
 from gwent_evaluation.models import SuiteSpec
+from gwent_evaluation.output import write_output_index, write_run_guide, write_sensitivity_guide
 from gwent_evaluation.provenance import default_repository_root as _repository_root
 from gwent_evaluation.records import StorageError
 from gwent_evaluation.replay import (
@@ -76,6 +77,12 @@ def _build_parser() -> argparse.ArgumentParser:
 
     tune_parser = subparsers.add_parser("tune", help="Plan a heuristic weight study.")
     tune_commands = tune_parser.add_subparsers(dest="tune_command", required=True)
+    pilot_parser = tune_commands.add_parser(
+        "pilot", help="Run or resume the complete pilot workflow."
+    )
+    _ = pilot_parser.add_argument("--output", type=Path, default=Path(".output/pilot"))
+    _ = pilot_parser.add_argument("--recover-lock", action="store_true")
+    pilot_parser.set_defaults(handler=_cmd_tune_pilot)
     plan_parser = tune_commands.add_parser(
         "plan", help="Resolve inputs and count matches; play no games."
     )
@@ -111,7 +118,7 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = run_parser.add_argument(
         "--output-root",
         type=Path,
-        default=Path(".output/experiments"),
+        default=Path(".output/manual/evaluations"),
         help="Directory that holds run directories.",
     )
     _ = run_parser.add_argument(
@@ -152,6 +159,33 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _cmd_tune_pilot(args: argparse.Namespace) -> int:
+    from gwent_evaluation.tuning.workflow import load_pilot_inputs, run_pilot
+
+    repository = _repository_root()
+    study, smoke = load_pilot_inputs(repository)
+    output = cast(Path, args.output)
+    _ = run_pilot(
+        study,
+        smoke,
+        output_root=output,
+        repository_root=repository,
+        recover_lock=cast(bool, args.recover_lock),
+        notify=print,
+    )
+    print(f"Read: {output / 'README.md'}")
+    return EXIT_OK
+
+
+def _index_output(root: Path) -> None:
+    write_output_index(root)
+    default_root = Path(".output").resolve()
+    for parent in root.parents:
+        if not parent.resolve().is_relative_to(default_root):
+            break
+        write_output_index(parent)
+
+
 def _cmd_tune_plan(args: argparse.Namespace) -> int:
     study = load_study_spec(cast(Path, args.spec), repository_root=_repository_root())
     print(dump_pretty_json(plan_study(study)), end="")
@@ -161,8 +195,10 @@ def _cmd_tune_plan(args: argparse.Namespace) -> int:
 def _cmd_tune_sensitivity(args: argparse.Namespace) -> int:
     path = cast(Path, args.spec)
     study = load_study_spec(path, repository_root=_repository_root())
-    output = cast(Path | None, args.output) or Path(".output/tuning") / path.stem / "sensitivity"
+    output = cast(Path | None, args.output) or Path(".output/manual/sensitivity") / path.stem
     report = run_sensitivity(study, output_root=output, repository_root=_repository_root())
+    write_sensitivity_guide(output)
+    _index_output(output.parent)
     print(
         dump_pretty_json(
             {
@@ -187,11 +223,13 @@ def _cmd_run(args: argparse.Namespace) -> int:
     run_id = cast(str | None, args.run_id)
     execution = execute_run(
         suite=suite,
-        run_id=run_id or _default_run_id(suite.suite_id),
+        run_id=run_id or _default_run_id(),
         output_root=cast(Path, args.output_root),
         repository_root=_repository_root(),
         evidence_policy=EvidencePolicy(cast(str, args.evidence_policy)),
     )
+    write_run_guide(execution.root)
+    _index_output(execution.root.parent)
     report = execution.report
     print(f"run: {execution.root}")
     print(
@@ -257,9 +295,9 @@ def _select_suite(
         raise SpecError(f"Unknown suite id {suite_id!r} in {catalog}.") from error
 
 
-def _default_run_id(suite_id: str) -> str:
+def _default_run_id() -> str:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-    return f"{suite_id}-{timestamp}"
+    return f"evaluation-{timestamp}"
 
 
 def _default_suites_path() -> Path:

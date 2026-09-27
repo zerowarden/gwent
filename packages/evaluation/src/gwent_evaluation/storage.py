@@ -11,6 +11,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from gwent_engine.cards import CardRegistry
 from gwent_shared.extract import require_sequence_field, require_str_field
@@ -106,23 +107,29 @@ class RunStore:
             return loaded
         loaded = LoadedRun(manifest, matches, {})
         validate_loaded_run(loaded)
-        self.matches_dir.mkdir(parents=True, exist_ok=True)
-        self.evidence_dir.mkdir(parents=True, exist_ok=True)
-        atomic_write_text(
-            self.manifest_path,
-            dump_pretty_json({"manifest_identity": identity, **record_to_dict(manifest)}),
-        )
-        atomic_write_text(
-            self.schedule_path,
-            "".join(canonical_json(record_to_dict(match)) + "\n" for match in matches),
-        )
+        self.output_root.mkdir(parents=True, exist_ok=True)
+        # Publish both metadata files together. An interruption during setup must
+        # not leave a run directory that looks committed but cannot be resumed.
+        with TemporaryDirectory(prefix=f".{self.run_id}-", dir=self.output_root) as temporary:
+            staging = RunStore(Path(temporary), self.run_id)
+            staging.matches_dir.mkdir(parents=True)
+            staging.evidence_dir.mkdir()
+            atomic_write_text(
+                staging.manifest_path,
+                dump_pretty_json({"manifest_identity": identity, **record_to_dict(manifest)}),
+            )
+            atomic_write_text(
+                staging.schedule_path,
+                "".join(canonical_json(record_to_dict(match)) + "\n" for match in matches),
+            )
+            os.rename(staging.root, self.root)
 
         return loaded
 
     def read_manifest(self) -> RunManifest:
         if not self.manifest_path.exists():
             raise CorruptRecordError(f"Run directory {self.root} has no manifest.")
-        document = _read_record_mapping(self.manifest_path)
+        document = read_record_mapping(self.manifest_path)
         identity = require_str_field(
             document,
             "manifest_identity",
@@ -142,7 +149,7 @@ class RunStore:
         path = self.result_path(case_id)
         if not path.exists():
             return None
-        document = _read_record_mapping(path)
+        document = read_record_mapping(path)
         digest = require_str_field(
             document,
             "record_digest",
@@ -187,7 +194,7 @@ class RunStore:
     ) -> tuple[TrajectoryStep, ...]:
         case_id = match.case_id
         path = self.trajectory_path(case_id)
-        document = _read_record_mapping(path)
+        document = read_record_mapping(path)
         if document.get("execution_identity") != result.execution_identity:
             raise CorruptRecordError("Trajectory belongs to another execution.")
         recorded_case_id = require_str_field(
@@ -333,7 +340,7 @@ def run_manifest_identity(manifest: RunManifest) -> str:
     return canonical_digest(manifest)
 
 
-def _read_record_mapping(path: Path) -> Mapping[str, object]:
+def read_record_mapping(path: Path) -> Mapping[str, object]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError as error:

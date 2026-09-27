@@ -105,7 +105,6 @@ class ScoiataelPassive(FactionPassive):
             state,
             owner,
             PassiveKind.SCOIATAEL_CHOOSES_STARTING_PLAYER,
-            require_unique=True,
         ):
             return requested_starting_player, ()
         return requested_starting_player, (
@@ -135,7 +134,6 @@ class NilfgaardPassive(FactionPassive):
             state,
             owner,
             PassiveKind.NILFGAARD_WINS_TIES,
-            require_unique=True,
         ):
             return outcome, ()
 
@@ -163,19 +161,16 @@ class MonstersPassive(FactionPassive):
         rng: SupportsRandom | None,
         event_id_start: int,
     ) -> tuple[frozenset[CardInstanceId], tuple[GameEvent, ...]]:
-        if not _owns_sole_passive(
-            state,
-            owner,
-            PassiveKind.MONSTERS_KEEP_ONE_UNIT,
-            require_unique=False,
-        ):
+        if passive_kind_for_player(owner) != PassiveKind.MONSTERS_KEEP_ONE_UNIT:
             return frozenset(), ()
 
         eligible_unit_cards = tuple(
             card.instance_id
             for card in state.card_instances
             if card.zone == Zone.BATTLEFIELD
+            and card.battlefield_side == owner.player_id
             and card_registry.get(card.definition_id).card_type == CardType.UNIT
+            and not card_registry.get(card.definition_id).is_hero
         )
         if not eligible_unit_cards:
             return frozenset(), ()
@@ -411,22 +406,13 @@ def _owns_sole_passive(
     state: GameState,
     owner: PlayerState,
     passive_kind: PassiveKind,
-    *,
-    require_unique: bool,
 ) -> bool:
-    """Whether `owner` is the player the passive applies to.
-
-    Mirror matches (both players sharing a faction) are asymmetric unless a
-    passive requires a unique owner; Monsters historically grants its keep-one
-    effect to the first matching player only.
-    """
+    """Whether `owner` alone has a passive that cancels in mirror matches."""
 
     matching_players = tuple(
         player for player in state.players if passive_kind_for_player(player) == passive_kind
     )
-    if not matching_players or matching_players[0].player_id != owner.player_id:
-        return False
-    return not require_unique or len(matching_players) == 1
+    return len(matching_players) == 1 and matching_players[0].player_id == owner.player_id
 
 
 def passive_kind_for_player(player: PlayerState) -> PassiveKind | None:

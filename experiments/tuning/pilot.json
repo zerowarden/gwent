@@ -1,66 +1,90 @@
 {
   "schema_version": 2,
-  "study_id": "tuning-smoke-v1",
-  "mode": "smoke",
+  "study_id": "weight-pilot",
+  "mode": "scientific",
   "agents_catalog": "../agents.json",
   "suites_catalog": "../suites.json",
   "suites": {
     "optimization": {
       "schema_version": 1,
-      "suite_id": "tuning-smoke-optimization-v1",
-      "purpose": "smoke",
+      "suite_id": "pilot-optimization",
+      "purpose": "optimize",
       "candidate": "heuristic-neutral",
       "opponents": [
-        "greedy"
+        "greedy",
+        "heuristic-neutral",
+        "heuristic-conservative",
+        "heuristic-aggressive"
       ],
       "deck_pairs": [
         [
           "monsters_muster_swarm_strict",
-          "monsters_muster_swarm_strict"
+          "nilfgaard_spy_medic_control_strict"
+        ],
+        [
+          "scoiatael_high_stakes",
+          "northern_realms_spy_siege_bond_strict"
         ]
       ],
       "seeds": [
-        90011
+        10001,
+        10002
       ],
       "scheduling": "balanced",
       "action_budget": 512
     },
     "validation": {
       "schema_version": 1,
-      "suite_id": "tuning-smoke-validation-v1",
-      "purpose": "smoke",
+      "suite_id": "pilot-validation",
+      "purpose": "validation",
       "candidate": "heuristic-neutral",
       "opponents": [
-        "greedy"
+        "greedy",
+        "heuristic-neutral",
+        "heuristic-conservative",
+        "heuristic-aggressive"
       ],
       "deck_pairs": [
         [
           "monsters_muster_swarm_strict",
-          "monsters_muster_swarm_strict"
+          "nilfgaard_spy_medic_control_strict"
+        ],
+        [
+          "scoiatael_high_stakes",
+          "northern_realms_spy_siege_bond_strict"
         ]
       ],
       "seeds": [
-        90012
+        200001,
+        200002
       ],
       "scheduling": "balanced",
       "action_budget": 512
     },
     "test": {
       "schema_version": 1,
-      "suite_id": "tuning-smoke-test-v1",
-      "purpose": "smoke",
+      "suite_id": "pilot-test",
+      "purpose": "test",
       "candidate": "heuristic-neutral",
       "opponents": [
-        "greedy"
+        "greedy",
+        "heuristic-neutral",
+        "heuristic-conservative",
+        "heuristic-aggressive"
       ],
       "deck_pairs": [
         [
           "monsters_muster_swarm_strict",
-          "monsters_muster_swarm_strict"
+          "nilfgaard_spy_medic_control_strict"
+        ],
+        [
+          "scoiatael_high_stakes",
+          "northern_realms_spy_siege_bond_strict"
         ]
       ],
       "seeds": [
-        90013
+        300001,
+        300002
       ],
       "scheduling": "balanced",
       "action_budget": 512
@@ -68,7 +92,7 @@
   },
   "parameter_space": {
     "schema_version": 1,
-    "space_id": "evaluation-weights-v1",
+    "space_id": "evaluation-weights",
     "parameters": [
       {
         "name": "immediate_points",
@@ -131,8 +155,8 @@
     {
       "method": "random",
       "seed": 26092601,
-      "proposal_budget": 2,
-      "batch_size": 2,
+      "proposal_budget": 16,
+      "batch_size": 8,
       "generations": null,
       "initial_sigma": null,
       "protocol_version": 1,
@@ -141,9 +165,9 @@
     {
       "method": "cma_es",
       "seed": 26092602,
-      "proposal_budget": 2,
-      "batch_size": 2,
-      "generations": 1,
+      "proposal_budget": 16,
+      "batch_size": 8,
+      "generations": 2,
       "initial_sigma": 0.2,
       "protocol_version": 1,
       "cma": {
@@ -163,7 +187,7 @@
   "objective_version": 1,
   "selection": {
     "version": 1,
-    "finalist_count": 2,
+    "finalist_count": 3,
     "minimum_test_improvement": 0.02,
     "maximum_stratum_decline": 0.05,
     "strata": [
@@ -174,20 +198,20 @@
   "sensitivity": {
     "version": 1,
     "pilot_seeds": [
-      90014
+      9001
     ],
-    "max_pilot_matches": 12,
+    "max_pilot_matches": 192,
     "observations_per_match": 8,
     "minimum_relative_score_witnesses": 1,
     "minimum_changed_actions": 1,
     "minimum_changed_outcomes": 1
   },
   "bootstrap": {
-    "resamples": 100,
+    "resamples": 2000,
     "confidence_level": 0.95,
     "minimum_blocks": 8,
     "seed": 26092603
   },
   "evidence_policy": "none",
-  "evaluation_match_budget": 40
+  "evaluation_match_budget": 4992
 }

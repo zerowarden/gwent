@@ -44,6 +44,45 @@ def _positive_integer(value: object, name: str) -> int:
 
 
 @dataclass(frozen=True, slots=True)
+class CmaTermination:
+    function_tolerance: float = 1e-11
+    history_tolerance: float = 1e-12
+    flat_generations: int = 1
+    coordinate_tolerance: float = 1e-11
+    condition_limit: float = 1e14
+
+    def __post_init__(self) -> None:
+        _ = _positive_integer(self.flat_generations, "flat_generations")
+        for name in ("function_tolerance", "history_tolerance", "coordinate_tolerance"):
+            value = finite_float(cast(object, getattr(self, name)), context=name)
+            if value < 0:
+                raise SpecError(f"{name} must be nonnegative.")
+            object.__setattr__(self, name, value)
+        limit = finite_float(self.condition_limit, context="condition_limit")
+        if limit <= 1:
+            raise SpecError("condition_limit must exceed one.")
+        object.__setattr__(self, "condition_limit", limit)
+
+
+@dataclass(frozen=True, slots=True)
+class CmaSettings:
+    backend_version: str = "4.5.0"
+    random_generator: str = "numpy_pcg64"
+    boundary_handler: str = "BoundTransform"
+    termination: CmaTermination = CmaTermination()
+
+    def __post_init__(self) -> None:
+        if self.backend_version != "4.5.0":
+            raise SpecError("Unsupported CMA backend version.")
+        if self.random_generator != "numpy_pcg64":
+            raise SpecError("Unsupported CMA random generator.")
+        if self.boundary_handler != "BoundTransform":
+            raise SpecError("Unsupported CMA boundary handler.")
+        if type(self.termination) is not CmaTermination:
+            raise SpecError("CMA termination must be an immutable typed record.")
+
+
+@dataclass(frozen=True, slots=True)
 class OptimizerSpec:
     method: OptimizerMethod
     seed: int
@@ -52,6 +91,7 @@ class OptimizerSpec:
     generations: int | None
     initial_sigma: float | None
     protocol_version: int = 1
+    cma: CmaSettings | None = None
 
     def __post_init__(self) -> None:
         if type(self.method) is not OptimizerMethod:
@@ -64,9 +104,13 @@ class OptimizerSpec:
         if self.proposal_budget % self.batch_size:
             raise SpecError("Proposal budget must contain complete batches.")
         if self.method is OptimizerMethod.RANDOM:
-            if self.generations is not None or self.initial_sigma is not None:
+            if any(value is not None for value in (self.generations, self.initial_sigma, self.cma)):
                 raise SpecError("Random search cannot declare CMA settings.")
         else:
+            if type(self.cma) is not CmaSettings:
+                raise SpecError("CMA requires explicit backend settings.")
+            if self.seed < 0:
+                raise SpecError("CMA seed must be nonnegative.")
             generations = _positive_integer(self.generations, "generations")
             sigma = finite_float(self.initial_sigma, context="initial_sigma")
             if self.batch_size < 2 or self.proposal_budget != generations * self.batch_size:
@@ -146,7 +190,7 @@ class StudySpec:
     evaluation_match_budget: int
 
     def __post_init__(self) -> None:
-        if _positive_integer(self.schema_version, "study schema version") != 1:
+        if _positive_integer(self.schema_version, "study schema version") != 2:
             raise SpecError("Unsupported study schema version.")
         _ = expect_str(self.study_id, context="study_id", error_factory=SpecError)
         if type(self.mode) is not StudyMode or type(self.evidence_policy) is not EvidencePolicy:

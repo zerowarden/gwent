@@ -33,9 +33,32 @@ class ProposalFitness:
 
 class OptimizerStopReason(StrEnum):
     BUDGET_EXHAUSTED = "budget_exhausted"
+    FLAT_OBJECTIVE = "flat_objective"
+    NUMERICAL_LIMIT = "numerical_limit"
+    BACKEND_FAILURE = "backend_failure"
+
+
+@dataclass(frozen=True, slots=True)
+class OptimizerStop:
+    reason: OptimizerStopReason
+    completed_proposals: int
+    backend_reasons: tuple[str, ...] = ()
+    detail: str | None = None
+
+
+def validate_population(
+    pending: tuple[Proposal, ...], results: tuple[ProposalFitness, ...]
+) -> tuple[float, ...]:
+    """Validate the entire ordered batch before a backend changes any state."""
+    if not pending or tuple(item.proposal for item in results) != pending:
+        raise SpecError("Tell requires the complete pending batch in its original order.")
+    return tuple(finite_float(item.fitness, context="optimizer fitness") for item in results)
 
 
 class ProposalOptimizer(Protocol):
+    @property
+    def stop(self) -> OptimizerStop | None: ...
+
     @property
     def stop_reason(self) -> OptimizerStopReason | None: ...
 
@@ -65,10 +88,14 @@ class RandomSearch:
         self._pending: tuple[Proposal, ...] = ()
 
     @property
-    def stop_reason(self) -> OptimizerStopReason | None:
+    def stop(self) -> OptimizerStop | None:
         if self._completed == self._settings.proposal_budget:
-            return OptimizerStopReason.BUDGET_EXHAUSTED
+            return OptimizerStop(OptimizerStopReason.BUDGET_EXHAUSTED, self._completed)
         return None
+
+    @property
+    def stop_reason(self) -> OptimizerStopReason | None:
+        return None if self.stop is None else self.stop.reason
 
     def ask(self) -> tuple[Proposal, ...]:
         if self._pending or self.stop_reason is not None:
@@ -83,10 +110,7 @@ class RandomSearch:
         return self._pending
 
     def tell(self, results: tuple[ProposalFitness, ...]) -> None:
-        if not self._pending or tuple(item.proposal for item in results) != self._pending:
-            raise SpecError("Tell requires the complete pending batch in its original order.")
-        for item in results:
-            _ = finite_float(item.fitness, context="optimizer fitness")
+        _ = validate_population(self._pending, results)
         self._completed += len(results)
         self._pending = ()
 

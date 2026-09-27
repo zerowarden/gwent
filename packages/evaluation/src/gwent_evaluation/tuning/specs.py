@@ -25,6 +25,8 @@ from gwent_evaluation.records import record_to_dict, run_manifest_from_dict
 from gwent_evaluation.schedule import schedule_suite
 from gwent_evaluation.specs import load_agent_catalog, load_suite_catalog, parse_suite_spec
 from gwent_evaluation.tuning.models import (
+    CmaSettings,
+    CmaTermination,
     OptimizerMethod,
     OptimizerSpec,
     SelectionPolicy,
@@ -76,6 +78,31 @@ def _space(value: object) -> ParameterSpace:
     )
 
 
+def _cma_settings(value: object) -> CmaSettings:
+    mapping = _mapping(value, {field.name for field in fields(CmaSettings)}, "cma")
+    termination = _mapping(
+        mapping["termination"], {field.name for field in fields(CmaTermination)}, "CMA termination"
+    )
+    return CmaSettings(
+        backend_version=_string(mapping["backend_version"]),
+        random_generator=_string(mapping["random_generator"]),
+        boundary_handler=_string(mapping["boundary_handler"]),
+        termination=CmaTermination(
+            function_tolerance=finite_float(
+                termination["function_tolerance"], context="function_tolerance"
+            ),
+            history_tolerance=finite_float(
+                termination["history_tolerance"], context="history_tolerance"
+            ),
+            flat_generations=_integer(termination["flat_generations"]),
+            coordinate_tolerance=finite_float(
+                termination["coordinate_tolerance"], context="coordinate_tolerance"
+            ),
+            condition_limit=finite_float(termination["condition_limit"], context="condition_limit"),
+        ),
+    )
+
+
 def _optimizer(value: object) -> OptimizerSpec:
     mapping = _mapping(value, {field.name for field in fields(OptimizerSpec)}, "optimizer")
     return OptimizerSpec(
@@ -90,6 +117,7 @@ def _optimizer(value: object) -> OptimizerSpec:
         if mapping["initial_sigma"] is None
         else finite_float(mapping["initial_sigma"], context="initial_sigma"),
         protocol_version=_integer(mapping["protocol_version"]),
+        cma=None if mapping["cma"] is None else _cma_settings(mapping["cma"]),
     )
 
 
@@ -270,5 +298,5 @@ def plan_study(study: StudySpec) -> dict[str, object]:
         "frozen_configuration_digest": study.frozen_configuration_digest,
         "clean_checkout": study.optimization.repository.is_clean_checkout,
         "sensitivity_status": "not_assessed",
-        "execution_available": False,
+        "execution_available": study.mode is StudyMode.SCIENTIFIC,
     }
