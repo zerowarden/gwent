@@ -41,6 +41,8 @@ def _build_card_definition(raw_card: object, *, path: Path) -> CardDefinition:
         ability_kinds=_parse_ability_kinds(entry.get("ability_kinds"), context=context),
         musters_group=optional_str(entry, "musters_group", context=context),
         muster_group=optional_str(entry, "muster_group", context=context),
+        muster_from_deck_only=optional_bool(entry, "muster_from_deck_only", context=context)
+        or False,
         bond_group=optional_str(entry, "bond_group", context=context),
         transforms_into_definition_id=_optional_card_definition_id(
             entry,

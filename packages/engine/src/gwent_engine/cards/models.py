@@ -23,6 +23,7 @@ class CardDefinition:
     ability_kinds: tuple[AbilityKind, ...] = ()
     musters_group: str | None = None
     muster_group: str | None = None
+    muster_from_deck_only: bool = False
     bond_group: str | None = None
     transforms_into_definition_id: CardDefinitionId | None = None
     avenger_summon_definition_id: CardDefinitionId | None = None
@@ -104,6 +105,8 @@ class CardDefinition:
         if self._has_ability(AbilityKind.MUSTER):
             self._require_any_muster_group()
             return
+        if self.muster_from_deck_only:
+            raise ValueError("Only Muster units may summon from the deck only.")
         if self.musters_group is not None:
             raise ValueError("Only Muster units may declare a musters_group.")
 
@@ -116,6 +119,8 @@ class CardDefinition:
             raise ValueError("Special cards must not carry base strength.")
         if self.is_hero:
             raise ValueError("Only unit cards may be marked as heroes.")
+        if self.muster_from_deck_only:
+            raise ValueError("Only Muster units may summon from the deck only.")
         self._require_no_unit_only_metadata("Special cards cannot declare unit metadata.")
         if len(self.ability_kinds) != 1:
             raise ValueError("Special cards must declare exactly one ability_kind.")
@@ -138,6 +143,8 @@ class CardDefinition:
             raise ValueError("Only unit cards may carry base strength in the current scope.")
         if self.is_hero:
             raise ValueError("Only unit cards may be marked as heroes.")
+        if self.muster_from_deck_only:
+            raise ValueError("Only Muster units may summon from the deck only.")
         if self.allowed_rows:
             raise ValueError(
                 "Only unit or horn cards may declare allowed_rows in the current scope."

@@ -1,3 +1,4 @@
+import pytest
 from gwent_engine.core import Row, Zone
 from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.events import MusterResolvedEvent
@@ -11,6 +12,77 @@ from ..support import (
     PLAYER_ONE_ID,
     PLAYER_TWO_ID,
 )
+
+
+@pytest.mark.parametrize("hero_id", ("neutral_geralt", "neutral_ciri"))
+@pytest.mark.parametrize("roach_zone", (Zone.HAND, Zone.DECK))
+def test_roach_reward_hero_summons_roach_only_from_deck(
+    hero_id: str,
+    roach_zone: Zone,
+) -> None:
+    hero_card_id = CardInstanceId("p1_reward_hero")
+    roach_card_id = CardInstanceId("p1_roach")
+    roach = card(roach_card_id, "neutral_roach")
+    state = (
+        scenario("reward_hero_roach")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[
+                card(hero_card_id, f"{hero_id}_with_roach"),
+                *([roach] if roach_zone == Zone.HAND else []),
+            ],
+            deck=[roach] if roach_zone == Zone.DECK else [],
+        )
+        .player(PLAYER_TWO_ID, hand=[card("p2_reserve", "monsters_griffin")])
+        .build()
+    )
+
+    next_state, events = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID, card_instance_id=hero_card_id, target_row=Row.CLOSE
+        ),
+        card_registry=CARD_REGISTRY,
+    )
+
+    summoned = roach_zone == Zone.DECK
+    assert next_state.player(PLAYER_ONE_ID).rows.close == (
+        (hero_card_id, roach_card_id) if summoned else (hero_card_id,)
+    )
+    assert next_state.player(PLAYER_ONE_ID).hand == (() if summoned else (roach_card_id,))
+    assert calculate_row_score(next_state, CARD_REGISTRY, PLAYER_ONE_ID, Row.CLOSE) == (
+        18 if summoned else 15
+    )
+    resolved_event = next(event for event in events if isinstance(event, MusterResolvedEvent))
+    assert resolved_event.mustered_card_instance_ids == ((roach_card_id,) if summoned else ())
+
+
+@pytest.mark.parametrize("hero_id", ("neutral_geralt", "neutral_ciri"))
+def test_ordinary_hero_does_not_summon_roach(hero_id: str) -> None:
+    hero_card_id = CardInstanceId("p1_ordinary_hero")
+    roach_card_id = CardInstanceId("p1_roach")
+    state = (
+        scenario("ordinary_hero_roach")
+        .player(
+            PLAYER_ONE_ID,
+            hand=[card(hero_card_id, hero_id)],
+            deck=[card(roach_card_id, "neutral_roach")],
+        )
+        .player(PLAYER_TWO_ID, hand=[card("p2_reserve", "monsters_griffin")])
+        .build()
+    )
+
+    next_state, events = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID, card_instance_id=hero_card_id, target_row=Row.CLOSE
+        ),
+        card_registry=CARD_REGISTRY,
+    )
+
+    assert next_state.player(PLAYER_ONE_ID).rows.close == (hero_card_id,)
+    assert next_state.player(PLAYER_ONE_ID).deck == (roach_card_id,)
+    assert not any(isinstance(event, MusterResolvedEvent) for event in events)
 
 
 def test_muster_pulls_matching_cards_from_deck_in_deck_order_without_duplication() -> None:

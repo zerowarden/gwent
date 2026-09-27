@@ -514,7 +514,9 @@ def _resolve_muster_after_play(
     player = state.player(played_by_player_id)
     mustered_card_ids = tuple(
         candidate_card_id
-        for candidate_card_id in (*player.hand, *player.deck)
+        for candidate_card_id in (
+            player.deck if definition.muster_from_deck_only else (*player.hand, *player.deck)
+        )
         if candidate_card_id not in context.reserved_muster_card_ids
         if _belongs_to_muster_group(
             state,

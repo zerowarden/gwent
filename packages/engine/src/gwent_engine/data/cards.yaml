@@ -69,6 +69,7 @@ cards:
     base_strength: 10
     allowed_rows: [close]
     ability_kinds: []
+    is_hero: true
   - definition_id: monsters_earth_elemental
     name: Earth Elemental
     faction: monsters
@@ -111,6 +112,13 @@ cards:
     base_strength: 5
     allowed_rows: [close]
     ability_kinds: []
+  - definition_id: monsters_frightener
+    name: Frightener
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [close]
+    ability_kinds: []
   - definition_id: monsters_gargoyle
     name: Gargoyle
     faction: monsters
@@ -128,7 +136,7 @@ cards:
     muster_group: ghoul
     max_copies_per_deck: 3
   - definition_id: monsters_grave_hag
-    name: Ghoul
+    name: Grave Hag
     faction: monsters
     card_type: unit
     base_strength: 5
@@ -147,6 +155,13 @@ cards:
     base_strength: 2
     allowed_rows: [close, ranged]
     ability_kinds: [agile]
+  - definition_id: monsters_ice_giant
+    name: Ice Giant
+    faction: monsters
+    card_type: unit
+    base_strength: 5
+    allowed_rows: [siege]
+    ability_kinds: []
   - definition_id: monsters_imlerith
     name: Imlerith
     faction: monsters
@@ -172,13 +187,14 @@ cards:
     ability_kinds: []
     is_hero: true
   - definition_id: monsters_nekkar
-    name: Nekkar
+    name: Nekker
     faction: monsters
     card_type: unit
     base_strength: 2
     allowed_rows: [close]
     ability_kinds: [muster]
     muster_group: nekkar
+    max_copies_per_deck: 3
   - definition_id: monsters_plague_maiden
     name: Plague Maiden
     faction: monsters
@@ -241,7 +257,7 @@ cards:
     allowed_rows: [close]
     ability_kinds: []
   - definition_id: monsters_wyvern
-    name: Werewolf
+    name: Wyvern
     faction: monsters
     card_type: unit
     base_strength: 2
@@ -270,25 +286,34 @@ cards:
     base_strength: 10
     allowed_rows: [ranged]
     ability_kinds: []
+    max_copies_per_deck: 2
   - definition_id: nilfgaard_cahir
-    name: Cahir Mawr Dyffryn aep Caellach
+    name: Cahir Mawr Dyffryn aep Ceallach
     faction: nilfgaard
     card_type: unit
     base_strength: 6
     allowed_rows: [close]
     ability_kinds: []
   - definition_id: nilfgaard_etolian_auxilary_archer
-    name: Etolian Auxilary Archer
+    name: Etolian Auxiliary Archers
     faction: nilfgaard
     card_type: unit
     base_strength: 1
     allowed_rows: [ranged]
     ability_kinds: [medic]
+    max_copies_per_deck: 2
   - definition_id: nilfgard_fringilla_vigo
     name: Fringilla Vigo 
     faction: nilfgaard
     card_type: unit
     base_strength: 6
+    allowed_rows: [ranged]
+    ability_kinds: []
+  - definition_id: nilfgaard_cynthia
+    name: Cynthia
+    faction: nilfgaard
+    card_type: unit
+    base_strength: 4
     allowed_rows: [ranged]
     ability_kinds: []
   - definition_id: nilfgaard_heavy_zerrikanian_fire_scorpion
@@ -331,7 +356,7 @@ cards:
     allowed_rows: [close]
     ability_kinds: []
   - definition_id: nilfgaard_morvan_voorhis
-    name: Morvan Voorhis 
+    name: Morvran Voorhis
     faction: nilfgaard
     card_type: unit
     base_strength: 10
@@ -346,6 +371,7 @@ cards:
     allowed_rows: [close]
     ability_kinds: [tight_bond]
     bond_group: nausicaa_cavalry
+    max_copies_per_deck: 3
   - definition_id: nilfgaard_puttkammer
     name: Puttkammer
     faction: nilfgaard
@@ -446,6 +472,7 @@ cards:
     allowed_rows: [close]
     ability_kinds: [tight_bond]
     bond_group: young_emissary
+    max_copies_per_deck: 2
   - definition_id: nilfgaard_zerrikanian_fire_scorpion
     name: Zerrikanian Fire Scorpion
     faction: nilfgaard
@@ -480,8 +507,9 @@ cards:
     allowed_rows: [siege]
     ability_kinds: [tight_bond]
     bond_group: catapult
+    max_copies_per_deck: 2
   - definition_id: northern_realms_crinfrid_reaver
-    name: Crinfrid Reaver Dragon Hunters
+    name: Crinfrid Reavers Dragon Hunter
     faction: northern_realms
     card_type: unit
     base_strength: 5
@@ -662,7 +690,7 @@ cards:
     allowed_rows: [close, ranged]
     ability_kinds: [agile]
   - definition_id: scoiatael_dennis_cranmer
-    name: Dnnis Cranmer
+    name: Dennis Cranmer
     faction: scoiatael
     card_type: unit
     base_strength: 6
@@ -691,6 +719,7 @@ cards:
     allowed_rows: [close]
     ability_kinds: [muster]
     muster_group: dwarven_skirmisher
+    max_copies_per_deck: 3
   - definition_id: scoiatael_eithne
     name: Eithne 
     faction: scoiatael
@@ -707,6 +736,7 @@ cards:
     allowed_rows: [ranged]
     ability_kinds: [muster]
     muster_group: elven_skirmisher
+    max_copies_per_deck: 3
   - definition_id: scoiatael_filavandrel_aen_fidhail
     name: Filavandrel aen Fidhail 
     faction: scoiatael
@@ -721,6 +751,7 @@ cards:
     base_strength: 0
     allowed_rows: [ranged]
     ability_kinds: [medic]
+    max_copies_per_deck: 3
   - definition_id: scoiatael_havekar_smuggler
     name: Havekar Smuggler 
     faction: scoiatael
@@ -736,6 +767,14 @@ cards:
     card_type: unit
     base_strength: 6
     allowed_rows: [ranged]
+  - definition_id: scoiatael_iorveth
+    name: Iorveth
+    faction: scoiatael
+    card_type: unit
+    base_strength: 10
+    allowed_rows: [ranged]
+    ability_kinds: []
+    is_hero: true
   - definition_id: scoiatael_isengrim_faoiltiarna
     name: Isengrim Faoiltiarna 
     faction: scoiatael
@@ -751,6 +790,7 @@ cards:
     base_strength: 5
     allowed_rows: [close]
     ability_kinds: []
+    max_copies_per_deck: 5
   - definition_id: scoiatael_hero_milva
     name: Milva
     faction: scoiatael
@@ -793,6 +833,7 @@ cards:
     base_strength: 5
     allowed_rows: [close, ranged]
     ability_kinds: [agile]
+    max_copies_per_deck: 2
   - definition_id: scoiatael_yaevinn
     name: Yaevinn
     faction: scoiatael
@@ -842,13 +883,14 @@ cards:
     musters_group: drummond_shieldmaiden
     is_hero: true
   - definition_id: skellige_clan_an_craie_warrior
-    name: Clan an Craie Warrior
+    name: Clan an Craite Warrior
     faction: skellige
     card_type: unit
     base_strength: 6
     allowed_rows: [close]
     ability_kinds: [tight_bond]
     bond_group: clan_an_craie_warrior
+    max_copies_per_deck: 3
   - definition_id: skellige_clan_brokvar_archer
     name: Clan Brokvar Archer 
     faction: skellige
@@ -856,6 +898,7 @@ cards:
     base_strength: 6
     allowed_rows: [ranged]
     ability_kinds: []
+    max_copies_per_deck: 3
   - definition_id: skellige_clan_dimun_pirate
     name: Clan Dimun Pirate 
     faction: skellige
@@ -916,6 +959,7 @@ cards:
     base_strength: 10
     allowed_rows: [ranged]
     ability_kinds: []
+    is_hero: true
   - definition_id: skellige_holger_blackhand
     name: Holger Blackhand
     faction: skellige
@@ -948,6 +992,7 @@ cards:
     allowed_rows: [ranged]
     ability_kinds: [muster]
     muster_group: light_longship
+    max_copies_per_deck: 3
   - definition_id: skellige_madman_lugos
     name: Madman Lugos 
     faction: skellige
@@ -962,6 +1007,7 @@ cards:
     base_strength: 0
     allowed_rows: [close, ranged, siege]
     ability_kinds: [mardroeme]
+    max_copies_per_deck: 3
   - definition_id: skellige_olaf
     name: Olaf
     faction: skellige
@@ -1036,6 +1082,16 @@ cards:
     allowed_rows: [close]
     ability_kinds: []
     is_hero: true
+  - definition_id: neutral_ciri_with_roach
+    name: Cirilla Fiona Elen Riannon
+    faction: neutral
+    card_type: unit
+    base_strength: 15
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    musters_group: roach
+    muster_from_deck_only: true
+    is_hero: true
   - definition_id: neutral_clear_weather
     name: Clear Weather
     faction: neutral
@@ -1107,6 +1163,16 @@ cards:
     allowed_rows: [close]
     ability_kinds: []
     is_hero: true
+  - definition_id: neutral_geralt_with_roach
+    name: Geralt of Rivia
+    faction: neutral
+    card_type: unit
+    base_strength: 15
+    allowed_rows: [close]
+    ability_kinds: [muster]
+    musters_group: roach
+    muster_from_deck_only: true
+    is_hero: true
   - definition_id: neutral_impenetrable_fog
     name: Impenetrable Fog
     faction: neutral
@@ -1130,6 +1196,14 @@ cards:
     base_strength: 6
     allowed_rows: [close, ranged]
     ability_kinds: [agile, morale_boost]
+  - definition_id: neutral_roach
+    name: Roach
+    faction: neutral
+    card_type: unit
+    base_strength: 3
+    allowed_rows: [close]
+    ability_kinds: []
+    muster_group: roach
   - definition_id: neutral_scorch
     name: Scorch
     faction: neutral

@@ -39,6 +39,7 @@ def _build_card_definition(**overrides: object) -> CardDefinition:
         "ability_kinds": (),
         "musters_group": None,
         "muster_group": None,
+        "muster_from_deck_only": False,
         "bond_group": None,
         "transforms_into_definition_id": None,
         "avenger_summon_definition_id": None,
@@ -57,6 +58,7 @@ def _build_card_definition(**overrides: object) -> CardDefinition:
         ability_kinds=cast(tuple[AbilityKind, ...], values["ability_kinds"]),
         musters_group=cast(str | None, values["musters_group"]),
         muster_group=cast(str | None, values["muster_group"]),
+        muster_from_deck_only=cast(bool, values["muster_from_deck_only"]),
         bond_group=cast(str | None, values["bond_group"]),
         transforms_into_definition_id=cast(
             CardDefinitionId | None,
@@ -209,6 +211,11 @@ LEADER_CARD_METADATA_DEFAULTS: dict[str, object] = {
             None,
             {"musters_group": "test_group"},
             "Only Muster units may declare a musters_group",
+        ),
+        (
+            None,
+            {"muster_from_deck_only": True},
+            "Only Muster units may summon from the deck only",
         ),
         (
             None,

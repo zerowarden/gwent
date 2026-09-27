@@ -55,6 +55,29 @@ def test_hero_strength_ignores_weather_horn_morale_and_bond_effects() -> None:
     assert calculate_row_score(state, card_registry, PLAYER_ONE_ID, Row.CLOSE) == 24
 
 
+@pytest.mark.parametrize(
+    ("definition_id", "row", "weather_id"),
+    (
+        ("monsters_draug", Row.CLOSE, "neutral_biting_frost"),
+        ("skellige_hjalmar", Row.RANGED, "neutral_impenetrable_fog"),
+    ),
+)
+def test_reconciled_heroes_ignore_weather(
+    definition_id: str,
+    row: Row,
+    weather_id: str,
+) -> None:
+    hero_card_id = CardInstanceId("hero")
+    state = (
+        scenario("reconciled_hero_under_weather")
+        .player(PLAYER_ONE_ID, board=rows(**{row.value: [card(hero_card_id, definition_id)]}))
+        .weather(rows(**{row.value: [card("weather", weather_id)]}))
+        .build()
+    )
+
+    assert calculate_effective_strength(state, CARD_REGISTRY, hero_card_id) == 10
+
+
 def test_special_scorch_does_not_destroy_hero_units() -> None:
     card_registry = CARD_REGISTRY
     scorch_card_id = CardInstanceId("p1_scorch_finisher")
