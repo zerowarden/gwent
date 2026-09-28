@@ -426,9 +426,10 @@ def test_cli_selection_verification_and_confirmation(
     from gwent_evaluation.cli import EXIT_OK, main
 
     experiment.optimize()
-    assert main(["tune", "select", str(experiment.root)]) == EXIT_OK
+    assert main(["tune", "select", str(experiment.root), "--json"]) == EXIT_OK
     assert '"stage": "validation_complete"' in capsys.readouterr().out
-    assert main(["tune", "verify", str(experiment.root)]) == EXIT_OK
+    assert main(["tune", "verify", str(experiment.root), "--json"]) == EXIT_OK
     assert '"passed": true' in capsys.readouterr().out
-    assert main(["tune", "finalize", str(experiment.root)]) == EXIT_OK
+    assert "Passed: True" in (experiment.root / "reports/study/report.md").read_text()
+    assert main(["tune", "finalize", str(experiment.root), "--json"]) == EXIT_OK
     assert '"promoted": true' in capsys.readouterr().out

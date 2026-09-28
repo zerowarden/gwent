@@ -26,6 +26,7 @@ from gwent_evaluation.assets import ResolvedAssets, resolve_assets
 from gwent_evaluation.execution import EvidencePolicy, execute_run, validate_run_environment
 from gwent_evaluation.metrics import block_outcomes, compute_run_metrics
 from gwent_evaluation.models import DecisionSample, SpecError, SuitePurpose, SuiteSpec
+from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import decision_sample_to_dict, parse_record_mapping, record_to_dict
 from gwent_evaluation.reporting import scored_cases
@@ -464,7 +465,7 @@ def sensitivity_suite(study: StudySpec) -> SuiteSpec:
     return suite
 
 
-def _observations(run: LoadedRun, limit: int) -> tuple[ObservationCase, ...]:
+def sample_observations(run: LoadedRun, limit: int) -> tuple[ObservationCase, ...]:
     observations: list[ObservationCase] = []
     for match in run.matches:
         samples = tuple(
@@ -624,8 +625,9 @@ def run_sensitivity(
         runs.append((name, loaded))
         if any(item.termination.value != "completed" for item in run.results):
             break
+    advance("checking relative action scores and control outcomes")
     incumbent = runs[0][1]
-    observations = _observations(incumbent, study.sensitivity.observations_per_match)
+    observations = sample_observations(incumbent, study.sensitivity.observations_per_match)
     dimensions = measure_dimensions(study, observations, assets)
     controls = tuple(_control_result(name, run, incumbent, study) for name, run in runs)
     validate_run_environment(study.optimization, repository_root=repository_root)

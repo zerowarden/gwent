@@ -15,6 +15,7 @@ from gwent_shared.extract import expect_mapping
 
 from gwent_evaluation.execution import EvidencePolicy, validate_run_environment
 from gwent_evaluation.models import SpecError
+from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.storage import RunConflictError
@@ -244,6 +245,12 @@ class _StudyRunner:
         self, method: OptimizerMethod | None, candidate: _Candidate
     ) -> tuple[ScoredCandidate, str]:
         self._require_running()
+        label = (
+            "incumbent"
+            if method is None
+            else f"{method.value} proposal {candidate.proposal.index + 1}"
+        )
+        advance(f"{label}: verifying or evaluating")
         current = candidate_evaluation_identity(
             self.study, candidate.configuration, repository_root=self.repository_root
         )

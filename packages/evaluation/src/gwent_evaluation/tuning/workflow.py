@@ -1,5 +1,6 @@
 """One reproducible pilot: smoke, sensitivity, optimization, replay, and reports."""
 
+import sys
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -233,3 +234,97 @@ def run_pilot(
             write_pilot_exports(output_root / "reports", study, result)
             progress.result = result
         return result
+
+
+def run_tuning(
+    study: StudySpec,
+    *,
+    output_root: Path,
+    repository_root: Path,
+    recover_lock: bool = False,
+) -> None:
+    """Freeze inputs, run preflight and optimization, then freeze validation selection."""
+    from gwent_evaluation.progress import stage
+    from gwent_evaluation.tuning.latency import measure_selected_latency
+    from gwent_evaluation.tuning.selection import select_challenger
+    from gwent_evaluation.tuning.study_report import write_study_report
+
+    validate_run_environment(study.optimization, repository_root=repository_root)
+    if study.mode is StudyMode.SCIENTIFIC and not study.optimization.repository.is_clean_checkout:
+        raise SpecError("Scientific tuning requires a clean committed checkout.")
+    with exclusive_writer(output_root, recover_lock=recover_lock):
+        path = output_root / "study.json"
+        payload = record_to_dict(study)
+        if path.exists():
+            if read_checked_document(path) != payload:
+                raise RunConflictError(
+                    "Study inputs changed; use a new study ID after code or spec changes."
+                )
+        else:
+            if any(output_root.glob("*/snapshot.json")):
+                raise RunConflictError("Study evidence exists without frozen inputs.")
+            _ = write_checked_document(path, payload)
+        active = "sensitivity"
+        atomic_write_text(
+            output_root / "operation.json", dump_pretty_json({"status": "running", "stage": active})
+        )
+        try:
+            with stage("sensitivity"):
+                sensitivity = run_sensitivity(
+                    study, output_root=output_root / "sensitivity", repository_root=repository_root
+                )
+            if study.mode is StudyMode.SMOKE:
+                atomic_write_text(
+                    output_root / "operation.json",
+                    dump_pretty_json({"status": "complete", "stage": "diagnostic"}),
+                )
+                return
+            require_sensitivity(study, sensitivity)
+            active = "optimization"
+            with stage(active):
+                _ = run_study(
+                    study,
+                    output_root=output_root / "optimization",
+                    repository_root=repository_root,
+                    sensitivity_report=sensitivity,
+                    recover_lock=recover_lock,
+                )
+            active = "validation"
+            with stage(active):
+                selection = select_challenger(
+                    output_root / "optimization",
+                    repository_root=repository_root,
+                    recover_lock=recover_lock,
+                )
+            if selection.selected is not None:
+                active = "candidate latency"
+                with stage(active):
+                    measure_selected_latency(
+                        study, selection.selected, root=output_root, repository_root=repository_root
+                    )
+            atomic_write_text(
+                output_root / "operation.json",
+                dump_pretty_json({"status": "complete", "stage": active}),
+            )
+        except BaseException as error:
+            atomic_write_text(
+                output_root / "operation.json",
+                dump_pretty_json(
+                    {
+                        "status": "interrupted"
+                        if isinstance(error, (KeyboardInterrupt, SystemExit))
+                        else "failed",
+                        "stage": active,
+                        "detail": str(error) or "Interrupted; rerun the same command to resume.",
+                    }
+                ),
+            )
+            raise
+        finally:
+            original_error = sys.exc_info()[0]
+            try:
+                with stage("report"):
+                    _ = write_study_report(output_root)
+            except Exception:
+                if original_error is None:
+                    raise

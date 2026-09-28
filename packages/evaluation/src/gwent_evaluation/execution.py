@@ -27,6 +27,7 @@ from gwent_evaluation.models import (
     SuiteSpec,
     candidate_score_for_outcome,
 )
+from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import (
     SEED_DERIVATION_VERSION,
     canonical_digest,
@@ -115,6 +116,7 @@ def execute_run(
     results: list[MatchResult] = []
     executed_case_ids: list[str] = []
     resumed_case_ids: list[str] = []
+    advance(f"{run_id[:24]} / {suite.suite_id}", completed=len(persisted), total=len(matches))
     for match in matches:
         existing = persisted.get(match.case_id)
         if existing is not None:
@@ -142,6 +144,11 @@ def execute_run(
         store.write_result(result)
         results.append(result)
         executed_case_ids.append(match.case_id)
+        advance(
+            f"{run_id[:24]} / {suite.suite_id}",
+            completed=len(persisted) + len(executed_case_ids),
+            total=len(matches),
+        )
 
     report = persist_run_report(
         store,

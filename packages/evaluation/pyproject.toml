@@ -12,6 +12,10 @@ dependencies = [
     "gwent-shared",
 ]
 
+[project.scripts]
+tune = "gwent_evaluation.cli:tune_main"
+gwent-eval = "gwent_evaluation.cli:main"
+
 [project.optional-dependencies]
 tuning = ["cma==4.5.0", "numpy>=2.0"]
 

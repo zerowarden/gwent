@@ -150,6 +150,11 @@ class StudyStore:
             self._previous = digest
 
     @property
+    def entries(self) -> tuple[JournalEntry, ...]:
+        """Checksum-verified entries from the prepared snapshot."""
+        return tuple(self._entries)
+
+    @property
     def next_entry(self) -> JournalEntry | None:
         return self._entries[self._cursor] if self._cursor < len(self._entries) else None
 

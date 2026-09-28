@@ -5,7 +5,7 @@ MYPY := uv run mypy
 BASEDPYRIGHT := uv run basedpyright
 PILOT_OUTPUT ?= .output/pilot
 
-.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play ai-eval-smoke ai-eval-core pilot service service-sqlite
+.PHONY: help sync test pytest test\:cov ruff fix mypy basedpyright check ai-play ai-eval-smoke ai-eval-core ai-tune-smoke pilot service service-sqlite
 
 ## Sync workspace environment
 sync:
@@ -109,3 +109,7 @@ service:
 ## Run HTTP service with durable SQLite storage
 service-sqlite:
 	GWENT_SERVICE_REPOSITORY=sqlite GWENT_SERVICE_SQLITE_PATH=gwent_service.sqlite3 uv run --package gwent-service uvicorn gwent_service.main:app --reload
+
+## Run bounded tuning diagnostics on synthetic smoke seeds (no held-out games)
+ai-tune-smoke:
+	uv run --locked tune run experiments/tuning/smoke.json

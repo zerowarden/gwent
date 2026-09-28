@@ -551,3 +551,147 @@ they must not guide another candidate selection on the same test partition.
   source files, and are marked `optimization_evidence: false`.
 - `report.json` only claims `valid_for_comparison` when every planned case
   completed; `compare` refuses to present an inferential interval otherwise.
+
+## Tuning command guide
+
+The short `tune` entry point is installed by `uv sync` (also performed by
+`uv run`). The longer `python -m gwent_evaluation tune` form calls the same
+controllers. Numerical settings remain in the strict JSON specification.
+
+```bash
+uv run --locked tune plan
+uv run --locked tune run
+uv run --locked tune report
+# When a challenger is selected:
+uv run --locked tune verify
+uv run --locked tune finalize
+```
+
+The default specification is `experiments/tuning/pilot.json`: a bounded
+scientific study, with study ID `weight-pilot`. It is not the large specification
+in `weights.json`. `plan` shows exact per-candidate counts, upper game budgets,
+seeds, opponents, deck pairs, tunable fields, bounds, and promotion thresholds
+without playing any games. A dirty checkout can be planned; scientific execution
+requires a clean committed checkout and the pinned environment.
+
+### Defaults and overrides
+
+| Setting | Environment key | Default | Explicit override |
+| --- | --- | --- | --- |
+| Study specification | `GWENT_TUNING_SPEC` | Repository `experiments/tuning/pilot.json` | `tune plan/run <spec>` |
+| Output parent | `GWENT_TUNING_OUTPUT_ROOT` | Repository `.output/tuning` | `--output-root <path>` |
+| Study directory ID | `GWENT_TUNING_STUDY_ID` | ID in the selected specification | `--study-id <id>` |
+| Existing study location | — | Output parent / study ID | `tune report/select/verify/finalize <directory>` |
+
+Explicit command arguments override environment variables, which override code
+defaults. Default paths are anchored to the repository; explicit relative paths
+and relative environment paths use the current working directory. Authoring
+catalog references stay relative to the specification, preserving its existing
+contract. There is no automatic “latest study” selection.
+
+For example, select defaults for a development epoch once:
+
+```bash
+export GWENT_TUNING_SPEC=experiments/tuning/pilot.json
+export GWENT_TUNING_STUDY_ID=weights-after-engine-fix
+uv run --locked tune plan
+uv run --locked tune run
+uv run --locked tune report
+```
+
+Keep experiment evidence beneath `.output/`. Output overrides should point to
+another directory beneath `.output/`, or an external ignored experiment store;
+putting generated evidence in tracked paths will invalidate scientific provenance.
+The command never rewrites a specification, incumbent, or built-in policy.
+
+### Execution, progress, and recovery
+
+`run` freezes the resolved study, runs sensitivity, gates optimization, evaluates
+random search and CMA-ES, and runs bounded validation to freeze one challenger.
+It then measures incumbent/selected decision latency on the same bounded sample
+of recorded sensitivity observations, alternating order. No extra games are
+needed for this timing diagnostic. It does not run correctness verification or
+the held-out suite. `select` remains available separately for a completed
+optimization directory, including the earlier pilot layout.
+
+The terminal displays the active stage, a spinner, and a match bar with saved
+plus newly completed games for the current candidate. Proposal updates identify
+the optimization method and proposal number. During resume, previously recorded
+games count as saved progress, not new independent samples. A spinner means the
+stage is active, not that additional games have completed. Progress goes to
+stderr, and redirected logs receive sparse plain-text updates. Use `--no-progress`
+to suppress it and `--json` for machine-readable command results on stdout.
+
+Rerun the same command and study ID to resume. Frozen source, runtime, settings,
+and committed records are checked by the existing controllers. After process
+death, use `--recover-lock`; it cannot displace a live writer. Reports never
+repair evidence, advance an optimizer, or start validation/test games. An active
+writer can prevent reporting; rerun after the writer finishes. A failed or
+inconclusive study is not permission to change thresholds or retry another
+finalist against the same holdout.
+
+`verify` runs `make check` and records a receipt bound to the study and selection.
+`finalize` requires that passing receipt when there is a selected challenger,
+then evaluates only that candidate and the incumbent. Repeating finalization
+verifies and reuses its fixed decision. No qualifying challenger means retain
+the incumbent without consuming the holdout. Successful command execution does
+not imply policy promotion.
+
+### Reading the report
+
+The complete workflow writes:
+
+| Path under `.output/tuning/<study-id>/` | Interpretation |
+| --- | --- |
+| `report.md` | Human summary: stage, engineering status, measurement adequacy, verdict and reasons, coefficients, method counts/curves, missingness, paired intervals and matchups. |
+| `report.json` | Same report model, including full frozen configuration, provenance, sensitivity witnesses, run metrics and stage evidence. |
+| `study.json` | Checksummed resolved inputs; never edit these to resume changed code/settings. |
+| `operation.json` | Operational interruption/failure information; not scientific evidence. |
+| `sensitivity/` | Separate control-panel matches and relative-action-score witnesses. Passing proves measurability, not improvement. |
+| `optimization/journal/` | Immutable asked proposals, evaluated trials, optimizer feedback and stop reasons. |
+| `optimization/runs/` | Ordinary evaluation runs; match records remain the evidence authority. |
+| `optimization/selection/selection.json` | Frozen validation decision and selected configuration digest. |
+| `optimization/selection/verification.log` | Correctness command output. |
+| `optimization/selection/confirmation/` | Held-out evidence and final decision, if explicitly run. |
+| `optimization/selection/confirmation/policy.json` | Portable policy with explicit promoted/unpromoted status; absent if no challenger. |
+| `latency.json` | Candidate-only timing of incumbent and selected policy on identical observations; diagnostic and hardware dependent. |
+
+For a historical pilot or direct optimization directory, `tune report <directory>`
+writes the aggregate report under `reports/study/`, preserving the existing
+controller report. Reports can be regenerated from frozen inputs and journals
+without the optimizer dependency or current source/runtime matching the study;
+execution and finalization still enforce pinned conditions.
+
+Method counts separate asked proposals, completed proposals, distinct configurations,
+fresh games, and cache hits. Each curve gives the best score so far (including
+the incumbent) against proposal count and consumed fresh games. Method fresh-game
+counts exclude the shared incumbent, reported separately, and should not be
+interpreted as elapsed runtime. Missing trials/results stay missing. Summary-only
+matches do not provide candidate-specific latency; the report labels that as
+not collected instead of relabeling the combined two-bot timing.
+
+Optimization and validation scores are selection affected. Held-out paired
+improvement is candidate minus incumbent, on a 0–1 score scale: `0.02` is two
+percentage points. Promotion requires the frozen mean improvement threshold,
+a paired bootstrap lower endpoint above zero, the declared opponent/deck decline
+guards, complete valid scientific evidence, and correctness checks. Insufficient
+blocks or an interval crossing zero retain the incumbent. Fixed decks, opponents,
+shortlists, tactical overrides, and bounds remain blind spots of the conclusion.
+Once held-out outcomes guide later engine or policy changes, use a new untouched
+confirmation benchmark for a new improvement claim.
+
+Load a resulting artifact through the normal evaluation command:
+
+```bash
+uv run --locked gwent-eval run --suite smoke-v1 \
+  --candidate-artifact .output/tuning/weight-pilot/optimization/selection/confirmation/policy.json
+```
+
+The artifact contains the full runtime policy; it does not need its study files
+or optimizer libraries. Its promotion status must still be read before treating
+it as an accepted replacement.
+
+`make ai-tune-smoke` runs the existing tiny smoke specification through diagnostic
+sensitivity and reporting only. Smoke evidence cannot become scientific optimizer
+fitness or promotion evidence. This command is separate from `make check`, which
+never consumes the genuine held-out suite.

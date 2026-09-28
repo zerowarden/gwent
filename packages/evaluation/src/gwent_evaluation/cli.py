@@ -44,7 +44,7 @@ from gwent_evaluation.specs import (
     load_suite_catalog,
 )
 from gwent_evaluation.tuning.sensitivity import run_sensitivity
-from gwent_evaluation.tuning.specs import load_study_spec, plan_study
+from gwent_evaluation.tuning.specs import load_study_spec
 
 EXIT_OK = 0
 EXIT_DIVERGENCE = 1
@@ -86,11 +86,12 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = pilot_parser.add_argument("--output", type=Path, default=Path(".output/pilot"))
     _ = pilot_parser.add_argument("--recover-lock", action="store_true")
     pilot_parser.set_defaults(handler=_cmd_tune_pilot)
-    plan_parser = tune_commands.add_parser(
-        "plan", help="Resolve inputs and count matches; play no games."
-    )
-    _ = plan_parser.add_argument("spec", type=Path)
-    plan_parser.set_defaults(handler=_cmd_tune_plan)
+    from gwent_evaluation.tuning.cli import tuning_parsers
+
+    for name, command_parser in tuning_parsers():
+        _ = tune_commands.add_parser(
+            name, parents=[command_parser], add_help=False, help=command_parser.description
+        )
 
     sensitivity_parser = tune_commands.add_parser(
         "sensitivity", help="Run the bounded diagnostic control panel and score sensitivity checks."
@@ -98,16 +99,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = sensitivity_parser.add_argument("spec", type=Path)
     _ = sensitivity_parser.add_argument("--output", type=Path, default=None)
     sensitivity_parser.set_defaults(handler=_cmd_tune_sensitivity)
-
-    for command, help_text in (
-        ("select", "Freeze finalists and select a challenger using validation only."),
-        ("verify", "Run repository correctness checks for the frozen challenger."),
-        ("finalize", "Confirm the frozen challenger on held-out cases and export its policy."),
-    ):
-        stage_parser = tune_commands.add_parser(command, help=help_text)
-        _ = stage_parser.add_argument("study", type=Path, help="Completed optimization directory.")
-        _ = stage_parser.add_argument("--recover-lock", action="store_true")
-        stage_parser.set_defaults(handler=_cmd_tune_stage)
 
     run_parser = subparsers.add_parser("run", help="Execute a suite and persist a run directory.")
     _ = run_parser.add_argument(
@@ -191,30 +182,6 @@ def _cmd_tune_pilot(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _cmd_tune_stage(args: argparse.Namespace) -> int:
-    from gwent_evaluation.tuning.selection import (
-        finalize_study,
-        select_challenger,
-        verify_selection,
-    )
-
-    root = cast(Path, args.study)
-    repository = _repository_root()
-    recover = cast(bool, args.recover_lock)
-    command = cast(str, args.tune_command)
-    if command == "select":
-        result = select_challenger(root, repository_root=repository, recover_lock=recover)
-        print(dump_pretty_json(result.to_dict()), end="")
-    elif command == "verify":
-        evidence = verify_selection(root, repository_root=repository, recover_lock=recover)
-        print(dump_pretty_json(evidence), end="")
-        return EXIT_OK if evidence["passed"] else EXIT_DIVERGENCE
-    else:
-        confirmation = finalize_study(root, repository_root=repository, recover_lock=recover)
-        print(dump_pretty_json(confirmation.to_dict()), end="")
-    return EXIT_OK
-
-
 def _index_output(root: Path) -> None:
     write_output_index(root)
     default_root = Path(".output").resolve()
@@ -222,12 +189,6 @@ def _index_output(root: Path) -> None:
         if not parent.resolve().is_relative_to(default_root):
             break
         write_output_index(parent)
-
-
-def _cmd_tune_plan(args: argparse.Namespace) -> int:
-    study = load_study_spec(cast(Path, args.spec), repository_root=_repository_root())
-    print(dump_pretty_json(plan_study(study)), end="")
-    return EXIT_OK
 
 
 def _cmd_tune_sensitivity(args: argparse.Namespace) -> int:
@@ -347,6 +308,10 @@ def _default_suites_path() -> Path:
 
 def _default_agents_path() -> Path:
     return _repository_root() / "experiments" / "agents.json"
+
+
+def tune_main() -> int:
+    return main(["tune", *sys.argv[1:]])
 
 
 __all__ = ["EXIT_DIVERGENCE", "EXIT_ERROR", "EXIT_OK", "main"]

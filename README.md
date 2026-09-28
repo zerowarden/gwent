@@ -57,17 +57,36 @@ make ai-play
 
 ## Evaluation
 
-From a clean committed checkout, recreate or resume the complete tuning pilot:
+Plan and run heuristic tuning with the bounded pilot defaults:
 
 ```bash
-make pilot
+uv run --locked tune plan
+# Commit implementation/spec changes before scientific execution:
+uv run --locked tune run
+uv run --locked tune report
+# Only when validation selects a challenger:
+uv run --locked tune verify
+uv run --locked tune finalize
 ```
 
-Start reading at `.output/README.md`, then `.output/pilot/README.md`. The command
-runs smoke, sensitivity, both optimizers, recovery verification, and reports.
-It uses `experiments/tuning/pilot.json` and never runs validation or test matches.
-Repeated invocations reuse verified matches. All executable logic is tracked in
-the evaluation package; `.output/` contains disposable results only.
+Read `.output/tuning/weight-pilot/report.md` for the stage, sensitivity findings,
+optimizer work, validation evidence, and promotion verdict. The matching
+`report.json` contains the full settings and measurements. `run` stops after
+validation; `finalize` explicitly consumes held-out evidence. Repeating a command
+verifies and reuses recorded work. An inconclusive study retains the incumbent.
+
+Terminal progress updates in place; `--no-progress` disables it, and `--json`
+prints machine-readable output. Paths have defaults and can be overridden with
+`GWENT_TUNING_SPEC`, `GWENT_TUNING_OUTPUT_ROOT`, and `GWENT_TUNING_STUDY_ID`.
+Use a new study ID after changing code, settings, or dependencies.
+
+`make ai-tune-smoke` runs bounded diagnostic sensitivity checks on synthetic
+smoke seeds, including from a dirty checkout. It cannot establish improvement
+or produce optimizer fitness. `make pilot` retains the earlier optimization-only
+workflow under `.output/pilot/`.
+
+See the [tuning command guide](experiments/README.md#tuning-command-guide)
+for defaults, recovery, report interpretation, and policy loading.
 
 
 Run reproducible agent benchmarks:

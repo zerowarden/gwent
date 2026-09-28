@@ -17,6 +17,7 @@ from gwent_evaluation.execution import (
     validate_run_environment,
 )
 from gwent_evaluation.models import RunManifest, SpecError
+from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.reporting import (
@@ -101,6 +102,7 @@ def _evaluate(
     *,
     repository_root: Path,
 ) -> _Evaluation:
+    advance(f"{template.suite.purpose.value}: checking candidate {configuration.digest()}")
     digest = configuration.digest()
     run_id = "candidate-" + digest.removeprefix("sha256:")
     expected = candidate_manifest(template, configuration, run_id=run_id)

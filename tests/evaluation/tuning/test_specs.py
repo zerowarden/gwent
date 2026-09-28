@@ -54,7 +54,7 @@ def test_plan_counts_are_exact_and_cli_never_calls_evaluator(
         pytest.fail("Planning must not call the evaluator")
 
     monkeypatch.setattr(cli, "execute_run", forbidden)
-    assert cli.main(["tune", "plan", str(study_path)]) == 0
+    assert cli.main(["tune", "plan", str(study_path), "--json"]) == 0
     payload = cast(dict[str, object], json.loads(capsys.readouterr().out))
     assert payload["sensitivity_status"] == "not_assessed"
     assert payload["execution_available"] is False
