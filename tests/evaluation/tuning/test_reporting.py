@@ -45,6 +45,10 @@ def test_reports_rebuild_without_games_and_distinguish_validation_and_test(
     machine = cast(dict[str, object], json.loads((output / "report.json").read_text()))
     assert machine["stage"] == report.stage
     markdown = (output / "report.md").read_text()
+    html = (output / "report.html").read_text()
+    assert "CMA-ES evaluated populations" in html
+    assert "<svg" in html
+    assert "https://" not in html
     for value in (report.stage, report.verdict, report.measurement):
         assert value in markdown
     _ = (output / "report.json").write_text('{"verdict":"promoted"}')
@@ -200,3 +204,16 @@ def test_failed_optimization_reports_failure_without_a_score(
     assert report.verdict == "not_assessed"
     assert report.reasons
     assert cast(dict[str, object], report.runs[0]["report"])["balanced_score"] is None
+
+
+def test_report_uses_controller_choice_when_scores_tie(experiment: Experiment) -> None:
+    for digest in (
+        experiment.study.incumbent.digest(),
+        experiment.challenger,
+        experiment.alternative,
+    ):
+        experiment.scores[SuitePurpose.OPTIMIZE, digest] = 0.5
+    experiment.optimize()
+    report = build_study_report(experiment.root)
+    assert report.inputs["displayed_candidate_digest"] == experiment.study.incumbent.digest()
+    assert all(parameter["candidate"] == parameter["incumbent"] for parameter in report.parameters)

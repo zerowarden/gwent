@@ -333,3 +333,11 @@ class StudySpec:
         )
         counts["separate_pilot_match_budget"] = self.sensitivity.max_pilot_matches
         return counts
+
+
+@dataclass(frozen=True, slots=True)
+class SweepPoint:
+    parameter: str
+    value: float
+    coordinates: tuple[float, ...]
+    configuration_digest: str

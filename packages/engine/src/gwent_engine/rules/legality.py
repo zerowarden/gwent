@@ -37,7 +37,7 @@ def validate_in_round_player_can_act(
     ):
         raise IllegalActionError(
             "Players with an empty hand and no available leader action cannot act "
-            "in the same round."
+            + "in the same round."
         )
     if state.current_player != player.player_id:
         raise IllegalActionError("Only the current player may act.")

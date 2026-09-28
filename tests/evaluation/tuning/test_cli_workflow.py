@@ -21,7 +21,8 @@ def test_default_plan_and_env_paths_do_not_play_games(
     assert "custom-study" in output
     assert str(tmp_path / "custom/custom-study") in output
     assert "No games played" in output
-    assert not (tmp_path / "custom").exists()
+    assert (tmp_path / "custom/custom-study/plan.html").exists()
+    assert not list((tmp_path / "custom").rglob("matches"))
     assert main(["tune", "plan", "--study-id", "explicit", "--json"]) == 0
     payload = cast(dict[str, object], json.loads(capsys.readouterr().out))
     assert payload["study_id"] == "explicit"

@@ -10,24 +10,16 @@ from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.policy_artifacts import PolicyArtifact, PolicyStatus
 from gwent_shared.json_payloads import dump_pretty_json
 
-from gwent_evaluation.execution import (
-    EvidencePolicy,
-    candidate_manifest,
-    execute_run,
-    validate_run_environment,
-)
-from gwent_evaluation.models import RunManifest, SpecError
-from gwent_evaluation.progress import advance
+from gwent_evaluation.models import SpecError
 from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.reporting import (
     RunComparison,
-    RunReport,
     build_run_comparison,
-    build_run_report,
 )
-from gwent_evaluation.storage import RunConflictError, RunStore, atomic_write_text
+from gwent_evaluation.storage import RunConflictError, atomic_write_text
 from gwent_evaluation.tuning.models import StudySpec
+from gwent_evaluation.tuning.objective import RecordedEvaluation, evaluate_recorded_candidate
 from gwent_evaluation.tuning.storage import (
     StudyStore,
     read_checked_document,
@@ -35,7 +27,6 @@ from gwent_evaluation.tuning.storage import (
 )
 from gwent_evaluation.tuning.study import StudyResult, load_completed_study
 from gwent_evaluation.tuning.verification import record_verification, require_verification
-from gwent_evaluation.validation import LoadedRun
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,66 +79,12 @@ class ConfirmationResult:
         return {"schema_version": 1, "stage": "confirmation_complete", **record_to_dict(self)}
 
 
-@dataclass(frozen=True, slots=True)
-class _Evaluation:
-    loaded: LoadedRun
-    report: RunReport
-
-
-def _evaluate(
-    store: StudyStore,
+def assess_candidate(
     study: StudySpec,
-    template: RunManifest,
-    configuration: HeuristicConfiguration,
+    reference: RecordedEvaluation,
+    candidate: RecordedEvaluation,
     *,
-    repository_root: Path,
-) -> _Evaluation:
-    advance(f"{template.suite.purpose.value}: checking candidate {configuration.digest()}")
-    digest = configuration.digest()
-    run_id = "candidate-" + digest.removeprefix("sha256:")
-    expected = candidate_manifest(template, configuration, run_id=run_id)
-    validate_run_environment(expected, repository_root=repository_root)
-    entry = store.next_entry
-    if entry is not None and (
-        entry.kind != "evaluation" or entry.payload.get("configuration_digest") != digest
-    ):
-        raise RunConflictError("Unexpected candidate in the frozen evaluation sequence.")
-    if entry is None and store.verification_only:
-        raise RunConflictError("Selection must be complete before finalization.")
-    run = RunStore(store.root / "runs", run_id)
-    loaded = run.load() if entry is not None or run.root.exists() else None
-    if loaded is not None and loaded.manifest != expected:
-        raise RunConflictError("Selection evidence differs from the frozen candidate or suite.")
-    report = None if loaded is None else build_run_report(loaded, bootstrap=study.bootstrap)
-    # Recorded failures are terminal. Only interrupted, uncommitted work may resume.
-    if entry is None and (report is None or (report.missing_matches and not report.failed_matches)):
-        execution = execute_run(
-            suite=expected.suite,
-            run_id=run_id,
-            output_root=run.output_root,
-            repository_root=repository_root,
-            evidence_policy=EvidencePolicy.NONE,
-            expected_manifest=expected,
-        )
-        loaded = RunStore.from_root(execution.root).load()
-        report = build_run_report(loaded, bootstrap=study.bootstrap)
-    assert loaded is not None and report is not None
-    validate_run_environment(expected, repository_root=repository_root)
-    _ = store.record(
-        "evaluation",
-        {
-            "configuration_digest": digest,
-            "manifest_digest": canonical_digest(loaded.manifest),
-            "run_root": str(run.root.relative_to(store.root)),
-            "results": dict(loaded.result_digests),
-            "report": record_to_dict(report),
-        },
-    )
-    return _Evaluation(loaded, report)
-
-
-def _assess(
-    study: StudySpec, reference: _Evaluation, candidate: _Evaluation, *, confirmation: bool
+    confirmation: bool,
 ) -> CandidateAssessment:
     comparison = build_run_comparison(reference.loaded, candidate.loaded, bootstrap=study.bootstrap)
     reasons: list[str] = []
@@ -229,17 +166,17 @@ def _validate_finalists(
     )
     if not finalists:
         return replace(result, reasons=("no_optimization_challenger",))
-    reference = _evaluate(
+    reference = evaluate_recorded_candidate(
         store, study, study.validation, study.incumbent, repository_root=repository_root
     )
     if not reference.report.optimization_evidence:
         return replace(result, reasons=("invalid_incumbent_validation",))
     assessments: list[CandidateAssessment] = []
     for configuration in finalists:
-        candidate = _evaluate(
+        candidate = evaluate_recorded_candidate(
             store, study, study.validation, configuration, repository_root=repository_root
         )
-        assessments.append(_assess(study, reference, candidate, confirmation=False))
+        assessments.append(assess_candidate(study, reference, candidate, confirmation=False))
         if not candidate.report.optimization_evidence:
             return replace(
                 result, assessments=tuple(assessments), reasons=("invalid_challenger_validation",)
@@ -353,18 +290,18 @@ def finalize_study(
             assessment = None
             reasons: tuple[str, ...] = ("incumbent_retained_after_validation",)
             if selection.selected is not None:
-                reference = _evaluate(
+                reference = evaluate_recorded_candidate(
                     store, study, study.test, study.incumbent, repository_root=repository_root
                 )
                 if reference.report.optimization_evidence:
-                    candidate = _evaluate(
+                    candidate = evaluate_recorded_candidate(
                         store,
                         study,
                         study.test,
                         selection.selected,
                         repository_root=repository_root,
                     )
-                    assessment = _assess(study, reference, candidate, confirmation=True)
+                    assessment = assess_candidate(study, reference, candidate, confirmation=True)
                     reasons = assessment.reasons
                 else:
                     reasons = ("invalid_incumbent_confirmation",)

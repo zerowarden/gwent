@@ -395,9 +395,7 @@ def test_search_engine_expects_leader_reply_from_empty_handed_opponent() -> None
         leader_registry=LEADER_REGISTRY,
     )
 
-    assert any(
-        isinstance(candidate.action, UseLeaderAbilityAction) for candidate in candidates
-    )
+    assert any(isinstance(candidate.action, UseLeaderAbilityAction) for candidate in candidates)
 
 
 def test_search_engine_skips_reply_search_when_opponent_has_passed() -> None:

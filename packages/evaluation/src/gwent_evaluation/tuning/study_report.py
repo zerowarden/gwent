@@ -1,8 +1,8 @@
 """Regenerable study reports over checked journals and ordinary evaluation records."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
 from pathlib import Path
+from statistics import median
 from typing import cast
 
 from gwent_engine.ai.policy_artifacts import PolicyArtifact
@@ -22,18 +22,11 @@ from gwent_evaluation.storage import (
 )
 from gwent_evaluation.tuning.latency import load_latency
 from gwent_evaluation.tuning.models import StudyMode, StudySpec
+from gwent_evaluation.tuning.report_models import LIMITATIONS, StudyReport
 from gwent_evaluation.tuning.sensitivity import SensitivityReport
 from gwent_evaluation.tuning.specs import study_from_dict
 from gwent_evaluation.tuning.storage import JournalEntry, StudyStore, read_checked_document
 from gwent_evaluation.tuning.verification import require_verification
-
-LIMITATIONS = (
-    "Fixed decks and opponents; additional seeds do not establish unseen-deck strength.",
-    "Fixed tactical structure, shortlist, overrides, and non-tunable configuration.",
-    "Optimization and validation are selection-affected development evidence.",
-    "Only explicit held-out confirmation can support promotion under the frozen thresholds.",
-    "Decision latency is diagnostic, depends on machine/load, and never enters fitness.",
-)
 
 
 def _mapping(value: object) -> Mapping[str, object]:
@@ -57,29 +50,6 @@ def _journal(root: Path) -> tuple[Mapping[str, object], tuple[JournalEntry, ...]
         return snapshot, store.entries
 
 
-@dataclass(frozen=True, slots=True)
-class StudyReport:
-    study_id: str
-    study_digest: str
-    stage: str
-    engineering: str
-    measurement: str
-    verdict: str
-    reasons: tuple[str, ...]
-    inputs: Mapping[str, object]
-    sensitivity: Mapping[str, object] | None
-    parameters: tuple[Mapping[str, object], ...]
-    methods: tuple[Mapping[str, object], ...]
-    runs: tuple[Mapping[str, object], ...]
-    validation: Mapping[str, object] | None
-    confirmation: Mapping[str, object] | None
-    verification: Mapping[str, object] | None
-    artifacts: tuple[str, ...]
-
-    def to_dict(self) -> dict[str, object]:
-        return {"schema_version": 1, **record_to_dict(self), "limitations": LIMITATIONS}
-
-
 def _method_reports(
     study: StudySpec, entries: tuple[JournalEntry, ...]
 ) -> tuple[Mapping[str, object], ...]:
@@ -87,6 +57,15 @@ def _method_reports(
     reference = next((_mapping(t["trial"]) for t in trials if t["method"] is None), None)
     reports: list[Mapping[str, object]] = []
     for settings in study.optimizers:
+        proposals = {
+            cast(int, _mapping(candidate["proposal"])["index"]): (
+                entry.payload["population"],
+                _mapping(candidate["proposal"])["coordinates"],
+            )
+            for entry in entries
+            if entry.kind == "ask" and entry.payload["method"] == settings.method.value
+            for candidate in map(_mapping, cast(list[object], entry.payload["candidates"]))
+        }
         rows = [t for t in trials if t["method"] == settings.method.value]
         best = None if reference is None else cast(float, reference["score"])
         work = 0
@@ -98,7 +77,18 @@ def _method_reports(
             best = score if best is None else max(best, score)
             work += cast(int, row["fresh_matches"])
             unique.add(cast(str, trial["configuration_digest"]))
-            curve.append({"proposals": index, "fresh_matches": work, "best_score": best})
+            population, coordinates = proposals[cast(int, row["index"])]
+            curve.append(
+                {
+                    "proposals": index,
+                    "fresh_matches": work,
+                    "best_score": best,
+                    "candidate_score": score,
+                    "configuration_digest": trial["configuration_digest"],
+                    "generation": cast(int, population) + 1,
+                    "coordinates": coordinates,
+                }
+            )
         stop = next(
             (
                 e.payload.get("stop")
@@ -123,6 +113,24 @@ def _method_reports(
                 "cache_hits": sum(row["cache_hit"] is True for row in rows),
                 "shared_incumbent_matches": 0 if reference is None else reference["completed"],
                 "best_score_curve": curve,
+                "generations": [
+                    {
+                        "generation": cast(int, entry.payload["population"]) + 1,
+                        "best": max(scores),
+                        "median": median(scores),
+                        "worst": min(scores),
+                    }
+                    for entry in entries
+                    if entry.kind == "tell" and entry.payload["method"] == settings.method.value
+                    for scores in [
+                        [
+                            1.0 - cast(float, result["fitness"])
+                            for result in map(
+                                _mapping, cast(list[object], entry.payload["results"])
+                            )
+                        ]
+                    ]
+                ],
                 "stop": stop,
             }
         )
@@ -317,16 +325,11 @@ def build_study_report(root: Path) -> StudyReport:
             artifacts.append(str(path))
     chosen = None if validation is None else validation.get("selected_digest")
     if chosen is None:
-        scored = [
-            row
-            for row in runs
-            if row["stage"] == "optimization"
-            and _mapping(row["report"])["balanced_score"] is not None
-        ]
-        if scored:
-            chosen = max(
-                scored, key=lambda row: cast(float, _mapping(row["report"])["balanced_score"])
-            )["configuration_digest"]
+        completed = next((entry.payload for entry in entries if entry.kind == "complete"), None)
+        if completed is not None:
+            # The controller owns score ties and candidate eligibility. Partial
+            # runs have no frozen best and must not introduce a second ranking.
+            chosen = _mapping(completed["best"])["configuration_digest"]
     selected = next(
         (_mapping(row["configuration"]) for row in runs if row["configuration_digest"] == chosen),
         None,
@@ -580,10 +583,15 @@ def render_study_markdown(report: StudyReport) -> str:
     return "\n".join(lines)
 
 
-def write_study_report(root: Path) -> StudyReport:
+def write_study_report(root: Path, *, destination: Path | None = None) -> StudyReport:
+    from gwent_evaluation.tuning.html import render_study_html
+
     report = build_study_report(root)
     # Keep the optimization controller's own report intact for historical roots.
-    destination = root if (root / "study.json").exists() else root / "reports/study"
+    destination = destination or (
+        root if (root / "study.json").exists() else root / "reports/study"
+    )
     atomic_write_text(destination / "report.json", dump_pretty_json(report.to_dict()))
     atomic_write_text(destination / "report.md", render_study_markdown(report))
+    atomic_write_text(destination / "report.html", render_study_html(report))
     return report

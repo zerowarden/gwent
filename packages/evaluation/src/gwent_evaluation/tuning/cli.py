@@ -61,7 +61,7 @@ def tuning_parsers() -> Iterator[tuple[str, argparse.ArgumentParser]]:
     for name, help_text in (
         ("plan", "Show resolved inputs and match budgets; play no games."),
         ("run", "Run or resume sensitivity, optimization, and validation."),
-        ("report", "Rebuild JSON and Markdown from recorded study evidence; play no games."),
+        ("report", "Rebuild HTML charts, JSON and Markdown from recorded evidence; play no games."),
         ("select", "Freeze finalists and select using validation only."),
         ("verify", "Run correctness checks for the frozen challenger."),
         ("finalize", "Confirm only the frozen challenger on held-out cases."),
@@ -97,6 +97,9 @@ def tuning_parsers() -> Iterator[tuple[str, argparse.ArgumentParser]]:
             _ = parser.add_argument("--recover-lock", action="store_true")
         parser.set_defaults(handler=command)
         yield name, parser
+    from gwent_evaluation.tuning.ranges import ranges_parser
+
+    yield "ranges", ranges_parser()
 
 
 def _print_plan(study: StudySpec, root: Path) -> None:
@@ -154,11 +157,15 @@ def _execute(args: argparse.Namespace) -> int:
     study = _study(args) if name in {"plan", "run"} else None
     root = _root(args, study)
     if name == "plan":
+        from gwent_evaluation.tuning.html import write_plan_html
+
         assert study is not None
+        write_plan_html(study, root)
         if as_json:
             print(dump_pretty_json(plan_study(study)), end="")
         else:
             _print_plan(study, root)
+            print(f"HTML plan: {root / 'plan.html'}")
         return 0
     recover = cast(bool, getattr(args, "recover_lock", False))
     if name == "run":
@@ -182,6 +189,7 @@ def _execute(args: argparse.Namespace) -> int:
                     optimization, repository_root=repository, recover_lock=recover
                 )
                 _ = write_study_report(root)
+                _ = write_study_report(root, destination=root / "stages/verification")
                 if as_json:
                     print(dump_pretty_json(evidence), end="")
                 else:
@@ -195,6 +203,8 @@ def _execute(args: argparse.Namespace) -> int:
                 _ = finalize_study(optimization, repository_root=repository, recover_lock=recover)
     with stage("report"):
         report = write_study_report(root)
+        if name in {"select", "verify", "finalize"}:
+            _ = write_study_report(root, destination=root / "stages" / name)
     if as_json:
         print(dump_pretty_json(report.to_dict()), end="")
     else:
@@ -236,7 +246,10 @@ def _execute(args: argparse.Namespace) -> int:
                     + "(0.02 = 2 percentage points)."
                 )
         directory = root if (root / "study.json").exists() else root / "reports/study"
-        print(f"Read: {directory / 'report.md'}\nJSON: {directory / 'report.json'}")
+        print(
+            f"Read: {directory / 'report.html'}\nMarkdown: {directory / 'report.md'}"
+            + f"\nJSON: {directory / 'report.json'}"
+        )
         if report.verdict == "awaiting_confirmation":
             print(f"Next: tune verify {root}\nThen: tune finalize {root}")
         elif report.verdict == "incumbent_retained":

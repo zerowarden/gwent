@@ -95,12 +95,9 @@ def test_skellige_never_summons_heroes_from_discard_on_round_three() -> None:
             if isinstance(event, FactionPassiveTriggeredEvent)
         }
         assert triggered_card_ids == summoned_card_ids
-        assert all(
-            not card_registry.get(
-                next_state.card(card_id).definition_id
-            ).is_hero
-            for card_id in triggered_card_ids
-        )
+        for card_id in triggered_card_ids:
+            assert card_id is not None
+            assert not card_registry.get(next_state.card(card_id).definition_id).is_hero
 
 
 def test_skellige_does_not_trigger_when_only_heroes_are_in_discard() -> None:

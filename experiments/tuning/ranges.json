@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "study_spec": "benchmark-v2.json",
+  "multipliers": [
+    0,
+    0.5,
+    1,
+    2,
+    4
+  ],
+  "selection": "best_positive_score_then_nearest_incumbent_then_digest",
+  "maximum_rechecks_per_parameter": 1
+}

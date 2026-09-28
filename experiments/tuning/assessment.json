@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "study_spec": "pilot.json",
+  "optimizer_seeds": [[26092801, 26092802], [26092811, 26092812], [26092821, 26092822]],
+  "nomination": "best_qualifying_validation_score_then_study_id"
+}

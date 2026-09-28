@@ -160,7 +160,6 @@ def experiment(
 
     monkeypatch.setattr(controller, "create_optimizer", factory)
     monkeypatch.setattr(objective, "execute_run", evaluate)
-    monkeypatch.setattr(selection, "execute_run", evaluate)
 
     def checks(_root: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(["make", "check"], 0, "passed\n", "")

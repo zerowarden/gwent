@@ -245,6 +245,7 @@ def run_tuning(
 ) -> None:
     """Freeze inputs, run preflight and optimization, then freeze validation selection."""
     from gwent_evaluation.progress import stage
+    from gwent_evaluation.tuning.html import write_plan_html
     from gwent_evaluation.tuning.latency import measure_selected_latency
     from gwent_evaluation.tuning.selection import select_challenger
     from gwent_evaluation.tuning.study_report import write_study_report
@@ -265,6 +266,7 @@ def run_tuning(
                 raise RunConflictError("Study evidence exists without frozen inputs.")
             _ = write_checked_document(path, payload)
         active = "sensitivity"
+        write_plan_html(study, output_root)
         atomic_write_text(
             output_root / "operation.json", dump_pretty_json({"status": "running", "stage": active})
         )
@@ -273,6 +275,7 @@ def run_tuning(
                 sensitivity = run_sensitivity(
                     study, output_root=output_root / "sensitivity", repository_root=repository_root
                 )
+            _ = write_study_report(output_root, destination=output_root / "stages/sensitivity")
             if study.mode is StudyMode.SMOKE:
                 atomic_write_text(
                     output_root / "operation.json",
@@ -281,6 +284,10 @@ def run_tuning(
                 return
             require_sensitivity(study, sensitivity)
             active = "optimization"
+            atomic_write_text(
+                output_root / "operation.json",
+                dump_pretty_json({"status": "running", "stage": active}),
+            )
             with stage(active):
                 _ = run_study(
                     study,
@@ -289,13 +296,19 @@ def run_tuning(
                     sensitivity_report=sensitivity,
                     recover_lock=recover_lock,
                 )
+            _ = write_study_report(output_root, destination=output_root / "stages/optimization")
             active = "validation"
+            atomic_write_text(
+                output_root / "operation.json",
+                dump_pretty_json({"status": "running", "stage": active}),
+            )
             with stage(active):
                 selection = select_challenger(
                     output_root / "optimization",
                     repository_root=repository_root,
                     recover_lock=recover_lock,
                 )
+            _ = write_study_report(output_root, destination=output_root / "stages/validation")
             if selection.selected is not None:
                 active = "candidate latency"
                 with stage(active):

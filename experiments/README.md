@@ -695,3 +695,112 @@ it as an accepted replacement.
 sensitivity and reporting only. Smoke evidence cannot become scientific optimizer
 fitness or promotion evidence. This command is separate from `make check`, which
 never consumes the genuine held-out suite.
+
+## Repeated optimizer acceptance assessment
+
+After committing implementation and protocol changes, run:
+
+```bash
+make check
+uv run --locked python -m gwent_evaluation.tuning.assessment
+```
+
+`experiments/tuning/assessment.json` predeclares three independent random/CMA
+seed pairs over the bounded pilot specification. All replicates are reported at
+`.output/acceptance/assessment/report.md` and `report.json`. Each replicate uses
+the normal sensitivity, optimization, and validation controllers. A single
+cross-replicate nomination is frozen using qualifying validation score, then
+study ID for ties, before any held-out game. Only that nominee may be finalized;
+a rejection never triggers a runner-up. No qualifying challenger retains the
+incumbent without consuming held-out games. Three seeds are an initial bounded
+assessment, not proof of general optimizer superiority.
+
+The assessment also exports a nondefault **unpromoted diagnostic** policy,
+loads it through the ordinary factory, and checks exact execution identity and
+semantic reproduction through M1. This runtime check is separate from any
+scientific promotion. Rerun the command to verify/reuse results; after process
+death pass `--recover-lock`. The full `weights.json` budget is a separate
+experiment and is not implicitly enabled by this acceptance recipe.
+
+The integrated acceptance tests exercise both real proposal backends and actual
+games across interruption/recovery, synthetic validation/confirmation gates,
+portable artifact reload, and exact M1 reproduction. Synthetic test provenance
+and synthetic outcomes do not constitute playing-strength evidence. Ordinary
+evaluation tests reject storage execution/reading of registered genuine holdouts.
+
+## Broader benchmark and weight ranges
+
+`experiments/tuning/benchmark-v2.json` adds all six distinct pairings and four
+mirror matchups of the pilot's four deck builds. Screening uses four game seeds;
+validation uses eight separate seeds. Opponents, seats, starters and deck
+assignments remain paired between incumbent and candidate. The objective gives
+each opponent/deck-pair/seed block equal weight; mirror blocks have four games,
+cross-deck blocks eight. This measures policy performance on a broader set of
+matchups, not deck strength independently of the policy or unseen-deck strength.
+The earlier pilot and its frozen evidence remain unchanged.
+
+The focused investigation changes one weight at a time to 0, 0.5, 1, 2 and 4
+times its incumbent value, clipped to the existing sign-preserving bounds.
+Duplicate values and the incumbent are reused. This gives 44 changes plus one
+shared incumbent: **46,080 screening games**. Before any recheck, it freezes the
+best positively improving value per weight, breaking score ties by distance to
+the incumbent, then configuration digest. Up to eleven nominees plus the
+incumbent use **24,576 separate development games**. Sensitivity has a separate
+768-game cap. This workflow never runs the final test suite or promotes a policy.
+
+```bash
+uv run --locked tune ranges plan
+uv run --locked tune ranges run
+uv run --locked tune ranges report
+# After process death, resume the same committed source and environment:
+uv run --locked tune ranges run --recover-lock
+```
+
+Execution requires clean, committed inputs. Planning and report regeneration do
+not require a clean checkout. Defaults are `experiments/tuning/ranges.json` and
+`.output/ranges`; override with `GWENT_RANGE_PROTOCOL`, `GWENT_RANGE_OUTPUT_ROOT`,
+`--protocol`, or `--output`. Changing code, bounds or protocol requires a new
+output directory. The report command verifies committed run evidence and never
+plays missing games. Incomplete and failed stages remain explicit.
+
+Open `.output/ranges/report.html`, then read:
+
+| Stage | What it answers |
+| --- | --- |
+| `plan/report.html` | What is frozen, which values will be tried, and what it costs. |
+| `sensitivity/report.html` | Can changing these weights change decisions and control outcomes? |
+| `benchmark/report.html` | How does the incumbent perform across the expanded deck matchup matrix? |
+| `screening/report.html` | Which one-weight changes help on screening games, with effect curves and paired intervals? |
+| `recheck/report.html` | Do the nominated changes help on separate development games, and do any protected matchups decline? |
+
+Screening intervals are exploratory and are not adjusted for testing many
+values. Rechecks also compare several nominees; they are development evidence,
+not a final promotion claim. An endpoint winner is a reason to investigate a
+boundary, not proof that the optimum lies outside it. One-weight sweeps cannot
+resolve all interactions. No bounds or source defaults change automatically.
+
+## HTML tuning reports and CMA-ES charts
+
+`tune plan` writes `plan.html`. `tune run` writes stage reports under `stages/`
+after sensitivity, optimization and validation, and updates `report.html` with
+the final or interrupted state. Selection, verification and finalization also
+write stage reports. Each page includes JSON and Markdown companions.
+
+`tune report <study-directory>` rebuilds HTML from checked journals without
+running games. Charts include best score versus proposal count and fresh games,
+CMA-ES best/median/worst scores per completed generation, individual candidate
+scores, and normalized parameter traces. Hover over points for values and expand
+parameter sections. The charts use evaluated proposals from journals, not CMA's
+internal covariance or distribution mean. They work offline with no plotting
+dependency, external script or CDN. A high optimization curve is not promotion.
+
+Rebuild the earlier repeated assessment with charts using:
+
+```bash
+uv run --locked python -m gwent_evaluation.tuning.assessment --report-only
+```
+
+Open `.output/acceptance/assessment/report.html` and follow its replicate links.
+To start a later optimizer experiment on the broader benchmark, explicitly use
+`tune run experiments/tuning/benchmark-v2.json`; the range investigation itself
+does not start another optimizer search.

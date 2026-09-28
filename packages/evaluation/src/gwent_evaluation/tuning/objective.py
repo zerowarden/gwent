@@ -15,14 +15,16 @@ from gwent_evaluation.execution import (
     validate_run_environment,
 )
 from gwent_evaluation.models import RunManifest, SpecError, TerminationReason
+from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import canonical_digest, default_repository_root
 from gwent_evaluation.records import record_to_dict
-from gwent_evaluation.reporting import build_run_report
+from gwent_evaluation.reporting import RunReport, build_run_report
 from gwent_evaluation.storage import RunConflictError, RunStore
 from gwent_evaluation.tuning.models import StudyMode, StudySpec
 from gwent_evaluation.tuning.parameters import encode_parameters, finite_float
 from gwent_evaluation.tuning.sensitivity import SensitivityReport, require_sensitivity
-from gwent_evaluation.validation import execution_identity
+from gwent_evaluation.tuning.storage import StudyStore
+from gwent_evaluation.validation import LoadedRun, execution_identity
 
 
 class TrialStatus(StrEnum):
@@ -251,3 +253,61 @@ def evaluate_candidate(
         sensitivity_report=sensitivity_report,
     )
     return replace(trial, fresh_matches=len(run.executed_case_ids))
+
+
+@dataclass(frozen=True, slots=True)
+class RecordedEvaluation:
+    loaded: LoadedRun
+    report: RunReport
+
+
+def evaluate_recorded_candidate(
+    store: StudyStore,
+    study: StudySpec,
+    template: RunManifest,
+    configuration: HeuristicConfiguration,
+    *,
+    repository_root: Path,
+) -> RecordedEvaluation:
+    advance(f"{template.suite.purpose.value}: checking candidate {configuration.digest()}")
+    digest = configuration.digest()
+    run_id = "candidate-" + digest.removeprefix("sha256:")
+    expected = candidate_manifest(template, configuration, run_id=run_id)
+    validate_run_environment(expected, repository_root=repository_root)
+    entry = store.next_entry
+    if entry is not None and (
+        entry.kind != "evaluation" or entry.payload.get("configuration_digest") != digest
+    ):
+        raise RunConflictError("Unexpected candidate in the frozen evaluation sequence.")
+    if entry is None and store.verification_only:
+        raise RunConflictError("Recorded evaluation sequence is incomplete.")
+    run = RunStore(store.root / "runs", run_id)
+    loaded = run.load() if entry is not None or run.root.exists() else None
+    if loaded is not None and loaded.manifest != expected:
+        raise RunConflictError("Evaluation evidence differs from the frozen candidate or suite.")
+    report = None if loaded is None else build_run_report(loaded, bootstrap=study.bootstrap)
+    # Recorded failures are terminal. Only interrupted, uncommitted work may resume.
+    if entry is None and (report is None or (report.missing_matches and not report.failed_matches)):
+        execution = execute_run(
+            suite=expected.suite,
+            run_id=run_id,
+            output_root=run.output_root,
+            repository_root=repository_root,
+            evidence_policy=EvidencePolicy.NONE,
+            expected_manifest=expected,
+        )
+        loaded = RunStore.from_root(execution.root).load()
+        report = build_run_report(loaded, bootstrap=study.bootstrap)
+    assert loaded is not None and report is not None
+    validate_run_environment(expected, repository_root=repository_root)
+    _ = store.record(
+        "evaluation",
+        {
+            "configuration_digest": digest,
+            "manifest_digest": canonical_digest(loaded.manifest),
+            "run_root": str(run.root.relative_to(store.root)),
+            "results": dict(loaded.result_digests),
+            "report": record_to_dict(report),
+        },
+    )
+    return RecordedEvaluation(loaded, report)
