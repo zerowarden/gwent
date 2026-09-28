@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
@@ -72,6 +72,7 @@ class Experiment:
     scores: dict[tuple[SuitePurpose, str], float]
     played: list[tuple[SuitePurpose, str, str]]
     deck_scores: dict[tuple[SuitePurpose, str, str], float]
+    worker_requests: list[tuple[SuitePurpose, int]] = field(default_factory=list)
 
     def optimize(self) -> None:
         _ = run_study(
@@ -126,7 +127,9 @@ def experiment(
         repository_root: Path,
         evidence_policy: EvidencePolicy,
         expected_manifest: RunManifest,
+        workers: int = 1,
     ) -> RunExecution:
+        fixture.worker_requests.append((suite.purpose, workers))
         assert repository_root == REPOSITORY_ROOT
         assert expected_manifest.suite == suite
         assert evidence_policy is EvidencePolicy.NONE

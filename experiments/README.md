@@ -763,6 +763,10 @@ not require a clean checkout. Defaults are `experiments/tuning/ranges.json` and
 output directory. The report command verifies committed run evidence and never
 plays missing games. Incomplete and failed stages remain explicit.
 
+Games within a candidate can run concurrently. The [range command guide](../README.md#range-investigations)
+describes the automatic worker default, flag/environment overrides, progress and
+safe recovery, and the reproducible throughput measurement command.
+
 Open `.output/ranges/report.html`, then read:
 
 | Stage | What it answers |
@@ -778,6 +782,47 @@ values. Rechecks also compare several nominees; they are development evidence,
 not a final promotion claim. An endpoint winner is a reason to investigate a
 boundary, not proof that the optimum lies outside it. One-weight sweeps cannot
 resolve all interactions. No bounds or source defaults change automatically.
+
+## Investigation checkpoint — 2026-09-28
+
+The completed investigation used source commit `725c831`, the broader benchmark
+above, and the frozen `ranges.json` protocol. It played **67,328 games**:
+768 sensitivity games, 46,080 screening games (44 changes and the incumbent),
+and 20,480 recheck games (nine nominees and the incumbent). Sensitivity passed.
+The incumbent's balanced screening score was **54.34%**.
+
+Two individual changes passed the development recheck's positive paired interval
+and protected opponent/deck decline checks:
+
+| Weight | Default → tested value | Recheck gain | Paired 95% interval |
+| --- | --- | --- | --- |
+| `card_advantage` | 2 → 8 | +1.80 percentage points | +0.08 to +3.61 points |
+| `scorch_exposure` | −1.5 → −0.75 | +1.89 percentage points | +0.86 to +2.95 points |
+
+The other seven nominees were inconclusive or regressed. No weather or horn
+change improved screening, so neither received a recheck. Full values and
+rejection reasons are in `.output/ranges/recheck/report.html`; screening curves
+are in `.output/ranges/screening/report.html`. Start at
+`.output/ranges/report.html`, with `report.json` as the machine-readable record.
+These are saved development findings across fixed decks and opponents, with
+multiple comparisons; they do not establish general playing strength.
+
+Card advantage won at its upper bound of 8, which justifies investigating larger
+values but does not show that the optimum lies outside the current range.
+Scorch exposure's best value was inside its bounds. The effects were measured
+separately: their gains cannot be added or assumed to survive combination.
+**No defaults or bounds were changed, no policy was promoted, and no final test
+games were consumed.** The earlier three-seed optimizer assessment also retained
+the incumbent because its challengers did not pass independent validation.
+
+The proposed next scientific experiment, not yet executed, is a fixed grid:
+`card_advantage` = 2, 4, 8, 12, 16 crossed with `scorch_exposure` = −1.5, −0.75,
+with all other weights fixed. This gives ten combinations including the
+incumbent. Freeze a new study identity and expanded bound, use fresh development
+seeds on the broader benchmark, then independently validate the strongest
+candidates. Only a qualifying frozen challenger should proceed through
+correctness verification and one untouched final confirmation. Keep HTML reports
+at every stage; a failed final confirmation must not trigger a runner-up test.
 
 ## HTML tuning reports and CMA-ES charts
 

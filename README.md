@@ -89,6 +89,59 @@ See the [tuning command guide](experiments/README.md#tuning-command-guide)
 for defaults, recovery, report interpretation, and policy loading.
 
 
+### Range investigations
+
+Plan, run, and read the benchmark and weight-range investigation:
+
+```bash
+uv run --locked tune ranges plan
+# Commit source changes, then use a new output directory for the new version:
+uv run --locked tune ranges run --output .output/ranges-parallel
+uv run --locked tune ranges report --output .output/ranges-parallel
+```
+
+Games within each candidate run concurrently. Candidates retain their declared
+order; screening finishes and saves its nominations before rechecks start.
+Sensitivity remains serial. Progress shows the stage, saved games and actual
+worker count, updating in place in a terminal and sparsely in redirected logs.
+Read `.output/ranges-parallel/report.html` for the stage reports and charts.
+
+The worker default is automatic: half the CPUs available to the process, capped
+at 16 and at least one. On a machine with 32 available logical CPUs this selects
+16 workers. `GWENT_RANGE_WORKERS` overrides that default; `-j` / `--workers`
+overrides the environment. Use `-j 1` for serial execution. Worker settings apply
+to `ranges run`; `plan` and `report` play no games and ignore the worker environment.
+
+```bash
+export GWENT_RANGE_WORKERS=8
+uv run --locked tune ranges run -j 16 --output .output/ranges-parallel
+# Resume after Ctrl-C, with the same committed source/runtime and protocol:
+uv run --locked tune ranges run -j 8 --output .output/ranges-parallel
+```
+
+Ctrl-C stops dispatch and waits for running games before releasing the writer
+lock. Saved games survive; unsaved games may run again on resume. The worker
+count can change between invocations. After process death, use `--recover-lock`
+only for an abandoned writer; it cannot displace a live writer. Source or protocol
+changes require a new output directory. Regenerating reports verifies saved
+evidence and starts no workers.
+
+Measure throughput with the actual screening/recheck game counts and separate
+diagnostic seeds. The command writes HTML charts, JSON, game records and a
+checksummed measurement journal under `.output/range-throughput`:
+
+```bash
+uv run --locked python -m gwent_evaluation.tuning.throughput
+uv run --locked python -m gwent_evaluation.tuning.throughput --report-only
+```
+
+It compares 1, 4, 8, 16 and 32 workers twice, checks identical outcomes and
+statistics, and includes process startup and file writes in wall time. These
+measurements can run from a dirty checkout; they measure execution throughput
+without using scientific or held-out seeds. Use a new `--output` for another
+measurement. The complete investigation also includes serial sensitivity and
+candidate/stage reporting, so its speedup depends on those additional costs.
+
 Run reproducible agent benchmarks:
 
 ```bash

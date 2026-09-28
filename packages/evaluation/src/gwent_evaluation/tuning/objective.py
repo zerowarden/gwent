@@ -13,6 +13,7 @@ from gwent_evaluation.execution import (
     candidate_manifest,
     execute_run,
     validate_run_environment,
+    validate_worker_count,
 )
 from gwent_evaluation.models import RunManifest, SpecError, TerminationReason
 from gwent_evaluation.progress import advance
@@ -268,7 +269,9 @@ def evaluate_recorded_candidate(
     configuration: HeuristicConfiguration,
     *,
     repository_root: Path,
+    workers: int = 1,
 ) -> RecordedEvaluation:
+    validate_worker_count(workers)
     advance(f"{template.suite.purpose.value}: checking candidate {configuration.digest()}")
     digest = configuration.digest()
     run_id = "candidate-" + digest.removeprefix("sha256:")
@@ -295,6 +298,7 @@ def evaluate_recorded_candidate(
             repository_root=repository_root,
             evidence_policy=EvidencePolicy.NONE,
             expected_manifest=expected,
+            workers=workers,
         )
         loaded = RunStore.from_root(execution.root).load()
         report = build_run_report(loaded, bootstrap=study.bootstrap)

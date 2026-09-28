@@ -9,7 +9,11 @@ from typing import cast
 
 from gwent_shared.extract import expect_sequence
 
-from gwent_evaluation.execution import candidate_manifest, validate_run_environment
+from gwent_evaluation.execution import (
+    candidate_manifest,
+    validate_run_environment,
+    validate_worker_count,
+)
 from gwent_evaluation.html_report import table
 from gwent_evaluation.models import RunManifest, SpecError
 from gwent_evaluation.progress import TerminalProgress, advance, stage
@@ -148,6 +152,7 @@ def _evaluate_stage(
     *,
     recheck: bool,
     recover_lock: bool,
+    workers: int = 1,
 ) -> list[dict[str, object]]:
     store = StudyStore(root)
     rows: list[dict[str, object]] = []
@@ -162,7 +167,7 @@ def _evaluate_stage(
         )
         try:
             reference = evaluate_recorded_candidate(
-                store, study, template, study.incumbent, repository_root=repository
+                store, study, template, study.incumbent, repository_root=repository, workers=workers
             )
             if not reference.report.optimization_evidence:
                 raise SpecError("Incumbent evidence is invalid; range investigation stopped.")
@@ -176,6 +181,7 @@ def _evaluate_stage(
                     template,
                     study.bind(point.coordinates),
                     repository_root=repository,
+                    workers=workers,
                 )
                 if not evaluation.report.optimization_evidence:
                     raise SpecError("Candidate evidence is invalid; range investigation stopped.")
@@ -193,7 +199,8 @@ def _evaluate_stage(
     return rows
 
 
-def run_ranges(protocol: Path, root: Path, *, recover_lock: bool = False) -> None:
+def run_ranges(protocol: Path, root: Path, *, recover_lock: bool = False, workers: int = 1) -> None:
+    validate_worker_count(workers)
     repository = default_repository_root()
     study, multipliers = load_protocol(protocol, repository)
     if (
@@ -259,6 +266,7 @@ def run_ranges(protocol: Path, root: Path, *, recover_lock: bool = False) -> Non
                     repository,
                     recheck=False,
                     recover_lock=recover_lock,
+                    workers=workers,
                 )
             nominated = nominate_ranges(study, screening)
             _ = store.record(
@@ -276,6 +284,7 @@ def run_ranges(protocol: Path, root: Path, *, recover_lock: bool = False) -> Non
                         repository,
                         recheck=True,
                         recover_lock=recover_lock,
+                        workers=workers,
                     )
             else:
                 write_stage_report(
@@ -448,13 +457,32 @@ def ranges_parser() -> argparse.ArgumentParser:
         ),
     )
     _ = parser.add_argument("--recover-lock", action="store_true")
+    _ = parser.add_argument(
+        "-j",
+        "--workers",
+        help="Run only: concurrent games (GWENT_RANGE_WORKERS or automatic, at most 16).",
+    )
     parser.set_defaults(handler=range_command)
     return parser
+
+
+def default_range_workers() -> int:
+    """Reserve CPU capacity and cap process startup cost on larger machines."""
+    available = os.cpu_count() or 1
+    if hasattr(os, "sched_getaffinity"):
+        try:
+            available = len(os.sched_getaffinity(0))
+        except OSError:
+            pass
+    return min(16, max(1, available // 2))
 
 
 def range_command(args: argparse.Namespace) -> int:
     protocol, root = cast(Path, args.protocol), cast(Path, args.output)
     action = cast(str, args.action)
+    explicit_workers = cast(str | None, args.workers)
+    if action != "run" and explicit_workers is not None:
+        raise SpecError("--workers is only supported for ranges run.")
     if action == "plan":
         study, multipliers = load_protocol(protocol, default_repository_root())
         plan = write_range_plan(study, sweep_points(study, multipliers), root)
@@ -465,8 +493,18 @@ def range_command(args: argparse.Namespace) -> int:
     elif action == "report":
         rebuild_range_reports(root)
     else:
+        raw_workers = (
+            explicit_workers
+            if explicit_workers is not None
+            else (os.environ.get("GWENT_RANGE_WORKERS") or str(default_range_workers()))
+        )
+        try:
+            workers = int(raw_workers)
+        except ValueError as error:
+            raise SpecError("Workers must be a positive integer.") from error
+        validate_worker_count(workers)
         with TerminalProgress(sys.stderr).display():
-            run_ranges(protocol, root, recover_lock=cast(bool, args.recover_lock))
+            run_ranges(protocol, root, recover_lock=cast(bool, args.recover_lock), workers=workers)
     print(f"Read: {root / ('plan/report.html' if action == 'plan' else 'report.html')}")
     return 0
 

@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+import multiprocessing
+import signal
+from collections.abc import Generator, Iterator
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from enum import StrEnum
+from itertools import islice
 from pathlib import Path
+from threading import current_thread, main_thread
 from time import perf_counter
 
 from gwent_engine.ai.arena import MatchExecution, execute_match
@@ -18,12 +25,14 @@ from gwent_evaluation.assets import ResolvedAssets, resolve_assets
 from gwent_evaluation.models import (
     RECORD_SCHEMA_VERSION,
     AgentIdentity,
+    AgentSpec,
     AssetIdentities,
     EvidenceRefs,
     MatchEvidence,
     MatchResult,
     RunManifest,
     ScheduledMatch,
+    SpecError,
     SuiteSpec,
     candidate_score_for_outcome,
 )
@@ -38,7 +47,11 @@ from gwent_evaluation.recording import ExperimentRecorder, SummaryRecorder
 from gwent_evaluation.reporting import RunReport, persist_run_report
 from gwent_evaluation.schedule import CASE_ID_VERSION, other_seat, schedule_suite
 from gwent_evaluation.storage import RunConflictError, RunStore
-from gwent_evaluation.validation import LoadedRun, validate_result_against_execution
+from gwent_evaluation.validation import (
+    LoadedRun,
+    execution_identity,
+    validate_result_against_execution,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +87,114 @@ class CaseExecution:
     decision_seconds: float
 
 
+def validate_worker_count(workers: int) -> None:
+    if type(workers) is not int or workers < 1:
+        raise SpecError("Workers must be a positive integer.")
+
+
+@dataclass(frozen=True, slots=True)
+class _SummaryWorkerContext:
+    assets: ResolvedAssets
+    candidate: ResolvedAgent
+    opponents: dict[AgentSpec, ResolvedAgent]
+    execution_id: str
+
+
+_summary_worker_context: _SummaryWorkerContext | None = None
+
+
+def _initialize_summary_worker(manifest: RunManifest, repository_root: Path) -> None:
+    global _summary_worker_context
+    _ = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    suite = manifest.suite
+    assets = resolve_assets()
+    candidate = resolve_agent(suite.candidate)
+    opponents = {item: resolve_agent(item) for item in suite.opponents}
+    current = build_run_manifest(
+        suite=suite,
+        run_id=manifest.run_id,
+        matches=schedule_suite(suite),
+        candidate=candidate,
+        opponents=tuple(opponents.values()),
+        assets=assets,
+        repository_root=repository_root,
+    )
+    if current != manifest:
+        raise RunConflictError("Worker execution conditions differ from the pinned manifest.")
+    _summary_worker_context = _SummaryWorkerContext(
+        assets, candidate, opponents, execution_identity(manifest)
+    )
+
+
+def _execute_summary_case(match: ScheduledMatch) -> MatchResult:
+    context = _summary_worker_context
+    if context is None:
+        raise RuntimeError("Summary worker has not been initialized.")
+    case = execute_case(
+        match,
+        candidate=context.candidate,
+        opponent=context.opponents[match.opponent_agent],
+        assets=context.assets,
+        collect_evidence=False,
+    )
+    return build_result(match, case, evidence=EvidenceRefs(), execution_id=context.execution_id)
+
+
+@contextmanager
+def _parallel_summary_results(
+    matches: tuple[ScheduledMatch, ...],
+    manifest: RunManifest,
+    repository_root: Path,
+    *,
+    workers: int,
+) -> Generator[Iterator[tuple[ScheduledMatch, MatchResult]]]:
+    """Keep pool ownership around consumption, including coordinator persistence."""
+    pool = ProcessPoolExecutor(
+        max_workers=min(workers, len(matches)),
+        mp_context=multiprocessing.get_context("spawn"),
+        initializer=_initialize_summary_worker,
+        initargs=(manifest, repository_root),
+    )
+
+    def results() -> Iterator[tuple[ScheduledMatch, MatchResult]]:
+        remaining = iter(matches)
+        pending = {
+            pool.submit(_execute_summary_case, match): match for match in islice(remaining, workers)
+        }
+        while pending:
+            done, _ = wait(pending, return_when=FIRST_COMPLETED)
+            for future in done:
+                match = pending.pop(future)
+                yield match, future.result()
+            for _ in range(len(done)):
+                next_match = next(remaining, None)
+                if next_match is None:
+                    break
+                pending[pool.submit(_execute_summary_case, next_match)] = next_match
+
+    stopped = False
+    try:
+        yield results()
+    except BaseException:
+        stopped = True
+        raise
+    finally:
+        # Repeated Ctrl-C must not release the caller's writer lock before workers exit.
+        on_main_thread = current_thread() is main_thread()
+        previous = signal.getsignal(signal.SIGINT)
+        if on_main_thread:
+            _ = signal.signal(signal.SIGINT, signal.SIG_IGN)
+        try:
+            try:
+                if stopped:
+                    advance("dispatch stopped; waiting for running workers to finish")
+            finally:
+                pool.shutdown(wait=True, cancel_futures=True)
+        finally:
+            if on_main_thread:
+                _ = signal.signal(signal.SIGINT, previous)
+
+
 def execute_run(
     *,
     suite: SuiteSpec,
@@ -82,6 +203,7 @@ def execute_run(
     repository_root: Path,
     evidence_policy: EvidencePolicy = EvidencePolicy.FAILURES,
     expected_manifest: RunManifest | None = None,
+    workers: int = 1,
 ) -> RunExecution:
     """Execute or resume one run, persisting results and evidence atomically.
 
@@ -89,6 +211,9 @@ def execute_run(
     re-executes or silently replaces completed work.
     """
 
+    validate_worker_count(workers)
+    if workers > 1 and evidence_policy is not EvidencePolicy.NONE:
+        raise SpecError("Parallel execution requires evidence policy 'none'.")
     suite = snapshot_suite(suite)
     assets = resolve_assets()
     candidate = resolve_agent(suite.candidate)
@@ -113,57 +238,62 @@ def execute_run(
     prepared = store.prepare(manifest, matches=matches)
     persisted = prepared.results
     execution_id = prepared.execution_identity
-    results: list[MatchResult] = []
-    executed_case_ids: list[str] = []
-    resumed_case_ids: list[str] = []
-    advance(f"{run_id[:24]} / {suite.suite_id}", completed=len(persisted), total=len(matches))
-    for match in matches:
-        existing = persisted.get(match.case_id)
-        if existing is not None:
-            results.append(existing)
-            resumed_case_ids.append(match.case_id)
-            continue
-        case = execute_case(
-            match,
-            candidate=candidate,
-            opponent=opponents[match.opponent_agent],
-            assets=assets,
-            collect_evidence=evidence_policy is not EvidencePolicy.NONE,
-        )
-        include_trajectory = evidence_policy.persists_trajectory(completed=case.execution.completed)
-        evidence_refs = EvidenceRefs()
-        if evidence_policy is not EvidencePolicy.NONE:
-            evidence_refs = store.write_evidence(
-                match.case_id,
-                case.evidence,
-                include_trajectory=include_trajectory,
-                execution_identity=execution_id,
-            )
-        result = build_result(match, case, evidence=evidence_refs, execution_id=execution_id)
+    results = dict(persisted)
+    resumed_case_ids = tuple(match.case_id for match in matches if match.case_id in persisted)
+    missing = tuple(match for match in matches if match.case_id not in persisted)
+    effective_workers = min(workers, len(missing)) if missing else 0
+    detail = f"{run_id[:24]} / {suite.suite_id} / {effective_workers} workers"
+    advance(detail, completed=len(persisted), total=len(matches))
+
+    def save(match: ScheduledMatch, result: MatchResult) -> None:
         validate_result_against_execution(result, match, prepared)
         store.write_result(result)
-        results.append(result)
-        executed_case_ids.append(match.case_id)
-        advance(
-            f"{run_id[:24]} / {suite.suite_id}",
-            completed=len(persisted) + len(executed_case_ids),
-            total=len(matches),
-        )
+        results[match.case_id] = result
+        advance(detail, completed=len(results), total=len(matches))
+
+    if workers > 1 and missing:
+        with _parallel_summary_results(
+            missing, manifest, repository_root, workers=workers
+        ) as completed:
+            for match, result in completed:
+                save(match, result)
+    else:
+        for match in missing:
+            case = execute_case(
+                match,
+                candidate=candidate,
+                opponent=opponents[match.opponent_agent],
+                assets=assets,
+                collect_evidence=evidence_policy is not EvidencePolicy.NONE,
+            )
+            include_trajectory = evidence_policy.persists_trajectory(
+                completed=case.execution.completed
+            )
+            evidence_refs = EvidenceRefs()
+            if evidence_policy is not EvidencePolicy.NONE:
+                evidence_refs = store.write_evidence(
+                    match.case_id,
+                    case.evidence,
+                    include_trajectory=include_trajectory,
+                    execution_identity=execution_id,
+                )
+            result = build_result(match, case, evidence=evidence_refs, execution_id=execution_id)
+            save(match, result)
 
     report = persist_run_report(
         store,
         LoadedRun(
             manifest=manifest,
             matches=matches,
-            results={result.case_id: result for result in results},
+            results=results,
         ),
     )
     return RunExecution(
         run_id=run_id,
         root=store.root,
-        results=tuple(results),
-        executed_case_ids=tuple(executed_case_ids),
-        resumed_case_ids=tuple(resumed_case_ids),
+        results=tuple(results[match.case_id] for match in matches),
+        executed_case_ids=tuple(match.case_id for match in missing),
+        resumed_case_ids=resumed_case_ids,
         report=report,
     )
 
