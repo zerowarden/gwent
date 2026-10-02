@@ -10,12 +10,11 @@ from typing import final
 
 from gwent_shared.json_payloads import canonical_json, dump_pretty_json
 
-from gwent_evaluation.agents import resolve_agent, snapshot_suite
-from gwent_evaluation.assets import resolve_assets
+from gwent_evaluation.agents import snapshot_suite
 from gwent_evaluation.execution import (
     EvidencePolicy,
-    build_run_manifest,
     execute_run,
+    pin_manifest,
     validate_run_environment,
 )
 from gwent_evaluation.models import RunManifest, SpecError, SuitePurpose, TerminationReason
@@ -58,15 +57,8 @@ def load_pilot_inputs(repository_root: Path) -> tuple[StudySpec, RunManifest]:
     )
     agents = load_agent_catalog(repository_root / "experiments/agents.json")
     suites = load_suite_catalog(repository_root / "experiments/suites.json", agents=agents)
-    suite = snapshot_suite(suites["smoke-v1"])
-    smoke = build_run_manifest(
-        suite=suite,
-        run_id="smoke",
-        matches=schedule_suite(suite),
-        candidate=resolve_agent(suite.candidate),
-        opponents=tuple(resolve_agent(agent) for agent in suite.opponents),
-        assets=resolve_assets(),
-        repository_root=repository_root,
+    smoke = pin_manifest(
+        snapshot_suite(suites["smoke-v1"]), run_id="smoke", repository_root=repository_root
     )
     return study, smoke
 

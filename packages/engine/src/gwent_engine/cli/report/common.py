@@ -3,7 +3,7 @@ from __future__ import annotations
 from gwent_engine.cli.report.format import HTMLFormatter
 from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import GameAction
-from gwent_engine.core.ids import PlayerId, player_id
+from gwent_engine.core.ids import PlayerId
 
 MINUS_SIGN = "\N{MINUS SIGN}"
 MULTIPLICATION_SIGN = "\N{MULTIPLICATION SIGN}"
@@ -11,7 +11,7 @@ MULTIPLICATION_SIGN = "\N{MULTIPLICATION SIGN}"
 
 def action_player_id(action: GameAction) -> PlayerId | None:
     raw_player_id = getattr(action, "player_id", None)
-    return player_id(raw_player_id) if isinstance(raw_player_id, str) else None
+    return PlayerId(raw_player_id) if isinstance(raw_player_id, str) else None
 
 
 def formatted_summary(

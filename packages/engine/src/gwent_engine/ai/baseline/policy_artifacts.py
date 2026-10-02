@@ -15,7 +15,7 @@ from gwent_shared.json_payloads import (
 from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 
-CONFIGURATION_CONTRACT_VERSION = 1
+CONFIGURATION_CONTRACT_VERSION = 2
 
 
 class PolicyArtifactError(ValueError):

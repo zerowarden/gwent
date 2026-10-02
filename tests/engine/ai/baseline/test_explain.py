@@ -9,23 +9,30 @@ from gwent_engine.ai.baseline import (
     build_assessment,
     classify_context,
     compose_profile,
-    evaluate_action,
     explain_action_score,
 )
 from gwent_engine.ai.baseline.explain import (
-    explain_heuristic_decision_from_state,
+    DecisionExplainer,
+    HeuristicDecisionExplanation,
     heuristic_decision_to_dict,
 )
 from gwent_engine.ai.baseline.profile_catalog import DEFAULT_BASE_PROFILE
 from gwent_engine.ai.baseline.score_terms import ActionScoreBreakdown, ScoreTerm
 from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.policy import BaselineConfig
 from gwent_engine.core import (
     ChoiceSourceKind,
     Row,
 )
-from gwent_engine.core.actions import PlayCardAction, ResolveChoiceAction, UseLeaderAbilityAction
-from gwent_engine.core.ids import CardInstanceId, ChoiceId
+from gwent_engine.core.actions import (
+    GameAction,
+    PlayCardAction,
+    ResolveChoiceAction,
+    UseLeaderAbilityAction,
+)
+from gwent_engine.core.ids import CardInstanceId, ChoiceId, PlayerId
 from gwent_engine.core.state import GameState
+from gwent_engine.leaders import LeaderRegistry
 
 from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY
 from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
@@ -37,55 +44,18 @@ from ..support import (
 )
 
 
-def test_explain_action_score_total_matches_evaluate_action() -> None:
-    state = (
-        scenario("explain_action_score")
-        .player(
-            "p1",
-            leader_used=True,
-            hand=[card("p1_archer", "scoiatael_dol_blathanna_archer")],
-        )
-        .player(
-            "p2",
-            leader_used=True,
-            hand=[card("p2_hidden_card", "scoiatael_mahakaman_defender")],
-        )
-        .build()
+def _explain(
+    state: GameState,
+    *,
+    leader_registry: LeaderRegistry | None = None,
+    config: BaselineConfig = DEFAULT_BASELINE_CONFIG,
+    player_id: PlayerId | None = None,
+    legal_actions: tuple[GameAction, ...] | None = None,
+) -> HeuristicDecisionExplanation:
+    explainer = DecisionExplainer(CARD_REGISTRY, leader_registry=leader_registry, config=config)
+    return explainer.explain_heuristic_from_state(
+        state, player_id=player_id, legal_actions=legal_actions
     )
-    observation = build_player_observation(state, PLAYER_ONE_ID)
-    legal_actions = enumerate_legal_actions(
-        state,
-        player_id=PLAYER_ONE_ID,
-        card_registry=CARD_REGISTRY,
-    )
-    action = next(action for action in legal_actions if isinstance(action, PlayCardAction))
-    assessment = build_assessment(observation, CARD_REGISTRY, legal_actions=legal_actions)
-    context = classify_context(assessment)
-    profile = compose_profile(
-        DEFAULT_BASELINE_CONFIG,
-        assessment,
-        context,
-        base_profile=DEFAULT_BASE_PROFILE,
-    )
-
-    breakdown = explain_action_score(
-        action,
-        observation=observation,
-        assessment=assessment,
-        context=context,
-        profile=profile,
-        card_registry=CARD_REGISTRY,
-    )
-
-    assert breakdown.total == evaluate_action(
-        action,
-        observation=observation,
-        assessment=assessment,
-        context=context,
-        profile=profile,
-        card_registry=CARD_REGISTRY,
-    )
-    assert breakdown.terms
 
 
 def test_explain_action_score_preserves_unsupported_pending_choice_reason() -> None:
@@ -137,9 +107,8 @@ def test_explain_heuristic_decision_surfaces_minimum_commitment_override() -> No
         card_registry=CARD_REGISTRY,
     )
 
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         legal_actions=legal_actions,
     )
 
@@ -151,8 +120,8 @@ def test_explain_heuristic_decision_surfaces_minimum_commitment_override() -> No
     assert explanation.override is not None
     assert explanation.override.reason == "minimum_commitment_finish"
     assert explanation.profile.profile_id == DEFAULT_BASE_PROFILE.profile_id
-    assert explanation.profile.policy_names.scorch_policy == "opportunistic_scorch"
-    assert explanation.profile.policy_names.leader_policy == "aggressive"
+    assert explanation.profile.policy_names.scorch == "opportunistic_scorch"
+    assert explanation.profile.policy_names.leader == "aggressive"
     assert any(candidate.shortlisted for candidate in explanation.candidates)
     assert explanation.ranked_actions
 
@@ -242,9 +211,8 @@ def test_explain_heuristic_decision_marks_noop_steel_forged_leader_candidate() -
         leader_registry=LEADER_REGISTRY,
     )
 
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         leader_registry=LEADER_REGISTRY,
         legal_actions=legal_actions,
     )
@@ -286,9 +254,8 @@ def test_explain_heuristic_decision_surfaces_pending_choice_terms() -> None:
         )
         .build()
     )
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         player_id=PLAYER_ONE_ID,
     )
 
@@ -302,9 +269,7 @@ def test_explain_heuristic_decision_surfaces_pending_choice_terms() -> None:
     assert all(
         term.name != "unsupported_action_penalty" for term in explanation.ranked_actions[0].terms
     )
-    assert any(
-        term.name == "decoy_target_spy_bonus" for term in explanation.ranked_actions[0].terms
-    )
+    assert any(term.name == "decoy_spy_reclaim" for term in explanation.ranked_actions[0].terms)
 
 
 def test_explain_action_score_surfaces_return_leader_value_terms() -> None:
@@ -373,9 +338,8 @@ def test_explain_heuristic_decision_surfaces_leader_pending_choice_terms() -> No
         .build()
     )
 
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         leader_registry=LEADER_REGISTRY,
         player_id=PLAYER_ONE_ID,
     )
@@ -412,9 +376,8 @@ def test_explain_heuristic_decision_surfaces_leader_steal_terms_for_player_two()
         .build()
     )
 
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         leader_registry=LEADER_REGISTRY,
         player_id=PLAYER_TWO_ID,
     )
@@ -443,9 +406,8 @@ def test_explain_heuristic_decision_surfaces_pruned_candidates_and_comparison() 
         card_registry=CARD_REGISTRY,
     )
 
-    explanation = explain_heuristic_decision_from_state(
+    explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
         config=config,
         legal_actions=legal_actions,
     )
@@ -461,9 +423,8 @@ def test_explain_heuristic_decision_surfaces_pruned_candidates_and_comparison() 
 def test_explanation_export_surfaces_comparison_and_pruning() -> None:
     state = _minimum_commitment_override_state()
 
-    heuristic_explanation = explain_heuristic_decision_from_state(
+    heuristic_explanation = _explain(
         state,
-        card_registry=CARD_REGISTRY,
     )
     heuristic_payload = heuristic_decision_to_dict(heuristic_explanation)
 

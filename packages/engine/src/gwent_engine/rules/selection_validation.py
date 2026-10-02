@@ -20,11 +20,9 @@ def validate_selection_count(
     min_selections: int,
     max_selections: int,
     invalid_count_message: str,
-) -> tuple[object, ...]:
-    normalized = tuple(selections)
-    if not min_selections <= len(normalized) <= max_selections:
+) -> None:
+    if not min_selections <= len(tuple(selections)) <= max_selections:
         raise IllegalActionError(invalid_count_message)
-    return normalized
 
 
 def validate_legal_selections(
@@ -32,9 +30,7 @@ def validate_legal_selections(
     *,
     legal_values: Iterable[object],
     illegal_message: str,
-) -> tuple[object, ...]:
-    normalized = tuple(selections)
+) -> None:
     legal = set(legal_values)
-    if any(value not in legal for value in normalized):
+    if any(value not in legal for value in selections):
         raise IllegalActionError(illegal_message)
-    return normalized

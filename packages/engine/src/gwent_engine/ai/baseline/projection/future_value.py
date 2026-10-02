@@ -23,9 +23,10 @@ from gwent_engine.ai.observation_queries import (
     viewer_deck_definitions,
 )
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
+from gwent_engine.ai.policy import DEFAULT_PROJECTION_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.weather import is_weather_ability, weather_rows_for
 
@@ -405,14 +406,12 @@ def projected_weather_loss(
 
 def projected_scorch_loss(
     rows: Iterable[ProjectedRowState],
-    *,
-    threshold: int = DEFAULT_FEATURE_POLICY.scorch_threshold,
 ) -> int:
     strengths = [strength for row in rows for strength in row.scorchable_unit_strengths]
     if not strengths:
         return 0
     highest = max(strengths)
-    if highest < threshold:
+    if highest < SCORCH_THRESHOLD:
         return 0
     return sum(strength for strength in strengths if strength == highest)
 
@@ -626,7 +625,7 @@ def _projected_unit_row_scorch_reserve_value(
             + opponent_row.effective_strength
             + definition.base_strength
         )
-        if row_total < DEFAULT_FEATURE_POLICY.scorch_threshold:
+        if row_total < SCORCH_THRESHOLD:
             continue
         row_strengths = [
             *viewer_row.scorchable_unit_strengths,

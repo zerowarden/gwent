@@ -29,7 +29,7 @@ from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.game_setup import apply_mulligan, apply_start_game
 from gwent_engine.rules.leader_resolution import apply_use_leader_ability
 from gwent_engine.rules.pending_choices import (
-    maybe_create_pending_choice_for_leader,
+    create_pending_choice_for_leader,
     maybe_create_pending_choice_for_play,
     resolve_pending_choice,
 )
@@ -190,9 +190,9 @@ def _dispatch_action(
             )
             assert leader_registry is not None
             assert card_registry is not None
-            pending_choice = maybe_create_pending_choice_for_leader(
+            pending_choice = create_pending_choice_for_leader(
                 state,
-                action,
+                state.player(action.player_id),
                 card_registry=card_registry,
                 leader_registry=leader_registry,
             )

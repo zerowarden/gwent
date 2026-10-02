@@ -8,7 +8,7 @@ from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline import BaseProfileDefinition, DecisionAssessment, build_assessment
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.policy import SearchConfig
-from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates
 from gwent_engine.ai.search.evaluator import evaluate_search_state
 from gwent_engine.ai.search.opponent_model import (
     OpponentReplyCandidate,
@@ -26,7 +26,7 @@ from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import GameAction
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.core.randomness import SeededRandom
-from gwent_engine.core.reducer import apply_action_with_intermediate_state
+from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.players import opponent_player_id_from_state
@@ -48,7 +48,6 @@ class TurnSearchResolver:
     config: SearchConfig
     card_registry: CardRegistry
     leader_registry: LeaderRegistry | None = None
-    seed: int = 0
 
     @dataclass(frozen=True, slots=True)
     class ResolvedTurn:
@@ -60,7 +59,7 @@ class TurnSearchResolver:
         state: GameState,
         root_action: GameAction,
     ) -> SearchLine:
-        branch_seed = _branch_seed(self.seed, root_action)
+        branch_seed = _branch_seed(0, root_action)
         viewer_turn = self._resolve_turn(state, (root_action,), branch_seed=branch_seed)
         reply_decision = should_search_opponent_reply(
             viewer_turn.end_state,
@@ -134,7 +133,7 @@ class TurnSearchResolver:
         *,
         branch_seed: int,
     ) -> ResolvedTurn:
-        next_state, _, _ = apply_action_with_intermediate_state(
+        next_state, _ = apply_action(
             state,
             root_actions[0],
             rng=SeededRandom(branch_seed),
@@ -199,14 +198,12 @@ class TurnSearchResolver:
             self.viewer_player_id,
             self.leader_registry,
         )
-        ordered_candidates = order_search_candidates(
-            generate_search_candidates(
-                observation,
-                legal_actions,
-                config=self.config,
-                card_registry=self.card_registry,
-                leader_registry=self.leader_registry,
-            )
+        ordered_candidates = generate_search_candidates(
+            observation,
+            legal_actions,
+            config=self.config,
+            card_registry=self.card_registry,
+            leader_registry=self.leader_registry,
         )
         best_line: TurnSearchResolver.ResolvedTurn | None = None
         for candidate in ordered_candidates:
@@ -251,7 +248,7 @@ class TurnSearchResolver:
         branch_seed: int,
     ) -> ResolvedTurn:
         candidate_seed = _branch_seed(branch_seed, candidate.action)
-        next_state, _, _ = apply_action_with_intermediate_state(
+        next_state, _ = apply_action(
             state,
             candidate.action,
             rng=SeededRandom(candidate_seed),
@@ -291,14 +288,9 @@ class TurnSearchResolver:
         reply_action = candidate.action
         reply_reason = candidate.reason
         if reply_action is None:
-            reply_explanation = candidate.explanation or SearchReplyExplanation(
-                kind="inferred_hidden",
-                reason=reply_reason,
-                value_adjustment=-candidate.inferred_penalty,
-            )
             return self._with_reply_explanation(
                 viewer_turn.line,
-                reply_explanation,
+                candidate.explanation,
                 value=viewer_turn.line.value - candidate.inferred_penalty,
                 notes=(
                     f"reply_search={reply_reason}",
@@ -318,10 +310,7 @@ class TurnSearchResolver:
             card_registry=self.card_registry,
             leader_registry=self.leader_registry,
         )
-        reply_explanation = candidate.explanation or SearchReplyExplanation(
-            kind="exact_public",
-            reason=reply_reason,
-        )
+        reply_explanation = candidate.explanation
         return SearchLine(
             actions=viewer_turn.line.actions,
             reply_actions=reply_turn.line.actions,

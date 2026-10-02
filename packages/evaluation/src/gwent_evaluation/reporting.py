@@ -40,8 +40,7 @@ from gwent_evaluation.models import (
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.schedule import ScheduleBlock, schedule_blocks
 from gwent_evaluation.storage import RunStore
-from gwent_evaluation.validation import LoadedRun as LoadedRun
-from gwent_evaluation.validation import validate_loaded_run
+from gwent_evaluation.validation import LoadedRun, validate_loaded_run
 
 
 class ReportError(ValueError):
@@ -143,26 +142,17 @@ def build_run_report(
     )
 
 
-def persist_run_report(
-    store: RunStore,
-    loaded: LoadedRun,
-    *,
-    bootstrap: BootstrapConfig = DEFAULT_BOOTSTRAP,
-) -> RunReport:
-    report = build_run_report(loaded, bootstrap=bootstrap)
+def persist_run_report(store: RunStore, loaded: LoadedRun) -> RunReport:
+    report = build_run_report(loaded)
     store.write_report(record_to_dict(report), render_report_markdown(report))
     return report
 
 
-def report_run(
-    run_root: Path,
-    *,
-    bootstrap: BootstrapConfig = DEFAULT_BOOTSTRAP,
-) -> RunReport:
+def report_run(run_root: Path) -> RunReport:
     """Rebuild and persist the report of an existing run directory."""
 
     store = RunStore.from_root(run_root)
-    return persist_run_report(store, load_run(run_root), bootstrap=bootstrap)
+    return persist_run_report(store, store.load())
 
 
 def build_run_comparison(
@@ -521,7 +511,6 @@ def _yes_no(value: bool) -> str:
 
 __all__ = [
     "LatencySummary",
-    "LoadedRun",
     "ReportError",
     "RunComparison",
     "RunReport",

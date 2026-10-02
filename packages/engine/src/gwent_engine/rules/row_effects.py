@@ -80,8 +80,6 @@ def row_has_active_mardroeme(
     player_id: PlayerId,
     row: Row,
 ) -> bool:
-    if row_has_special_mardroeme(state, card_registry, player_id, row):
-        return True
     return any(
         card_has_ability(state, card_registry, card_id, AbilityKind.MARDROEME)
         for card_id in state.player(player_id).rows.cards_for(row)

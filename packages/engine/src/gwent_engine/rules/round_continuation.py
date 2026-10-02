@@ -25,7 +25,7 @@ from gwent_engine.rules.leader_common import (
     leader_pending_choice_targets,
 )
 from gwent_engine.rules.leader_validation import validate_leader_ability_availability
-from gwent_engine.rules.players import other_player_from_pair
+from gwent_engine.rules.players import other_player_from_state
 
 
 def can_continue_round(
@@ -110,7 +110,7 @@ def advance_turn_after_action(
     leader_registry: LeaderRegistry | None,
     rng: SupportsRandom | None = None,
 ) -> GameState:
-    opponent = other_player_from_pair(state.players, acting_player_id)
+    opponent = other_player_from_state(state, acting_player_id)
     return assign_round_priority(
         state,
         opponent.player_id,
@@ -136,7 +136,7 @@ def assign_round_priority(
         rng=rng,
     ):
         return replace(state, current_player=preferred_player_id, phase=Phase.IN_ROUND)
-    alternate = other_player_from_pair(state.players, preferred_player_id)
+    alternate = other_player_from_state(state, preferred_player_id)
     if can_continue_round(
         state,
         alternate.player_id,

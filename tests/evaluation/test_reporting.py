@@ -65,7 +65,7 @@ def test_execute_run_writes_json_and_markdown_reports(tmp_path: Path) -> None:
     assert (root / "report.json").is_file()
     assert (root / "report.md").is_file()
     payload = read_json_object(root / "report.json")
-    assert payload["schema_version"] == 3
+    assert payload["schema_version"] == 4
     assert payload["run_id"] == "run"
     assert payload["suite_id"] == "reporting-test"
     assert payload["observation_contract_version"] == 2

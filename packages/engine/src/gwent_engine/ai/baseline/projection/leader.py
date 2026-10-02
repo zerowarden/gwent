@@ -22,7 +22,7 @@ from gwent_engine.ai.observation_queries import (
     viewer_deck_definitions,
 )
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
-from gwent_engine.cards import CardDefinition, CardRegistry
+from gwent_engine.cards import CardRegistry
 from gwent_engine.core import AbilityKind, CardType, LeaderAbilityKind, Row
 from gwent_engine.core.actions import UseLeaderAbilityAction
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
@@ -229,7 +229,7 @@ class LeaderProjectionResolver(ProjectionResolverContext):
         retrievable_cards = tuple(
             card
             for card in discard_cards
-            if _is_leader_discard_retrieval_target(self.card_registry.get(card.definition_id))
+            if is_non_hero_unit(self.card_registry.get(card.definition_id))
         )
         if not retrievable_cards:
             return self._noop(ability_kind=ability_kind)
@@ -452,7 +452,3 @@ def project_leader_action(
         card_registry=card_registry,
         leader_registry=leader_registry,
     ).resolve()
-
-
-def _is_leader_discard_retrieval_target(definition: CardDefinition) -> bool:
-    return is_non_hero_unit(definition)

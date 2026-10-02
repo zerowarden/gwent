@@ -141,11 +141,6 @@ def validate_result_against_execution(
         and result.accepted_transitions != match.action_budget
     ):
         raise CorruptRecordError("Action limit result has not exhausted its budget.")
-    # Model construction also enforces this for direct Python callers.
-    try:
-        result.__post_init__()
-    except ValueError as error:
-        raise CorruptRecordError(str(error)) from error
 
 
 def validate_trajectory(

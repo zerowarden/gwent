@@ -36,7 +36,6 @@ from gwent_engine.serialize.actions import action_to_id
 @dataclass(frozen=True, slots=True)
 class DecisionPlan:
     observation: PlayerObservation
-    legal_actions: tuple[GameAction, ...]
     candidate_actions: tuple[GameAction, ...]
     viewer_hand_definitions: dict[CardInstanceId, CardDefinition]
     assessment: DecisionAssessment
@@ -84,7 +83,11 @@ def build_decision_plan(
         viewer_hand_definitions=viewer_hand_definitions,
     )
     candidates = candidate_pool.retained_candidates
-    shortlisted_actions = shortlist_actions(candidates, candidate_limit=profile.candidate_limit)
+    shortlisted_actions = (
+        tuple(sorted(candidate_actions, key=action_to_id))
+        if config.candidates.ranking_scope == "all_legal"
+        else shortlist_actions(candidates, candidate_limit=profile.candidate_limit)
+    )
     ranked_actions = explain_ranked_actions(
         shortlisted_actions,
         observation=observation,
@@ -103,6 +106,7 @@ def build_decision_plan(
         card_registry=card_registry,
         pass_config=profile.pass_config,
         viewer_hand_definitions=viewer_hand_definitions,
+        leader_registry=leader_registry,
     )
     chosen_action = (
         override.action
@@ -113,7 +117,6 @@ def build_decision_plan(
     )
     return DecisionPlan(
         observation=observation,
-        legal_actions=legal_actions,
         candidate_actions=candidate_actions,
         viewer_hand_definitions=viewer_hand_definitions,
         assessment=assessment,
@@ -143,6 +146,7 @@ def explain_tactical_override(
     card_registry: CardRegistry,
     pass_config: PassConfig,
     viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
+    leader_registry: LeaderRegistry | None = None,
 ) -> TacticalOverride | None:
     exact_finish = minimum_commitment_finish(
         legal_actions,
@@ -151,6 +155,7 @@ def explain_tactical_override(
         card_registry=card_registry,
         config=pass_config,
         viewer_hand_definitions=viewer_hand_definitions,
+        leader_registry=leader_registry,
     )
     if exact_finish is not None:
         return TacticalOverride(

@@ -18,9 +18,9 @@ from gwent_engine.ai.observations import (
     ObservedCard,
     PlayerObservation,
 )
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.rules.row_effects import special_ability_kind
 
@@ -35,13 +35,7 @@ class ProjectedBattlefieldCard:
 
 @dataclass(frozen=True)
 class BoardProjectionContext(PublicPlayerContext):
-    """Bundle the deterministic public board inputs for one projection pass.
-
-    The old board helpers passed the same `observation`, registry, projected
-    cards, replacement cards, and weather rows through every call. This context
-    keeps that bundle in one place so the board subsystem reads as a coherent
-    unit rather than a long chain of parameter plumbing.
-    """
+    """Bundle the deterministic public board inputs for one projection pass."""
 
     observation: PlayerObservation
     card_registry: CardRegistry
@@ -182,8 +176,6 @@ def current_public_scorch_impact(
 
 def scorch_impact_from_board(
     board: PublicBoardProjection,
-    *,
-    threshold: int = DEFAULT_FEATURE_POLICY.scorch_threshold,
 ) -> ScorchImpact:
     viewer_strengths = [
         strength for row in board.viewer_rows for strength in row.scorchable_unit_strengths
@@ -195,7 +187,7 @@ def scorch_impact_from_board(
     if not all_strengths:
         return ScorchImpact(viewer_strength_lost=0, opponent_strength_lost=0)
     highest = max(all_strengths)
-    if highest < threshold:
+    if highest < SCORCH_THRESHOLD:
         return ScorchImpact(viewer_strength_lost=0, opponent_strength_lost=0)
     return ScorchImpact(
         viewer_strength_lost=sum(strength for strength in viewer_strengths if strength == highest),

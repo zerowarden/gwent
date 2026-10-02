@@ -67,24 +67,17 @@ class StoredMatch:
             raise ValueError("StoredMatch version cannot be negative.")
 
     def slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
-        return find_service_player_slot(self.player_slots, service_player_id)
+        for slot in self.player_slots:
+            if slot.service_player_id == service_player_id:
+                return slot
+        raise UnknownMatchPlayerError(service_player_id, self.match_id)
 
     def opponent_slot_for_service_player(self, service_player_id: str) -> StoredPlayerSlot:
         viewer_slot = self.slot_for_service_player(service_player_id)
         for slot in self.player_slots:
             if slot.service_player_id != viewer_slot.service_player_id:
                 return slot
-        raise KeyError(service_player_id)
-
-
-def find_service_player_slot(
-    player_slots: tuple[StoredPlayerSlot, StoredPlayerSlot],
-    service_player_id: str,
-) -> StoredPlayerSlot:
-    for slot in player_slots:
-        if slot.service_player_id == service_player_id:
-            return slot
-    raise KeyError(service_player_id)
+        raise UnknownMatchPlayerError(service_player_id, self.match_id)
 
 
 class MatchRepository(Protocol):
@@ -121,7 +114,6 @@ class UnknownDeckError(_SingleValueMatchServiceError):
 
 
 class MatchVersionConflictError(MatchServiceError):
-    match_id: str
     expected_version: int
     actual_version: int
 
@@ -135,7 +127,6 @@ class MatchVersionConflictError(MatchServiceError):
         super().__init__(
             f"Stale match {match_id!r}: expected version {expected_version}, got {actual_version}."
         )
-        self.match_id = match_id
         self.expected_version = expected_version
         self.actual_version = actual_version
 
@@ -151,10 +142,6 @@ class MatchPhaseError(MatchServiceError):
 
 class MulliganAlreadySubmittedError(_SingleValueMatchServiceError):
     message_template: ClassVar[str] = "Mulligan already submitted for engine player {value!r}."
-
-
-class MulliganSelectionError(MatchServiceError):
-    pass
 
 
 @dataclass(frozen=True, slots=True)

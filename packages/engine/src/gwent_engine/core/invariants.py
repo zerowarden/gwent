@@ -316,8 +316,7 @@ def _iter_located_cards(
         locations.extend(_player_zone_entries(player))
     for row in (Row.CLOSE, Row.RANGED, Row.SIEGE):
         locations.extend(
-            (None, Zone.WEATHER, row, card_id)
-            for card_id in state.battlefield_weather.cards_for(row)
+            (None, Zone.WEATHER, row, card_id) for card_id in state.weather.cards_for(row)
         )
     return tuple(locations)
 

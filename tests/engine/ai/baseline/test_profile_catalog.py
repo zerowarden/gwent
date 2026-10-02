@@ -27,7 +27,7 @@ def test_get_base_profile_definition_returns_loaded_profile() -> None:
     profile = get_base_profile_definition("conservative")
 
     assert profile.profile_id == "conservative"
-    assert profile.policies.scorch_policy == "reserve_scorch"
+    assert profile.policies.scorch == "reserve_scorch"
     assert profile.weights.card_advantage == 2.2
     assert profile.pass_overrides.safe_lead_margin == 5
 

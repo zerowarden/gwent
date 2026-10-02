@@ -7,45 +7,6 @@ from typing import cast
 
 ErrorFactory = Callable[[str], Exception]
 
-NO_NONE_VALUES: frozenset[str] = frozenset()
-
-__all__ = [
-    "expect_bool",
-    "expect_constructor",
-    "expect_constructor_sequence",
-    "expect_enum",
-    "expect_finite_float",
-    "expect_int",
-    "expect_mapping",
-    "expect_optional_bool",
-    "expect_optional_constructor",
-    "expect_optional_enum",
-    "expect_optional_int",
-    "expect_optional_str",
-    "expect_pair_sequence",
-    "expect_sequence",
-    "expect_str",
-    "optional_bool_field",
-    "optional_constructor_field",
-    "optional_enum_field",
-    "optional_int_field",
-    "optional_str_field",
-    "require_bool_field",
-    "require_constructor_field",
-    "require_enum_field",
-    "require_field",
-    "require_int_field",
-    "require_mapping_field",
-    "require_pair_sequence_field",
-    "require_sequence_field",
-    "require_str_field",
-    "require_str_sequence_field",
-    "stringify",
-    "stringify_list",
-    "stringify_optional",
-    "translate_mapping_key",
-]
-
 
 def require_field(
     mapping: Mapping[str, object],
@@ -433,12 +394,11 @@ def expect_optional_enum[EnumType: Enum](
     context: str,
     label: str | None = None,
     error_factory: ErrorFactory = TypeError,
-    none_values: frozenset[str] = NO_NONE_VALUES,
 ) -> EnumType | None:
     raw_value = expect_optional_str(
         value, context=context, label=label, error_factory=error_factory
     )
-    if raw_value is None or raw_value in none_values:
+    if raw_value is None:
         return None
     return expect_enum(
         raw_value,
@@ -446,25 +406,6 @@ def expect_optional_enum[EnumType: Enum](
         context=context,
         label=label,
         error_factory=error_factory,
-    )
-
-
-def optional_enum_field[EnumType: Enum](
-    mapping: Mapping[str, object],
-    field: str,
-    enum_type: type[EnumType],
-    *,
-    context: str,
-    error_factory: ErrorFactory = TypeError,
-    none_values: frozenset[str] = NO_NONE_VALUES,
-) -> EnumType | None:
-    return expect_optional_enum(
-        mapping.get(field),
-        enum_type,
-        context=context,
-        label=field,
-        error_factory=error_factory,
-        none_values=none_values,
     )
 
 
@@ -509,18 +450,12 @@ def expect_optional_int(
     return value
 
 
-def stringify(value: object) -> str:
-    return str(value)
-
-
 def stringify_optional(value: object | None) -> str | None:
-    if value is None:
-        return None
-    return stringify(value)
+    return None if value is None else str(value)
 
 
 def stringify_list(values: Sequence[object]) -> list[str]:
-    return [stringify(value) for value in values]
+    return [str(value) for value in values]
 
 
 def _message(context: str, label: str | None, suffix: str) -> str:

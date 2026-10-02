@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Sequence
 from typing import final
 
@@ -51,8 +50,8 @@ class GreedyBot:
         return best_mulligan_selection(
             legal_selections,
             hand_by_id,
-            Counter(definition.definition_id for definition in hand_by_id.values()),
             weights=DEFAULT_MULLIGAN_POLICY.greedy,
+            policy=DEFAULT_MULLIGAN_POLICY,
             prefer_highest_card_ids=False,
         )
 

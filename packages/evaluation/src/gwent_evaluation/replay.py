@@ -17,7 +17,7 @@ from gwent_engine.ai.hashing import event_fingerprint, state_fingerprint
 from gwent_engine.core.errors import GwentEngineError, SerializationError
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 from gwent_engine.core.randomness import SeededRandom
-from gwent_engine.core.reducer import apply_action_with_intermediate_state
+from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import action_from_id
 from gwent_shared.json_payloads import canonical_digest, dump_pretty_json
@@ -68,7 +68,7 @@ class ReproductionOutcome:
 
     @property
     def reproduced(self) -> bool:
-        """Compatibility alias for semantic reproduction, independent of identity drift."""
+        """Semantic reproduction, independent of identity drift; shared with `ReplayOutcome`."""
         return self.semantics_reproduced
 
 
@@ -228,7 +228,7 @@ def _drive(
         except SerializationError as error:
             return (Divergence(step.index, "action_id", step.action_id, str(error)),)
         try:
-            state, events, _ = apply_action_with_intermediate_state(
+            state, events = apply_action(
                 state,
                 action,
                 rng=rng,

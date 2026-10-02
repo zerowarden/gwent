@@ -20,7 +20,7 @@ def generate_search_candidates(
     card_registry: CardRegistry,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[SearchCandidate, ...]:
-    """Build the root candidate set.
+    """Build the root candidate set, best ordering score first.
 
     Search owns the final choice, but it may still reuse baseline coarse
     candidate signals as ordering hints and branch-control guidance.
@@ -36,7 +36,7 @@ def generate_search_candidates(
         card_registry=card_registry,
         leader_registry=leader_registry,
     )
-    return tuple(
+    candidates = (
         SearchCandidate(
             action=candidate.action,
             ordering_score=candidate.coarse_score,
@@ -44,11 +44,6 @@ def generate_search_candidates(
         )
         for candidate in pool.retained_candidates[: config.max_candidate_actions]
     )
-
-
-def order_search_candidates(
-    candidates: tuple[SearchCandidate, ...],
-) -> tuple[SearchCandidate, ...]:
     return tuple(
         sorted(
             candidates,

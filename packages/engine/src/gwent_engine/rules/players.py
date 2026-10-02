@@ -3,14 +3,7 @@ from gwent_engine.core.state import GameState, PlayerState
 
 
 def other_player_from_state(state: GameState, player_id: PlayerId) -> PlayerState:
-    return other_player_from_pair(state.players, player_id)
-
-
-def other_player_from_pair(
-    players: tuple[PlayerState, PlayerState],
-    player_id: PlayerId,
-) -> PlayerState:
-    first_player, second_player = players
+    first_player, second_player = state.players
     if first_player.player_id == player_id:
         return second_player
     return first_player

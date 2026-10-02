@@ -17,8 +17,9 @@ from gwent_evaluation.models import (
     SUITE_SPEC_VERSION,
     BotFamily,
     SchedulingPolicy,
+    SpecError,
 )
-from gwent_evaluation.specs import AgentResolver, SpecError, parse_agent_spec, parse_suite_spec
+from gwent_evaluation.specs import AgentResolver, parse_agent_spec, parse_suite_spec
 
 
 def _stub_resolver(reference: str) -> AgentSpec:

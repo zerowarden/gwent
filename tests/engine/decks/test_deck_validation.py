@@ -1,3 +1,7 @@
+from dataclasses import replace
+
+import pytest
+from gwent_engine.assets import load_card_registry, load_leader_registry, load_sample_deck_map
 from gwent_engine.cards.models import CardDefinition, CardRegistry
 from gwent_engine.core import (
     AbilityKind,
@@ -418,3 +422,24 @@ def test_deck_validation_is_not_wired_into_apply_action() -> None:
 
     assert validation_result.errors != ()
     assert started_state.phase == Phase.MULLIGAN
+
+
+@pytest.mark.parametrize("deck_id", sorted(load_sample_deck_map()))
+def test_bundled_sample_decks_satisfy_the_official_rules(deck_id: str) -> None:
+    deck = load_sample_deck_map()[deck_id]
+
+    result = validate_deck(deck, load_card_registry(), load_leader_registry())
+
+    assert result.errors == ()
+
+
+def test_deck_with_generated_only_card_fails() -> None:
+    deck = load_sample_deck_map()["skellige_cerys_berserker_combo_strict"]
+    with_hemdall = replace(
+        deck,
+        card_definition_ids=(*deck.card_definition_ids, CardDefinitionId("skellige_hemdall")),
+    )
+
+    result = validate_deck(with_hemdall, load_card_registry(), load_leader_registry())
+
+    assert [error.code for error in result.errors] == ["generated_only_card"]

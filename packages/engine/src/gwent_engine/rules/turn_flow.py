@@ -320,7 +320,7 @@ def _apply_clear_weather(
     ability_kind: AbilityKind,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del player
-    cleared_weather_ids = state.battlefield_weather.all_cards()
+    cleared_weather_ids = state.weather.all_cards()
     updated_players, updated_cards = clear_weather_cards(state, cleared_weather_ids)
     updated_players = (
         _discard_played_clear_weather_card(updated_players[0], action),

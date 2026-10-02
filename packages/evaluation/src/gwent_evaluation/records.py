@@ -53,12 +53,13 @@ from gwent_evaluation.models import (
     RunManifest,
     ScheduledMatch,
     SchedulingPolicy,
+    SpecError,
     SuitePurpose,
     SuiteSpec,
     TrajectoryStep,
 )
 from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance
-from gwent_evaluation.specs import SpecError, parse_agent_spec
+from gwent_evaluation.specs import parse_agent_spec
 
 
 class StorageError(ValueError):
@@ -143,21 +144,17 @@ def trajectory_step_to_dict(step: TrajectoryStep) -> dict[str, object]:
 def match_result_from_dict(payload: object) -> MatchResult:
     context = "match result"
     mapping = expect_mapping(payload, context=context, error_factory=StorageError)
-    schema_version = require_int_field(
-        mapping,
-        "schema_version",
-        context=context,
-        error_factory=StorageError,
-    )
-    if schema_version != RECORD_SCHEMA_VERSION:
-        raise StorageError(
-            f"{context} schema_version must be {RECORD_SCHEMA_VERSION}, "
-            + f"found {schema_version}."
-        )
+    schema_version = _require_record_schema_version(mapping, context=context)
     return MatchResult(
         schema_version=schema_version,
         case_id=require_str_field(mapping, "case_id", context=context, error_factory=StorageError),
-        termination=_require_termination(mapping, context=context),
+        termination=require_enum_field(
+            mapping,
+            "termination",
+            TerminationReason,
+            context=context,
+            error_factory=StorageError,
+        ),
         candidate_agent_id=require_str_field(
             mapping, "candidate_agent_id", context=context, error_factory=StorageError
         ),
@@ -515,20 +512,6 @@ def _game_state_from_dict(
         )
     except GwentEngineError as error:
         raise CorruptRecordError(f"{context}: {error}") from error
-
-
-def _require_termination(
-    mapping: Mapping[str, object],
-    *,
-    context: str,
-) -> TerminationReason:
-    return require_enum_field(
-        mapping,
-        "termination",
-        TerminationReason,
-        context=context,
-        error_factory=StorageError,
-    )
 
 
 def _require_player_id(

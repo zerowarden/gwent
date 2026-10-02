@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from gwent_engine.ai.baseline.projection.board import current_public_board_projection
 from gwent_engine.ai.baseline.projection.context import (
     active_weather_rows as context_active_weather_rows,
 )
@@ -17,7 +18,7 @@ from gwent_engine.ai.observations import (
     PublicPlayerStateView,
 )
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.core import CardType, ChoiceSourceKind, GameStatus, Phase, Row
+from gwent_engine.core import CardType, ChoiceSourceKind, Row
 from gwent_engine.core.actions import GameAction, PassAction, PlayCardAction
 from gwent_engine.core.ids import PlayerId
 
@@ -48,15 +49,13 @@ class PlayerAssessment:
     passed: bool
     leader_used: bool
 
-    def row_summaries(self) -> tuple[RowSummary, RowSummary, RowSummary]:
-        return (self.close, self.ranged, self.siege)
+    def row_summary(self, row: Row) -> RowSummary:
+        return {Row.CLOSE: self.close, Row.RANGED: self.ranged, Row.SIEGE: self.siege}[row]
 
 
 @dataclass(frozen=True, slots=True)
 class DecisionAssessment:
     viewer_player_id: PlayerId
-    phase: Phase
-    status: GameStatus
     round_number: int
     viewer: PlayerAssessment
     opponent: PlayerAssessment
@@ -78,8 +77,6 @@ def build_assessment(
     *,
     legal_actions: tuple[GameAction, ...] = (),
 ) -> DecisionAssessment:
-    from gwent_engine.ai.baseline.projection.board import current_public_board_projection
-
     public_state = observation.public_state
     viewer_public = viewer_public_view(observation)
     opponent_public = opponent_public_view(observation)
@@ -102,8 +99,6 @@ def build_assessment(
     active_weather_rows = context_active_weather_rows(observation)
     return DecisionAssessment(
         viewer_player_id=observation.viewer_player_id,
-        phase=public_state.phase,
-        status=public_state.status,
         round_number=public_state.round_number,
         viewer=viewer,
         opponent=opponent,

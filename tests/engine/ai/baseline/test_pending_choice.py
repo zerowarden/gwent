@@ -1,8 +1,15 @@
+from dataclasses import replace
+
 from gwent_engine.ai.actions import enumerate_legal_actions
-from gwent_engine.ai.baseline.pending_choice import choose_pending_choice_action
+from gwent_engine.ai.baseline.pending_choice import (
+    choose_pending_choice_action,
+    explain_pending_choice_score_components,
+)
 from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG
 from gwent_engine.core import ChoiceSourceKind
-from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.core.actions import ResolveChoiceAction
+from gwent_engine.core.ids import CardInstanceId, ChoiceId
 
 from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
@@ -38,9 +45,51 @@ def test_choose_pending_choice_action_prefers_spy_target_for_decoy() -> None:
         build_player_observation(state, PLAYER_ONE_ID),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
     )
 
     assert action.selected_card_instance_ids == (CardInstanceId("p1_spy_target"),)
+
+
+def test_decoy_choice_is_explained_with_the_play_time_target_priority() -> None:
+    state = (
+        scenario("decoy_choice_components_state")
+        .player(
+            "p1",
+            hand=[card("p1_decoy_source", "neutral_decoy")],
+            board=rows(close=[card("p1_spy_target", "nilfgaard_vattier_de_rideaux", owner="p2")]),
+        )
+        .card_choice(
+            choice_id="decoy_choice",
+            player_id="p1",
+            source_kind=ChoiceSourceKind.DECOY,
+            source_card_instance_id="p1_decoy_source",
+            legal_target_card_instance_ids=("p1_spy_target",),
+        )
+        .build()
+    )
+    action_bonus = DEFAULT_BASELINE_CONFIG.action_bonus
+
+    components = explain_pending_choice_score_components(
+        ResolveChoiceAction(
+            player_id=PLAYER_ONE_ID,
+            choice_id=ChoiceId("decoy_choice"),
+            selected_card_instance_ids=(CardInstanceId("p1_spy_target"),),
+        ),
+        observation=build_player_observation(state, PLAYER_ONE_ID),
+        card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=action_bonus,
+        card_advantage_weight=3.0,
+    )
+
+    assert components == (
+        ("decoy_target_strength", 4.0),
+        ("decoy_spy_reclaim", action_bonus.decoy_spy_reclaim_bonus),
+        ("decoy_opponent_resource_swing", 3.0),
+    )
 
 
 def test_choose_pending_choice_action_prefers_stronger_medic_target() -> None:
@@ -69,9 +118,50 @@ def test_choose_pending_choice_action_prefers_stronger_medic_target() -> None:
         build_player_observation(state, PLAYER_ONE_ID),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
     )
 
     assert action.selected_card_instance_ids == (CardInstanceId("p1_discard_large"),)
+
+
+def test_configured_medic_target_bonus_changes_the_medic_target() -> None:
+    state = (
+        scenario("medic_choice_configured_bonus_state")
+        .player(
+            "p1",
+            discard=[
+                card("p1_discard_medic", "nilfgaard_etolian_auxilary_archer"),
+                card("p1_discard_plain", "nilfgaard_cahir"),
+            ],
+            board=rows(ranged=[card("p1_medic_source", "nilfgaard_etolian_auxilary_archer")]),
+        )
+        .card_choice(
+            choice_id="medic_choice",
+            player_id="p1",
+            source_kind=ChoiceSourceKind.MEDIC,
+            source_card_instance_id="p1_medic_source",
+            legal_target_card_instance_ids=("p1_discard_medic", "p1_discard_plain"),
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    legal_actions = enumerate_legal_actions(state, player_id=PLAYER_ONE_ID)
+    default = DEFAULT_BASELINE_CONFIG.pending_choice
+
+    def chosen_target(medic_bonus: int) -> tuple[CardInstanceId, ...]:
+        return choose_pending_choice_action(
+            observation,
+            legal_actions,
+            card_registry=CARD_REGISTRY,
+            policy=replace(default, medic_target_medic_bonus=medic_bonus),
+            action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+            card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
+        ).selected_card_instance_ids
+
+    assert chosen_target(default.medic_target_medic_bonus) == (CardInstanceId("p1_discard_plain"),)
+    assert chosen_target(8) == (CardInstanceId("p1_discard_medic"),)
 
 
 def test_choose_pending_choice_action_avoids_spy_medic_target_when_deck_is_empty() -> None:
@@ -100,6 +190,9 @@ def test_choose_pending_choice_action_avoids_spy_medic_target_when_deck_is_empty
         build_player_observation(state, PLAYER_ONE_ID),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
     )
 
     assert action.selected_card_instance_ids == (CardInstanceId("p1_discard_catapult"),)
@@ -142,6 +235,9 @@ def test_leader_discard_and_choose_prefers_weak_discards_and_best_pick() -> None
         build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -178,6 +274,9 @@ def test_choose_pending_choice_action_return_leader_prefers_best_own_discard() -
         build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -213,6 +312,9 @@ def test_choose_pending_choice_action_steal_leader_prefers_best_opponent_discard
         build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
         leader_registry=LEADER_REGISTRY,
     )
 
@@ -250,6 +352,9 @@ def test_choose_pending_choice_action_leader_uses_opponent_discard_from_viewer_p
         build_player_observation(state, PLAYER_TWO_ID, LEADER_REGISTRY),
         legal_actions,
         card_registry=CARD_REGISTRY,
+        policy=DEFAULT_BASELINE_CONFIG.pending_choice,
+        action_bonus=DEFAULT_BASELINE_CONFIG.action_bonus,
+        card_advantage_weight=DEFAULT_BASELINE_CONFIG.weights.card_advantage,
         leader_registry=LEADER_REGISTRY,
     )
 

@@ -8,7 +8,7 @@ from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfigurat
 from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact, PolicyStatus
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.cards.models import CardRegistry
-from gwent_engine.core import ChoiceSourceKind, GameStatus, Phase, Row
+from gwent_engine.core import ChoiceSourceKind, Row
 from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import GameState
@@ -90,8 +90,6 @@ def make_assessment(
     )
     return DecisionAssessment(
         viewer_player_id=PLAYER_ONE_ID,
-        phase=Phase.IN_ROUND,
-        status=GameStatus.IN_PROGRESS,
         round_number=1,
         viewer=viewer_assessment,
         opponent=opponent_assessment,

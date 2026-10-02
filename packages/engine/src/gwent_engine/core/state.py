@@ -249,26 +249,16 @@ class GameState:
     def player_ids(self) -> frozenset[PlayerId]:
         return self._player_ids
 
-    @property
-    def battlefield_weather(self) -> RowState:
-        return self.weather
-
     def player(self, player_id: PlayerId) -> PlayerState:
         return translate_mapping_key(self._player_index, player_id, UnknownPlayerError)
 
     def card(self, instance_id: CardInstanceId) -> CardInstance:
         return translate_mapping_key(self._card_index, instance_id, UnknownCardInstanceError)
 
-    def cached_value(self, key: object) -> object | None:
-        return self._derived_cache.get(key)
-
-    def cache_value(self, key: object, value: object) -> None:
-        self._derived_cache[key] = value
-
     def cached_or_compute[T](self, key: object, factory: Callable[[], T]) -> T:
-        cached_value = self.cached_value(key)
+        cached_value = self._derived_cache.get(key)
         if cached_value is not None:
             return cast(T, cached_value)
         value = factory()
-        self.cache_value(key, value)
+        self._derived_cache[key] = value
         return value

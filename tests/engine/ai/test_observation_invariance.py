@@ -6,8 +6,7 @@ import pytest
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.arena import create_seeded_bot
 from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
-from gwent_engine.ai.hashing import observation_fingerprint
-from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.observations import build_player_observation, player_observation_to_dict
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize.actions import action_to_id
 
@@ -60,7 +59,7 @@ def test_opponent_hidden_hand_identities_do_not_change_observation() -> None:
     observation_b = build_player_observation(state_b, PLAYER_ONE_ID)
 
     assert observation_a == observation_b
-    assert observation_fingerprint(observation_a) == observation_fingerprint(observation_b)
+    assert player_observation_to_dict(observation_a) == player_observation_to_dict(observation_b)
 
 
 def test_opponent_hidden_deck_identities_and_order_do_not_change_observation() -> None:
@@ -81,7 +80,7 @@ def test_opponent_hidden_deck_identities_and_order_do_not_change_observation() -
     observation_b = build_player_observation(state_b, PLAYER_ONE_ID)
 
     assert observation_a == observation_b
-    assert observation_fingerprint(observation_a) == observation_fingerprint(observation_b)
+    assert player_observation_to_dict(observation_a) == player_observation_to_dict(observation_b)
 
 
 def test_viewer_future_deck_order_does_not_change_observation() -> None:
@@ -92,7 +91,7 @@ def test_viewer_future_deck_order_does_not_change_observation() -> None:
     observation_b = build_player_observation(state_b, PLAYER_ONE_ID)
 
     assert observation_a == observation_b
-    assert observation_fingerprint(observation_a) == observation_fingerprint(observation_b)
+    assert player_observation_to_dict(observation_a) == player_observation_to_dict(observation_b)
 
 
 def test_viewer_deck_composition_changes_are_visible() -> None:
@@ -108,7 +107,7 @@ def test_viewer_deck_composition_changes_are_visible() -> None:
     observation_b = build_player_observation(state_b, PLAYER_ONE_ID)
 
     assert observation_a != observation_b
-    assert observation_fingerprint(observation_a) != observation_fingerprint(observation_b)
+    assert player_observation_to_dict(observation_a) != player_observation_to_dict(observation_b)
 
 
 def test_hidden_permutations_do_not_change_offered_legal_action_ids() -> None:

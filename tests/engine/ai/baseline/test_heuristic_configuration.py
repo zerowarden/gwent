@@ -22,6 +22,7 @@ from gwent_engine.ai.baseline.profile_catalog import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
     get_base_profile_definition,
+    resolve_base_profile,
 )
 from gwent_engine.ai.observations import PlayerObservation, build_player_observation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig, EvaluationWeights
@@ -108,7 +109,7 @@ def _capture_plan(
     )
     assert len(plans) == 1
     assert chosen == plans[0].chosen_action
-    assert chosen in plans[0].legal_actions
+    assert chosen in plans[0].candidate_actions
     return plans[0]
 
 
@@ -237,7 +238,7 @@ def test_leader_and_exact_finish_weights_reach_constant_score_terms(
 def test_named_and_materialized_configurations_make_the_same_decisions(
     profile_id: str, state_factory: Callable[[], GameState]
 ) -> None:
-    explicit = HeuristicConfiguration.from_profile_id(profile_id)
+    explicit = HeuristicConfiguration(profile=resolve_base_profile(profile_id))
     named = create_bot(f"heuristic:{profile_id}", bot_id="named")
     assert isinstance(named, HeuristicBot)
     assert named.configuration == explicit
@@ -272,7 +273,7 @@ def test_explicit_profile_is_not_resolved_again_and_overrides_still_take_precede
 
 
 def test_full_snapshot_round_trip_and_display_name_independent_digest() -> None:
-    default = HeuristicConfiguration.from_profile_id("aggressive")
+    default = HeuristicConfiguration(profile=resolve_base_profile("aggressive"))
     config = replace(
         default,
         baseline=replace(
@@ -285,9 +286,17 @@ def test_full_snapshot_round_trip_and_display_name_independent_digest() -> None:
             candidate_scoring=replace(default.baseline.candidate_scoring, pass_score=-7.0),
             pass_logic=replace(default.baseline.pass_logic, safe_lead_margin=8),
             profile_tuning=replace(default.baseline.profile_tuning, economy_weight_multiplier=1.2),
+            mulligan=replace(
+                default.baseline.mulligan,
+                baseline=replace(default.baseline.mulligan.baseline, medic_keep_bonus=-7),
+                low_strength_anchor=8,
+            ),
+            pending_choice=replace(default.baseline.pending_choice, medic_target_medic_bonus=6),
         ),
     )
-    decoded = HeuristicConfiguration.from_json(json.dumps(config.to_dict()))
+    decoded = HeuristicConfiguration.from_dict(
+        cast(object, json.loads(json.dumps(config.to_dict())))
+    )
     assert decoded == config
     assert decoded.digest() == config.digest()
     assert (
@@ -306,7 +315,9 @@ def test_numeric_normalization_including_optional_overrides_and_signed_zero() ->
             DEFAULT_BASE_PROFILE, weights=replace(DEFAULT_BASE_PROFILE.weights, leader_value=4)
         ),
     )
-    decoded = HeuristicConfiguration.from_json(json.dumps(python.to_dict()))
+    decoded = HeuristicConfiguration.from_dict(
+        cast(object, json.loads(json.dumps(python.to_dict())))
+    )
     assert decoded == python
     assert type(python.baseline.weights.immediate_points) is float
     assert type(python.profile.weights.leader_value) is float
@@ -329,7 +340,7 @@ def test_invalid_weights_are_rejected_in_python_and_payloads(name: str, value: o
     baseline = cast(dict[str, object], payload["baseline"])
     cast(dict[str, object], baseline["weights"])[name] = value
     with pytest.raises(HeuristicConfigurationError):
-        _ = HeuristicConfiguration.from_json(json.dumps(payload))
+        _ = HeuristicConfiguration.from_dict(cast(object, json.loads(json.dumps(payload))))
 
 
 @pytest.mark.parametrize(
@@ -342,6 +353,8 @@ def test_invalid_weights_are_rejected_in_python_and_payloads(name: str, value: o
         ("candidates", "always_keep_pass", 1),
         ("pass_logic", "safe_lead_margin", "6"),
         ("profile_tuning", "economy_weight_multiplier", float("nan")),
+        ("mulligan", "low_strength_anchor", 6.0),
+        ("pending_choice", "medic_target_medic_bonus", True),
     ],
 )
 def test_invalid_fixed_fields_are_rejected_on_both_paths(
@@ -353,6 +366,8 @@ def test_invalid_fixed_fields_are_rejected_on_both_paths(
         "candidates": DEFAULT_BASELINE_CONFIG.candidates,
         "pass_logic": DEFAULT_BASELINE_CONFIG.pass_logic,
         "profile_tuning": DEFAULT_BASELINE_CONFIG.profile_tuning,
+        "mulligan": DEFAULT_BASELINE_CONFIG.mulligan,
+        "pending_choice": DEFAULT_BASELINE_CONFIG.pending_choice,
     }[section]
     with pytest.raises(HeuristicConfigurationError):
         _ = HeuristicConfiguration(
@@ -416,6 +431,9 @@ def test_unsupported_field_annotation_is_a_configuration_error(
         (),
         ("baseline",),
         ("baseline", "weights"),
+        ("baseline", "mulligan"),
+        ("baseline", "mulligan", "baseline"),
+        ("baseline", "pending_choice"),
         ("profile",),
         ("profile", "policies"),
         ("profile", "weights"),
@@ -436,9 +454,12 @@ def test_snapshot_rejects_unknown_and_missing_fields(path: tuple[str, ...], muta
         _ = HeuristicConfiguration.from_dict(payload)
 
 
-def test_strict_json_rejects_duplicate_keys() -> None:
-    with pytest.raises(HeuristicConfigurationError, match="duplicate key"):
-        _ = HeuristicConfiguration.from_json('{"baseline": {}, "baseline": {}}')
+@pytest.mark.parametrize("section", ["mulligan", "pending_choice"])
+def test_snapshot_without_decision_policy_section_is_rejected(section: str) -> None:
+    payload = HeuristicConfiguration().to_dict()
+    del cast(dict[str, object], payload["baseline"])[section]
+    with pytest.raises(HeuristicConfigurationError, match=f"missing fields \\['{section}'\\]"):
+        _ = HeuristicConfiguration.from_dict(payload)
 
 
 @pytest.mark.parametrize("family", ["random", "greedy", "search"])
@@ -478,7 +499,7 @@ def test_factory_rejects_ambiguous_or_untyped_configuration() -> None:
     assert bot.configuration == _candidate(immediate_points=3.0)
 
 
-def test_action_weights_do_not_change_mulligan_or_pending_choice() -> None:
+def test_action_weights_do_not_change_mulligan_or_medic_choice() -> None:
     default = _bot(HeuristicConfiguration())
     candidate = _bot(_candidate(**{field.name: 123.0 for field in fields(EvaluationWeights)}))
     state, _ = build_started_game_state()
@@ -491,20 +512,18 @@ def test_action_weights_do_not_change_mulligan_or_pending_choice() -> None:
         scenario("configuration_pending")
         .player(
             "p1",
-            hand=[card("source_decoy", "neutral_decoy")],
-            board=rows(
-                ranged=[
-                    card("spy", "neutral_mysterious_elf", owner="p2"),
-                    card("archer", "scoiatael_dol_blathanna_archer"),
-                ]
-            ),
+            discard=[
+                card("medic", "nilfgaard_etolian_auxilary_archer"),
+                card("plain", "nilfgaard_cahir"),
+            ],
+            board=rows(ranged=[card("source_medic", "nilfgaard_etolian_auxilary_archer")]),
         )
         .card_choice(
-            choice_id="decoy",
+            choice_id="medic",
             player_id="p1",
-            source_kind=ChoiceSourceKind.DECOY,
-            source_card_instance_id="source_decoy",
-            legal_target_card_instance_ids=("spy", "archer"),
+            source_kind=ChoiceSourceKind.MEDIC,
+            source_card_instance_id="source_medic",
+            legal_target_card_instance_ids=("medic", "plain"),
         )
         .build()
     )

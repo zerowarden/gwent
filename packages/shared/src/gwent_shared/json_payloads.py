@@ -4,18 +4,12 @@ import dataclasses
 import hashlib
 import json
 import math
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from enum import Enum
 from pathlib import Path
 from typing import NoReturn, cast
 
-from gwent_shared.extract import expect_mapping, expect_sequence, expect_str
-
-ErrorFactory = Callable[[str], Exception]
-
-
-def dump_json(payload: object) -> str:
-    return json.dumps(payload)
+from gwent_shared.extract import ErrorFactory, expect_mapping, expect_sequence, expect_str
 
 
 def dump_pretty_json(payload: object) -> str:
@@ -24,42 +18,31 @@ def dump_pretty_json(payload: object) -> str:
     return json.dumps(payload, sort_keys=True, indent=2, ensure_ascii=True) + "\n"
 
 
-def dump_canonical_json(payload: object) -> str:
-    """Deterministic JSON text: sorted keys, compact separators, ASCII-only."""
+def canonical_json(payload: object) -> str:
+    """Canonical JSON text for typed payloads: sorted keys, compact, ASCII-only.
+
+    Non-finite numbers are rejected.
+    """
 
     return json.dumps(
-        payload,
+        to_canonical(payload),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
     )
 
 
-def canonical_json(payload: object) -> str:
-    """Canonical JSON text for typed payloads, rejecting non-finite numbers."""
-
-    return dump_canonical_json(to_canonical(payload))
-
-
 DIGEST_PREFIX = "sha256:"
-
-
-def sha256_bytes(data: bytes) -> bytes:
-    return hashlib.sha256(data).digest()
 
 
 def sha256_bytes_hexdigest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def sha256_hexdigest(text: str) -> str:
-    return sha256_bytes_hexdigest(text.encode("utf-8"))
-
-
 def canonical_hexdigest(payload: object) -> str:
     """Bare SHA-256 hex digest of the canonical JSON form of `payload`."""
 
-    return sha256_hexdigest(canonical_json(payload))
+    return sha256_bytes_hexdigest(canonical_json(payload).encode("utf-8"))
 
 
 def canonical_digest(payload: object) -> str:
@@ -79,7 +62,7 @@ def digest_hex(digest: str) -> str:
 def seed_from_text(text: str) -> int:
     """Deterministic seed from text: first 8 SHA-256 bytes, big-endian."""
 
-    return int.from_bytes(sha256_bytes(text.encode("utf-8"))[:8], "big")
+    return int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
 
 
 def to_canonical(value: object) -> object:

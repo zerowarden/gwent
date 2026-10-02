@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from gwent_engine.ai.baseline.pending_choice import pending_choice_score
@@ -43,6 +43,7 @@ class _CandidateContext:
     card_registry: CardRegistry
     leader_registry: LeaderRegistry | None
     viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None
+    config: BaselineConfig
 
     def leader_projection(self, action: UseLeaderAbilityAction) -> LeaderActionProjection | None:
         return project_leader_action(
@@ -60,11 +61,14 @@ class _CandidateContext:
             viewer_hand_definitions=self.viewer_hand_definitions,
         )
 
-    def pending_choice_score(self, action: ResolveChoiceAction) -> int:
+    def pending_choice_score(self, action: ResolveChoiceAction) -> float:
         return pending_choice_score(
             action,
             observation=self.observation,
             card_registry=self.card_registry,
+            policy=self.config.pending_choice,
+            action_bonus=self.config.action_bonus,
+            card_advantage_weight=self.config.weights.card_advantage,
             leader_registry=self.leader_registry,
         )
 
@@ -83,6 +87,7 @@ def build_candidate_pool(
         card_registry=card_registry,
         leader_registry=leader_registry,
         viewer_hand_definitions=viewer_hand_definitions,
+        config=config,
     )
     scored_candidates = tuple(
         sorted(
@@ -95,24 +100,16 @@ def build_candidate_pool(
                         config.candidate_scoring,
                     ),
                     reason=_candidate_reason(action, context),
-                    always_keep=_always_keep(action, config=config, context=context),
+                    always_keep=_always_keep(action, context=context),
                 )
                 for action in legal_actions
             ),
             key=lambda candidate: _candidate_sort_key(candidate),
         )
     )
-    always_keep, ranked = _partition_always_keep(scored_candidates)
-    retained = always_keep + ranked
-    trimmed = tuple(
-        sorted(
-            _dedupe_by_action_id(retained, action=lambda candidate: candidate.action),
-            key=lambda candidate: _candidate_sort_key(candidate),
-        )[: config.candidates.max_candidates]
-    )
     return CandidatePool(
         all_candidates=scored_candidates,
-        retained_candidates=trimmed,
+        retained_candidates=_dedupe(scored_candidates)[: config.candidates.max_candidates],
     )
 
 
@@ -125,7 +122,7 @@ def shortlist_actions(
         return ()
     always_keep, ranked = _partition_always_keep(candidates)
     retained = (*always_keep, *ranked[: max(0, candidate_limit - len(always_keep))])
-    deduped = _dedupe_by_action_id(retained, action=lambda candidate: candidate.action)
+    deduped = _dedupe(retained)
     return tuple(sorted((candidate.action for candidate in deduped), key=action_to_id))
 
 
@@ -139,14 +136,10 @@ def _partition_always_keep(
     return tuple(always_keep), tuple(ranked)
 
 
-def _dedupe_by_action_id[ItemT](
-    items: Iterable[ItemT],
-    *,
-    action: Callable[[ItemT], GameAction],
-) -> tuple[ItemT, ...]:
-    deduped: dict[str, ItemT] = {}
-    for item in items:
-        _ = deduped.setdefault(action_to_id(action(item)), item)
+def _dedupe(candidates: Iterable[CandidateAction]) -> tuple[CandidateAction, ...]:
+    deduped: dict[str, CandidateAction] = {}
+    for candidate in candidates:
+        _ = deduped.setdefault(action_to_id(candidate.action), candidate)
     return tuple(deduped.values())
 
 
@@ -164,7 +157,7 @@ def _coarse_action_score(
                 scoring,
             )
         case ResolveChoiceAction() as resolve_choice_action:
-            return float(context.pending_choice_score(resolve_choice_action))
+            return context.pending_choice_score(resolve_choice_action)
         case PlayCardAction(card_instance_id=card_instance_id):
             return _play_card_coarse_score(context.hand_definition(card_instance_id), scoring)
         case _:
@@ -246,28 +239,22 @@ def _special_candidate_reason(ability_kind: AbilityKind) -> str:
             return "special card"
 
 
-def _always_keep(
-    action: GameAction,
-    *,
-    config: BaselineConfig,
-    context: _CandidateContext,
-) -> bool:
+def _always_keep(action: GameAction, *, context: _CandidateContext) -> bool:
     if isinstance(action, PassAction):
-        return config.candidates.always_keep_pass
+        return context.config.candidates.always_keep_pass
     if isinstance(action, UseLeaderAbilityAction):
-        return _always_keep_leader(action, config=config, context=context)
+        return _always_keep_leader(action, context=context)
     if isinstance(action, PlayCardAction):
-        return _always_keep_play_card(action, config=config, context=context)
+        return _always_keep_play_card(action, context=context)
     return False
 
 
 def _always_keep_leader(
     action: UseLeaderAbilityAction,
     *,
-    config: BaselineConfig,
     context: _CandidateContext,
 ) -> bool:
-    if not config.candidates.always_keep_leader:
+    if not context.config.candidates.always_keep_leader:
         return False
     projection = context.leader_projection(action)
     return projection is None or projection.has_effect
@@ -276,10 +263,9 @@ def _always_keep_leader(
 def _always_keep_play_card(
     action: PlayCardAction,
     *,
-    config: BaselineConfig,
     context: _CandidateContext,
 ) -> bool:
-    if not config.candidates.always_keep_tactical_specials:
+    if not context.config.candidates.always_keep_tactical_specials:
         return False
     definition = context.hand_definition(action.card_instance_id)
     return (

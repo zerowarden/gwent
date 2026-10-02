@@ -103,6 +103,7 @@ print(json.dumps(action_to_id(action)))
         ("schema_version", 999),
         ("schema_version", True),
         ("observation_contract_version", 999),
+        ("configuration_contract_version", 1),
         ("configuration_contract_version", 999),
         ("configuration_digest", "wrong"),
         ("artifact_digest", "wrong"),

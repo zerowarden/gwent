@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
 from gwent_evaluation import load_agent_catalog, load_suite_catalog
+from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.schedule import schedule_suite
 from gwent_shared.json_payloads import canonical_digest
 
@@ -39,6 +41,25 @@ def test_experiment_catalogs_declare_expected_participants_and_suites() -> None:
         "weights-validation",
         "weights-test",
     }
+
+
+def test_experiment_decks_satisfy_the_official_rules() -> None:
+    suites = load_suite_catalog(SUITES_CATALOG, agents=load_agent_catalog(AGENTS_CATALOG))
+    deck_pairs: list[Sequence[str]] = [
+        pair for suite in suites.values() for pair in suite.deck_pairs
+    ]
+    for path in (EXPERIMENTS / "tuning").glob("*.json"):
+        references = cast(Mapping[str, object], read_json_object(path).get("suites", {}))
+        for reference in references.values():
+            if isinstance(reference, Mapping):
+                inline = cast(Mapping[str, Sequence[Sequence[str]]], reference)
+                deck_pairs.extend(inline["deck_pairs"])
+    assets = resolve_assets()
+    deck_ids = {deck_id for pair in deck_pairs for deck_id in pair}
+
+    assert "scoiatael_high_stakes" in deck_ids
+    for deck_id in sorted(deck_ids):
+        _ = assets.require_valid_deck(deck_id)
 
 
 def test_core_partitions_do_not_overlap_in_seeds_or_cases() -> None:

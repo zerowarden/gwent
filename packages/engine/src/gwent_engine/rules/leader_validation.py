@@ -15,27 +15,6 @@ from gwent_engine.rules.leader_common import (
 from gwent_engine.rules.row_effects import row_has_commanders_horn
 
 
-def validate_use_leader_ability_legality(
-    state: GameState,
-    action: UseLeaderAbilityAction,
-    *,
-    leader_registry: LeaderRegistry | None,
-    card_registry: CardRegistry | None,
-    rng: SupportsRandom | None,
-) -> None:
-    assert leader_registry is not None
-    assert card_registry is not None
-    player = state.player(action.player_id)
-    validate_leader_ability_availability(
-        state,
-        player,
-        action,
-        leader_registry=leader_registry,
-        card_registry=card_registry,
-        rng=rng,
-    )
-
-
 def validate_leader_ability_availability(
     state: GameState,
     player: PlayerState,

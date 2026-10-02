@@ -225,9 +225,8 @@ def _effective_viewer_hand_value_for_search(assessment: DecisionAssessment) -> i
     held cards are no longer future-round resources, they are dead.
 
     We therefore keep ordinary hand preservation in non-elimination rounds, but
-    zero it once the viewer has already passed in an elimination state. This is
-    the round-3 failure mode from the match review: search preferred pass
-    because it still credited dead post-pass hand value.
+    zero it once the viewer has already passed in an elimination state, so a
+    pass is not credited with hand value that can no longer be played.
     """
 
     if assessment.viewer.passed and assessment.is_elimination_round:

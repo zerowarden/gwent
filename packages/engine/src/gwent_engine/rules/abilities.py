@@ -45,6 +45,7 @@ from gwent_engine.rules.row_effects import (
     apply_berserker_transformations_for_row,
     horn_source_for_row,
 )
+from gwent_engine.rules.scoring import calculate_effective_strength
 from gwent_engine.rules.state_ops import (
     append_to_row,
     card_in_zone,
@@ -58,7 +59,6 @@ type AfterUnitPlayedHandler = Callable[
     [GameState, CardInstanceId, PlayerId, "AbilityResolutionContext"],
     GameState,
 ]
-type PlayDestinationModifier = Callable[[GameState, PlayerId], PlayerId]
 
 
 @dataclass(slots=True)
@@ -177,8 +177,6 @@ def strongest_eligible_unit_card_ids(
     *,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[CardInstanceId, ...]:
-    from gwent_engine.rules.scoring import calculate_effective_strength
-
     eligible_card_ids = eligible_destroyable_unit_ids(
         state,
         card_registry,
@@ -264,8 +262,6 @@ def resolve_row_scorch(
     event_id_start: int,
     leader_registry: LeaderRegistry | None = None,
 ) -> tuple[GameState, tuple[CardInstanceId, ...], tuple[GameEvent, ...]]:
-    from gwent_engine.rules.scoring import calculate_effective_strength
-
     row_total = sum(
         calculate_effective_strength(
             state,
@@ -390,12 +386,9 @@ def modify_play_destination(
     card_registry: CardRegistry,
 ) -> PlayerId:
     definition = card_registry.get(state.card(card_instance_id).definition_id)
-    battlefield_side = played_by_player_id
-    for ability_kind in definition.ability_kinds:
-        modifier = PLAY_DESTINATION_MODIFIERS.get(ability_kind)
-        if modifier is not None:
-            battlefield_side = modifier(state, played_by_player_id)
-    return battlefield_side
+    if AbilityKind.SPY in definition.ability_kinds:
+        return opponent_player_id_from_state(state, played_by_player_id)
+    return played_by_player_id
 
 
 def _resolve_after_unit_played(
@@ -748,10 +741,6 @@ def _next_event_id(context: AbilityResolutionContext) -> int:
     return context.event_builder.next_event_id()
 
 
-def _spy_destination(state: GameState, played_by_player_id: PlayerId) -> PlayerId:
-    return opponent_player_id_from_state(state, played_by_player_id)
-
-
 def _destroy_player_cards(
     state: GameState,
     player: PlayerState,
@@ -769,10 +758,6 @@ def _destroy_player_cards(
         rows=player.rows.without(removed_row_cards),
     )
 
-
-PLAY_DESTINATION_MODIFIERS: dict[AbilityKind, PlayDestinationModifier] = {
-    AbilityKind.SPY: _spy_destination,
-}
 
 AFTER_UNIT_PLAYED_HANDLERS: dict[AbilityKind, AfterUnitPlayedHandler] = {
     AbilityKind.SPY: _resolve_spy_after_play,

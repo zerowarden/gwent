@@ -12,13 +12,12 @@ from gwent_engine.ai.baseline import (
     leader_coarse_score,
 )
 from gwent_engine.ai.baseline.projection import project_leader_action
+from gwent_engine.ai.baseline.projection.context import viewer_public
 from gwent_engine.ai.observations import (
-    PlayerObservation,
-    PublicPlayerStateView,
     build_player_observation,
 )
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
-from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates
 from gwent_engine.ai.search.types import (
     SearchReplyExplanation,
     SearchTraceFact,
@@ -52,8 +51,8 @@ class OpponentReplyCandidate:
     action: GameAction | None
     ordering_score: float
     reason: str
+    explanation: SearchReplyExplanation
     inferred_penalty: float = 0.0
-    explanation: SearchReplyExplanation | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,14 +168,12 @@ def _public_exact_pending_choice_reply_candidates(
                 reason=f"pending_choice:{candidate.reason}",
             ),
         )
-        for candidate in order_search_candidates(
-            generate_search_candidates(
-                observation,
-                legal_actions,
-                config=config,
-                card_registry=card_registry,
-                leader_registry=leader_registry,
-            )
+        for candidate in generate_search_candidates(
+            observation,
+            legal_actions,
+            config=config,
+            card_registry=card_registry,
+            leader_registry=leader_registry,
         )[: config.max_opponent_replies]
     )
 
@@ -209,7 +206,7 @@ def _public_explicit_reply_candidates(
     if leader_registry is None:
         return
     observation = build_player_observation(state, opponent_id, leader_registry)
-    opponent_public = _player_view(observation, opponent_id)
+    opponent_public = viewer_public(observation)
     leader_definition = leader_registry.get(opponent_public.leader.leader_id)
     if (
         opponent_public.leader.used
@@ -339,10 +336,8 @@ def _estimated_hidden_pressure_penalty(
         context,
         base_profile=profile_definition,
     )
-    tempo_per_card = (
-        profile.elimination_estimated_opponent_tempo_per_card
-        if assessment.is_elimination_round
-        else profile.estimated_opponent_tempo_per_card
+    tempo_per_card = profile.pass_config.opponent_tempo_per_card(
+        elimination=assessment.is_elimination_round
     )
     immediate_points = float(profile.weights.immediate_points)
     components: list[SearchValueTerm] = [
@@ -397,14 +392,6 @@ def _estimated_hidden_pressure_penalty(
             SearchTraceFact("context_mode", context.mode.value),
         ),
     )
-
-
-def _player_view(
-    observation: PlayerObservation,
-    player_id: PlayerId,
-) -> PublicPlayerStateView:
-    players = observation.public_state.players
-    return players[0] if players[0].player_id == player_id else players[1]
 
 
 def _pending_choice_is_public_exact(state: GameState) -> bool:

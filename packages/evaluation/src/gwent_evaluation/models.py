@@ -25,7 +25,7 @@ from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance
 
 AGENT_SPEC_VERSION = 2
 SUITE_SPEC_VERSION = 1
-RECORD_SCHEMA_VERSION = 3
+RECORD_SCHEMA_VERSION = 4
 
 
 class SpecError(ValueError):
@@ -201,7 +201,7 @@ class TrajectoryStep:
 class MatchEvidence:
     samples: tuple[DecisionSample, ...]
     trajectory: tuple[TrajectoryStep, ...]
-    trace_digest: str = ""
+    trace_digest: str
 
 
 @dataclass(frozen=True, slots=True)

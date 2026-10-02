@@ -9,7 +9,7 @@ from gwent_engine.core.state import (
     RowState,
 )
 
-from gwent_service.domain import MatchSnapshot, UnknownMatchPlayerError
+from gwent_service.domain import MatchSnapshot
 from gwent_service.dto import (
     CardView,
     LeaderView,
@@ -28,10 +28,7 @@ def project_match_for_player(
     *,
     adapter: GwentEngineAdapter,
 ) -> MatchView:
-    try:
-        viewer_slot = snapshot.stored.slot_for_service_player(viewer_service_player_id)
-    except KeyError as exc:
-        raise UnknownMatchPlayerError(viewer_service_player_id, snapshot.stored.match_id) from exc
+    viewer_slot = snapshot.stored.slot_for_service_player(viewer_service_player_id)
     opponent_slot = snapshot.stored.opponent_slot_for_service_player(viewer_service_player_id)
 
     state = snapshot.state

@@ -1,3 +1,4 @@
+import pytest
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.baseline.assessment import build_assessment
 from gwent_engine.ai.baseline.context import (
@@ -13,7 +14,7 @@ from gwent_engine.core.ids import CardDefinitionId
 
 from tests.support import PLAYER_ONE_ID
 
-from ...scenario_builder import card, rows, scenario
+from ...scenario_builder import ScenarioCard, card, rows, scenario
 from ...support import CARD_REGISTRY
 from ..support import make_assessment
 
@@ -137,3 +138,42 @@ def test_classify_context_detects_elimination_pressure() -> None:
     assert context.mode == TacticalMode.ALL_IN
     assert context.pressure == PressureMode.ELIMINATION
     assert context.preserve_resources is False
+
+
+@pytest.mark.parametrize("card_advantage", [-2, 0, 2])
+@pytest.mark.parametrize(
+    "round_number, viewer_gems, opponent_gems, preserve_resources, mode",
+    [
+        (1, 2, 2, True, TacticalMode.PROBE),
+        (2, 1, 2, False, TacticalMode.ALL_IN),
+        (2, 2, 1, False, TacticalMode.ALL_IN),
+        (3, 1, 1, False, TacticalMode.ALL_IN),
+    ],
+)
+def test_only_round_one_preserves_resources_whatever_the_card_advantage(
+    card_advantage: int,
+    round_number: int,
+    viewer_gems: int,
+    opponent_gems: int,
+    preserve_resources: bool,
+    mode: TacticalMode,
+) -> None:
+    def hand(prefix: str, size: int) -> list[ScenarioCard]:
+        return [
+            card(f"{prefix}_hand_{index}", "scoiatael_mahakaman_defender") for index in range(size)
+        ]
+
+    state = (
+        scenario("preserve_resources_by_round")
+        .round(round_number)
+        .player("p1", gems_remaining=viewer_gems, hand=hand("p1", 3 + max(card_advantage, 0)))
+        .player("p2", gems_remaining=opponent_gems, hand=hand("p2", 3 + max(-card_advantage, 0)))
+        .build()
+    )
+    assessment = build_assessment(build_player_observation(state, PLAYER_ONE_ID), CARD_REGISTRY)
+
+    context = classify_context(assessment)
+
+    assert assessment.card_advantage == card_advantage
+    assert context.preserve_resources is preserve_resources
+    assert context.mode == mode

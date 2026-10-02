@@ -320,6 +320,8 @@ def build_run_manifest(
     repository_root: Path,
 ) -> RunManifest:
     deck_ids = sorted({deck_id for pair in suite.deck_pairs for deck_id in pair})
+    for deck_id in deck_ids:
+        _ = assets.require_valid_deck(deck_id)
     return RunManifest(
         schema_version=RECORD_SCHEMA_VERSION,
         run_id=run_id,
@@ -364,18 +366,28 @@ def candidate_manifest(
     )
 
 
-def validate_run_environment(manifest: RunManifest, *, repository_root: Path) -> None:
-    """Recheck pinned implementation, runtime, participants, and assets at a run boundary."""
-    suite = manifest.suite
-    current = build_run_manifest(
+def pin_manifest(
+    suite: SuiteSpec,
+    *,
+    run_id: str,
+    repository_root: Path,
+    assets: ResolvedAssets | None = None,
+) -> RunManifest:
+    """The manifest a run of `suite` pins against the current checkout and assets."""
+    return build_run_manifest(
         suite=suite,
-        run_id=manifest.run_id,
+        run_id=run_id,
         matches=schedule_suite(suite),
         candidate=resolve_agent(suite.candidate),
-        opponents=tuple(resolve_agent(item) for item in suite.opponents),
-        assets=resolve_assets(),
+        opponents=tuple(resolve_agent(agent) for agent in suite.opponents),
+        assets=assets or resolve_assets(),
         repository_root=repository_root,
     )
+
+
+def validate_run_environment(manifest: RunManifest, *, repository_root: Path) -> None:
+    """Recheck pinned implementation, runtime, participants, and assets at a run boundary."""
+    current = pin_manifest(manifest.suite, run_id=manifest.run_id, repository_root=repository_root)
     if current != manifest:
         raise RunConflictError("Execution conditions differ from the pinned manifest.")
 

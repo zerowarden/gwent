@@ -17,6 +17,7 @@ from gwent_engine.ai.policy import (
     BaselineConfig,
     EvaluationWeights,
     PassConfig,
+    PendingChoicePolicyConfig,
     PolicyResourceBias,
     PolicySelection,
     ProfileTuningConfig,
@@ -45,63 +46,19 @@ class HeuristicProfile:
     weights: EvaluationWeights
     weight_provenance: tuple[WeightProvenance, ...]
     action_bonus: ActionBonusConfig
+    pending_choice: PendingChoicePolicyConfig
     candidate_limit: int
     pass_config: PassConfig
     pass_lead_margin: int
-    estimated_opponent_tempo_per_card: int
-    elimination_estimated_opponent_tempo_per_card: int
     minimum_commitment_bias: float
     preserve_resources_bias: float
     scorch_policy: ScorchPolicy
-    leader_policy: str
 
     @property
     def resource_bias(self) -> PolicyResourceBias:
         return PolicyResourceBias(
             minimum_commitment=self.minimum_commitment_bias,
             preserve_resources=self.preserve_resources_bias,
-        )
-
-    @classmethod
-    def from_components(
-        cls,
-        *,
-        profile_id: str,
-        policy_names: PolicySelection,
-        weights: EvaluationWeights,
-        weight_provenance: tuple[WeightProvenance, ...],
-        action_bonus: ActionBonusConfig,
-        candidate_limit: int,
-        pass_config: PassConfig,
-        pass_lead_margin: int,
-        estimated_opponent_tempo_per_card: int,
-        elimination_estimated_opponent_tempo_per_card: int,
-        minimum_commitment_bias: float,
-        preserve_resources_bias: float,
-    ) -> HeuristicProfile:
-        """Build a profile from resolved policy wiring and tuned values.
-
-        This keeps `compose_profile` focused on policy selection while the
-        dataclass constructor stays readable.
-        """
-
-        return cls(
-            profile_id=profile_id,
-            policy_names=policy_names,
-            weights=weights,
-            weight_provenance=weight_provenance,
-            action_bonus=action_bonus,
-            candidate_limit=candidate_limit,
-            pass_config=pass_config,
-            pass_lead_margin=pass_lead_margin,
-            estimated_opponent_tempo_per_card=estimated_opponent_tempo_per_card,
-            elimination_estimated_opponent_tempo_per_card=(
-                elimination_estimated_opponent_tempo_per_card
-            ),
-            minimum_commitment_bias=minimum_commitment_bias,
-            preserve_resources_bias=preserve_resources_bias,
-            scorch_policy=SCORCH_POLICIES[policy_names.scorch],
-            leader_policy=policy_names.leader,
         )
 
 
@@ -138,19 +95,16 @@ def compose_profile(
         else pass_config.safe_lead_margin
     )
     policy_names = base_profile.policies
-    return HeuristicProfile.from_components(
+    return HeuristicProfile(
         profile_id=base_profile.profile_id,
         policy_names=policy_names,
         weights=weights,
         weight_provenance=weight_provenance,
         action_bonus=config.action_bonus,
+        pending_choice=config.pending_choice,
         candidate_limit=candidate_limit,
         pass_config=pass_config,
         pass_lead_margin=pass_lead_margin,
-        estimated_opponent_tempo_per_card=pass_config.estimated_opponent_tempo_per_card,
-        elimination_estimated_opponent_tempo_per_card=(
-            pass_config.elimination_estimated_opponent_tempo_per_card
-        ),
         minimum_commitment_bias=(
             tuning.minimum_commitment_mode_bias
             if context.minimum_commitment_mode
@@ -161,6 +115,7 @@ def compose_profile(
             if context.preserve_resources
             else tuning.spend_resources_bias
         ),
+        scorch_policy=SCORCH_POLICIES[policy_names.scorch],
     )
 
 

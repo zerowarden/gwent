@@ -5,7 +5,7 @@ from gwent_engine.core.events import CardPlayedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.scoring import calculate_row_score
-from gwent_engine.rules.weather import active_weather_cards, weather_card_affects_row
+from gwent_engine.rules.weather import weather_card_affects_row
 
 from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import CARD_REGISTRY
@@ -138,9 +138,9 @@ def test_skellige_storm_sets_ranged_and_siege_rows_to_one_for_both_players() -> 
     assert calculate_row_score(state, card_registry, PLAYER_ONE_ID, Row.SIEGE) == 1
     assert calculate_row_score(state, card_registry, PLAYER_TWO_ID, Row.RANGED) == 1
     assert calculate_row_score(state, card_registry, PLAYER_TWO_ID, Row.SIEGE) == 1
-    assert active_weather_cards(state) == (storm_card_id,)
-    assert state.battlefield_weather.cards_for(Row.RANGED) == (storm_card_id,)
-    assert state.battlefield_weather.cards_for(Row.SIEGE) == ()
+    assert state.weather.all_cards() == (storm_card_id,)
+    assert state.weather.cards_for(Row.RANGED) == (storm_card_id,)
+    assert state.weather.cards_for(Row.SIEGE) == ()
     assert state.card(storm_card_id).zone == Zone.WEATHER
     assert state.player(PLAYER_ONE_ID).rows.cards_for(Row.RANGED) == (player_one_ranged_unit_id,)
     assert weather_card_affects_row(state, card_registry, storm_card_id, Row.RANGED)

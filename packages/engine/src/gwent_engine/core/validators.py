@@ -18,7 +18,7 @@ from gwent_engine.core.errors import (
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.rules.leader_validation import validate_use_leader_ability_legality
+from gwent_engine.rules.leader_validation import validate_leader_ability_availability
 from gwent_engine.rules.legality import (
     validate_in_round_player_can_act,
     validate_play_card_legality,
@@ -92,8 +92,6 @@ def validate_resolve_mulligans_action(
     seen_player_ids = frozenset(selection.player_id for selection in action.selections)
     if seen_player_ids != state.player_ids():
         raise IllegalActionError("ResolveMulligansAction must include both players exactly once.")
-    if len(seen_player_ids) != len(action.selections):
-        raise IllegalActionError("ResolveMulligansAction cannot repeat the same player.")
 
     for selection in action.selections:
         validate_mulligan_selection(state, selection)
@@ -178,13 +176,13 @@ def validate_resolve_choice_action(state: GameState, action: ResolveChoiceAction
         selected_ids,
         duplicate_message="ResolveChoiceAction cannot select the same card twice.",
     )
-    _ = validate_selection_count(
+    validate_selection_count(
         selected_ids,
         min_selections=pending_choice.min_selections,
         max_selections=pending_choice.max_selections,
         invalid_count_message="ResolveChoiceAction selected an invalid number of cards.",
     )
-    _ = validate_legal_selections(
+    validate_legal_selections(
         selected_ids,
         legal_values=pending_choice.legal_target_card_instance_ids,
         illegal_message="ResolveChoiceAction selected an illegal target card.",
@@ -211,8 +209,9 @@ def validate_use_leader_ability_action(
         leader_registry=leader_registry,
         rng=rng,
     )
-    validate_use_leader_ability_legality(
+    validate_leader_ability_availability(
         state,
+        state.player(action.player_id),
         action,
         leader_registry=leader_registry,
         card_registry=card_registry,

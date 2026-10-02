@@ -6,7 +6,8 @@ scheduled matches and match results into those facts.
 
 The primary comparison treats each complete balanced block as one independent
 sampling unit. Treating individual matches (or decisions) as independent would
-understate uncertainty, because legs of one block share their deal and seed.
+understate uncertainty, because legs of one block share the block's root seed,
+opponent and deck pair (each leg derives its own environment seed).
 """
 
 from __future__ import annotations
@@ -207,7 +208,6 @@ def compute_run_metrics(
     cases: Sequence[ScoredCase],
     *,
     bootstrap: BootstrapConfig = DEFAULT_BOOTSTRAP,
-    dimensions: Sequence[str] = DEFAULT_STRATA_DIMENSIONS,
 ) -> RunMetrics:
     """Compute descriptive scores plus a block-level interval for one candidate."""
 
@@ -234,7 +234,6 @@ def compute_run_metrics(
         strata=_stratum_metrics(
             cases,
             complete_blocks=complete_blocks,
-            dimensions=dimensions,
             bootstrap=bootstrap,
         ),
         valid=not validity_reasons,
@@ -303,7 +302,7 @@ def compare_block_scores(
 def insufficient_sample_interval(
     *,
     blocks: int,
-    config: BootstrapConfig = DEFAULT_BOOTSTRAP,
+    config: BootstrapConfig,
 ) -> ScoreInterval:
     """An explicit non-inferential interval for incomplete or explicitly gated runs."""
 
@@ -321,11 +320,10 @@ def _stratum_metrics(
     cases: Sequence[ScoredCase],
     *,
     complete_blocks: Sequence[BlockOutcome],
-    dimensions: Sequence[str],
     bootstrap: BootstrapConfig,
 ) -> tuple[StratumMetrics, ...]:
     metrics: list[StratumMetrics] = []
-    for dimension in dimensions:
+    for dimension in DEFAULT_STRATA_DIMENSIONS:
         values = sorted({case.strata[dimension] for case in cases if dimension in case.strata})
         for value in values:
             selected = tuple(case for case in cases if case.strata.get(dimension) == value)

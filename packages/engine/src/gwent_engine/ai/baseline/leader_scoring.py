@@ -63,10 +63,8 @@ def _leader_action_terms(
 ) -> tuple[ScoreTerm, ...]:
     """Score leader usage from actual projected effect, not just urgency.
 
-    The previous generic leader scoring rewarded spending leader whenever the
-    round looked urgent, even if the concrete leader effect would do nothing.
-    We keep the generic appetite terms for live leader activations, but dead
-    leader lines now collapse to reserve-cost plus an explicit no-effect
+    Live leader activations keep the generic appetite terms. Leader lines with
+    no projected effect collapse to reserve cost plus an explicit no-effect
     penalty so they do not outrank productive plays.
     """
 
@@ -76,14 +74,14 @@ def _leader_action_terms(
             value,
             formula=name,
             details=(
-                term_detail("leader_policy", profile.leader_policy),
+                term_detail("leader_policy", profile.policy_names.leader),
                 term_detail("score_gap", assessment.score_gap),
                 term_detail("pressure", context.pressure.value),
                 term_detail("tempo", context.tempo.value),
             ),
         )
         for name, value in leader_policy_components(
-            policy_name=profile.leader_policy,
+            policy_name=profile.policy_names.leader,
             assessment=assessment,
             context=context,
             profile=profile,
@@ -123,7 +121,7 @@ def _leader_action_terms(
                 "leader_reserve_cost",
                 reserve_cost,
                 formula="leader_reserve_cost",
-                details=(term_detail("leader_policy", profile.leader_policy),),
+                details=(term_detail("leader_policy", profile.policy_names.leader),),
             ),
         )
     evaluation_policy = DEFAULT_EVALUATION_POLICY
@@ -175,7 +173,7 @@ def _leader_action_terms(
             live_commitment_cost,
             formula="leader_reserve_cost / max(preserve_resources_bias * 2, 3)",
             details=(
-                term_detail("leader_policy", profile.leader_policy),
+                term_detail("leader_policy", profile.policy_names.leader),
                 term_detail("leader_reserve_cost", reserve_cost),
                 term_detail("preserve_resources_bias", profile.preserve_resources_bias),
             ),

@@ -1,14 +1,11 @@
 import pytest
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.ids import DeckId
-from gwent_engine.serialize import events_from_dict
 from gwent_service.engine_adapter import (
     CreateMatchStateSpec,
     EnginePlayerDeckSpec,
     GwentEngineAdapter,
 )
-
-from tests.support import IdentityRandom
 
 
 def test_engine_adapter_can_create_initial_match_state() -> None:
@@ -63,26 +60,3 @@ def test_engine_adapter_round_trips_serialized_state() -> None:
     round_tripped = adapter.deserialize_state(payload)
 
     assert adapter.serialize_state(round_tripped) == payload
-
-
-def test_engine_adapter_round_trips_serialized_events() -> None:
-    adapter = GwentEngineAdapter()
-    state = adapter.create_match_state(
-        CreateMatchStateSpec(
-            game_id="service_match_3",
-            players=(
-                EnginePlayerDeckSpec(player_id="p1", deck_id="monsters_muster_swarm_strict"),
-                EnginePlayerDeckSpec(player_id="p2", deck_id="nilfgaard_spy_medic_control_strict"),
-            ),
-        )
-    )
-    transition = adapter.apply_engine_action(
-        state,
-        adapter.build_start_game_action(starting_player_id="p1"),
-        rng=IdentityRandom(),
-    )
-
-    payloads = adapter.serialize_events(transition.events)
-    round_tripped = events_from_dict(payloads)
-
-    assert round_tripped == transition.events

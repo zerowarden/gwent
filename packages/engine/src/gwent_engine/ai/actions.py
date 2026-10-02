@@ -29,7 +29,6 @@ from gwent_engine.core.validators import (
     validate_use_leader_ability_action,
 )
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.serialize.actions import action_to_id
 
 
 def enumerate_legal_actions(
@@ -57,14 +56,6 @@ def enumerate_legal_actions(
             rng=rng,
         )
     )
-
-
-def legal_action_mask(
-    candidates: Sequence[GameAction],
-    legal_actions: Sequence[GameAction],
-) -> tuple[int, ...]:
-    legal_ids = {action_to_id(action) for action in legal_actions}
-    return tuple(1 if action_to_id(action) in legal_ids else 0 for action in candidates)
 
 
 def is_legal_action(

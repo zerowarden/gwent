@@ -96,10 +96,6 @@ class _SummaryCardContext:
         return card_ref_text(card_instance_id, self.cards)
 
 
-def event_type_name(event: GameEvent) -> str:
-    return type(event).__name__
-
-
 def round_ended_event(events: tuple[GameEvent, ...]) -> RoundEndedEvent | None:
     for event in events:
         if isinstance(event, RoundEndedEvent):

@@ -23,8 +23,6 @@ class DeckValidationResult:
 class DeckRuleset:
     min_unit_cards: int = 22
     max_special_cards: int = 10
-    require_single_leader: bool = True
-    enforce_faction: bool = True
 
 
 DEFAULT_DECK_RULESET = DeckRuleset()
@@ -38,6 +36,7 @@ class _DeckCardScan:
     known_card_ids: tuple[CardDefinitionId, ...]
     malformed_card_ids: tuple[CardDefinitionId, ...]
     unknown_card_ids: tuple[CardDefinitionId, ...]
+    generated_only_card_ids: tuple[CardDefinitionId, ...]
     off_faction_card_ids: tuple[CardDefinitionId, ...]
 
 
@@ -49,12 +48,7 @@ def validate_deck(
 ) -> DeckValidationResult:
     errors: list[DeckValidationError] = []
     leader_definition = _leader_definition(deck, leader_registry, errors)
-    scan = _scan_deck_cards(
-        deck,
-        card_registry,
-        leader_definition=leader_definition,
-        ruleset=ruleset,
-    )
+    scan = _scan_deck_cards(deck, card_registry, leader_definition=leader_definition)
     errors.extend(_validate_deck_shape(deck))
     errors.extend(_scan_errors(scan))
     errors.extend(_validate_copy_limits(scan.known_card_ids, card_registry))
@@ -66,13 +60,6 @@ def _validate_deck_shape(deck: DeckDefinition) -> tuple[DeckValidationError, ...
     errors: list[DeckValidationError] = []
     if not str(deck.deck_id).strip():
         errors.append(_error("malformed_deck", "Deck id cannot be blank."))
-    if not deck.card_definition_ids:
-        errors.append(
-            _error(
-                "malformed_deck",
-                "Deck must include at least one card definition id.",
-            )
-        )
     return tuple(errors)
 
 
@@ -95,12 +82,12 @@ def _scan_deck_cards(
     card_registry: CardRegistry,
     *,
     leader_definition: LeaderDefinition | None,
-    ruleset: DeckRuleset,
 ) -> _DeckCardScan:
     unit_count = 0
     special_count = 0
     embedded_leader_count = 0
     unknown_card_ids: list[CardDefinitionId] = []
+    generated_only_card_ids: list[CardDefinitionId] = []
     off_faction_card_ids: list[CardDefinitionId] = []
     malformed_card_ids: list[CardDefinitionId] = []
     known_card_ids: list[CardDefinitionId] = []
@@ -118,7 +105,9 @@ def _scan_deck_cards(
         unit_count += int(definition.card_type == CardType.UNIT)
         special_count += int(definition.card_type == CardType.SPECIAL)
         embedded_leader_count += int(definition.card_type == CardType.LEADER)
-        if _is_off_faction_card(definition, leader_definition=leader_definition, ruleset=ruleset):
+        if definition.generated_only:
+            generated_only_card_ids.append(definition_id)
+        if _is_off_faction_card(definition, leader_definition=leader_definition):
             off_faction_card_ids.append(definition_id)
 
     return _DeckCardScan(
@@ -128,6 +117,7 @@ def _scan_deck_cards(
         known_card_ids=tuple(known_card_ids),
         malformed_card_ids=tuple(malformed_card_ids),
         unknown_card_ids=tuple(unknown_card_ids),
+        generated_only_card_ids=tuple(generated_only_card_ids),
         off_faction_card_ids=tuple(off_faction_card_ids),
     )
 
@@ -136,9 +126,8 @@ def _is_off_faction_card(
     definition: CardDefinition,
     *,
     leader_definition: LeaderDefinition | None,
-    ruleset: DeckRuleset,
 ) -> bool:
-    if not ruleset.enforce_faction or leader_definition is None:
+    if leader_definition is None:
         return False
     if definition.card_type == CardType.LEADER:
         return False
@@ -163,6 +152,14 @@ def _scan_errors(scan: _DeckCardScan) -> tuple[DeckValidationError, ...]:
                 f"Deck references unknown card definition ids: {ids}.",
             )
         )
+    if scan.generated_only_card_ids:
+        ids = _joined_ids(scan.generated_only_card_ids)
+        errors.append(
+            _error(
+                "generated_only_card",
+                f"Deck contains cards that only abilities can create: {ids}.",
+            )
+        )
     return tuple(errors)
 
 
@@ -174,14 +171,13 @@ def _ruleset_errors(
     ruleset: DeckRuleset,
 ) -> tuple[DeckValidationError, ...]:
     errors: list[DeckValidationError] = []
-    errors.extend(_leader_count_errors(deck, scan, ruleset=ruleset))
+    errors.extend(_leader_count_errors(deck, scan))
     errors.extend(_composition_errors(scan, ruleset=ruleset))
     errors.extend(
         _faction_errors(
             deck,
             scan,
             leader_definition=leader_definition,
-            ruleset=ruleset,
         )
     )
     return tuple(errors)
@@ -190,11 +186,7 @@ def _ruleset_errors(
 def _leader_count_errors(
     deck: DeckDefinition,
     scan: _DeckCardScan,
-    *,
-    ruleset: DeckRuleset,
 ) -> tuple[DeckValidationError, ...]:
-    if not ruleset.require_single_leader:
-        return ()
     leader_count = int(bool(str(deck.leader_id).strip())) + scan.embedded_leader_count
     if leader_count <= 1:
         return ()
@@ -242,9 +234,8 @@ def _faction_errors(
     scan: _DeckCardScan,
     *,
     leader_definition: LeaderDefinition | None,
-    ruleset: DeckRuleset,
 ) -> tuple[DeckValidationError, ...]:
-    if not ruleset.enforce_faction or leader_definition is None:
+    if leader_definition is None:
         return ()
     errors: list[DeckValidationError] = []
     if leader_definition.faction != deck.faction:

@@ -12,9 +12,6 @@ from gwent_engine.ai.baseline.pending_choice import (
 )
 from gwent_engine.ai.baseline.play_scoring import play_card_action_score
 from gwent_engine.ai.baseline.profiles import HeuristicProfile
-from gwent_engine.ai.baseline.projection import (
-    current_public_board_projection,
-)
 from gwent_engine.ai.baseline.score_terms import (
     ActionScoreBreakdown,
     constant_term,
@@ -36,29 +33,6 @@ from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.serialize.actions import action_to_id
 
 
-def evaluate_action(
-    action: GameAction,
-    *,
-    observation: PlayerObservation,
-    assessment: DecisionAssessment,
-    context: DecisionContext,
-    profile: HeuristicProfile,
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry | None = None,
-    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
-) -> float:
-    return explain_action_score(
-        action,
-        observation=observation,
-        assessment=assessment,
-        context=context,
-        profile=profile,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        viewer_hand_definitions=viewer_hand_definitions,
-    ).total
-
-
 def explain_action_score(
     action: GameAction,
     *,
@@ -75,11 +49,9 @@ def explain_action_score(
     if isinstance(action, PassAction):
         return _pass_action_score(
             action,
-            observation=observation,
             assessment=assessment,
             context=context,
             profile=profile,
-            card_registry=card_registry,
         )
     if isinstance(action, ResolveChoiceAction):
         return _resolve_choice_action_score(
@@ -129,17 +101,11 @@ def _leave_action_score(action: LeaveAction, *, profile: HeuristicProfile) -> Ac
 def _pass_action_score(
     action: PassAction,
     *,
-    observation: PlayerObservation,
     assessment: DecisionAssessment,
     context: DecisionContext,
     profile: HeuristicProfile,
-    card_registry: CardRegistry,
 ) -> ActionScoreBreakdown:
-    current_board = current_public_board_projection(
-        observation,
-        card_registry=card_registry,
-    )
-    if assessment.opponent_passed and current_board.score_gap > 0:
+    if assessment.opponent_passed and assessment.score_gap > 0:
         return ActionScoreBreakdown(
             action=action,
             terms=(
@@ -166,7 +132,7 @@ def _pass_action_score(
         context=context,
         config=profile.pass_config,
     )
-    pass_projection = current_board.score_gap - required_lead
+    pass_projection = assessment.score_gap - required_lead
     terms = [
         constant_term(
             "pass_tempo_penalty",
@@ -181,7 +147,7 @@ def _pass_action_score(
             weight=profile.weights.immediate_points,
             weight_label="immediate_points",
             details=(
-                term_detail("current_score_gap", current_board.score_gap),
+                term_detail("current_score_gap", assessment.score_gap),
                 term_detail("required_pass_lead", required_lead),
             ),
         ),
@@ -216,6 +182,9 @@ def _resolve_choice_action_score(
             action,
             observation=observation,
             card_registry=card_registry,
+            policy=profile.pending_choice,
+            action_bonus=profile.action_bonus,
+            card_advantage_weight=profile.weights.card_advantage,
             leader_registry=leader_registry,
         )
     except UnsupportedPendingChoiceError as exc:

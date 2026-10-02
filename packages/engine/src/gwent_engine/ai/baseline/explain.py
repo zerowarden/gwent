@@ -157,28 +157,6 @@ class DecisionExplainer:
         )
 
 
-def explain_heuristic_decision_from_state(
-    state: GameState,
-    *,
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry | None = None,
-    config: BaselineConfig = DEFAULT_BASELINE_CONFIG,
-    profile_definition: BaseProfileDefinition = DEFAULT_BASE_PROFILE,
-    player_id: PlayerId | None = None,
-    legal_actions: tuple[GameAction, ...] | None = None,
-) -> HeuristicDecisionExplanation:
-    return DecisionExplainer(
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-        config=config,
-        profile_definition=profile_definition,
-    ).explain_heuristic_from_state(
-        state,
-        player_id=player_id,
-        legal_actions=legal_actions,
-    )
-
-
 def heuristic_decision_to_dict(explanation: HeuristicDecisionExplanation) -> dict[str, object]:
     return {
         "assessment": {
@@ -199,8 +177,8 @@ def heuristic_decision_to_dict(explanation: HeuristicDecisionExplanation) -> dic
         "profile": {
             "profile_id": explanation.profile.profile_id,
             "policy_names": {
-                "scorch": explanation.profile.policy_names.scorch_policy,
-                "leader": explanation.profile.policy_names.leader_policy,
+                "scorch": explanation.profile.policy_names.scorch,
+                "leader": explanation.profile.policy_names.leader,
             },
             "weight_provenance": {
                 item.name: {

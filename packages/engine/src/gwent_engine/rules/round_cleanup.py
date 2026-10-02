@@ -21,14 +21,12 @@ from gwent_engine.rules.avenger import (
 )
 from gwent_engine.rules.state_ops import card_in_zone, replace_card_instances
 
-EMPTY_RETAINED_CARD_IDS: frozenset[CardInstanceId] = frozenset()
-
 
 def cleanup_battlefield(
     state: GameState,
     *,
     card_registry: CardRegistry,
-    retained_card_ids: frozenset[CardInstanceId] = EMPTY_RETAINED_CARD_IDS,
+    retained_card_ids: frozenset[CardInstanceId],
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     """Move round-ended battlefield cards to discard and resolve leave effects.
 
@@ -185,9 +183,7 @@ def _owned_battlefield_weather_cards(
     player_id: PlayerId,
 ) -> tuple[CardInstanceId, ...]:
     return tuple(
-        card_id
-        for card_id in state.battlefield_weather.all_cards()
-        if state.card(card_id).owner == player_id
+        card_id for card_id in state.weather.all_cards() if state.card(card_id).owner == player_id
     )
 
 

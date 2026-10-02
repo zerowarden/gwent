@@ -22,7 +22,6 @@ from gwent_engine.ai.baseline.projection.future_value import (
 )
 from gwent_engine.ai.baseline.projection.models import (
     PlayActionProjection,
-    ScorchImpact,
 )
 from gwent_engine.ai.observation_queries import (
     is_non_hero_unit,
@@ -31,7 +30,7 @@ from gwent_engine.ai.observation_queries import (
     viewer_hand_definition,
 )
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
+from gwent_engine.ai.policy import DEFAULT_PROJECTION_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import PlayCardAction
@@ -109,7 +108,6 @@ class PlayProjectionResolver(ProjectionResolverContext):
         )
         current_scorch_loss = projected_scorch_loss(
             self.current_board.viewer_rows,
-            threshold=DEFAULT_FEATURE_POLICY.scorch_threshold,
         )
         current_synergy_value = projected_synergy_value(
             self.current_hand_definitions,
@@ -154,8 +152,6 @@ class PlayProjectionResolver(ProjectionResolverContext):
 
         projected_cards: list[ProjectedBattlefieldCard] = []
         projected_weather_row_set = set(self.current_weather_rows)
-        replacement_cards: tuple[ProjectedBattlefieldCard, ...] | None = None
-        scorch_impact = ScorchImpact(viewer_strength_lost=0, opponent_strength_lost=0)
         viewer_hand_count_after = self.viewer.hand_count - 1
         opponent_hand_count_after = self.opponent.hand_count
         immediate_draw_count = 0
@@ -227,7 +223,6 @@ class PlayProjectionResolver(ProjectionResolverContext):
             projected_scorch_loss=(
                 projected_scorch_loss(
                     board_after.viewer_rows,
-                    threshold=DEFAULT_FEATURE_POLICY.scorch_threshold,
                 )
                 - current_scorch_loss
             ),

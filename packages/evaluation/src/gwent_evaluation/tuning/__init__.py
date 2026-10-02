@@ -1,1 +1,1 @@
-"""Immutable tuning contracts and planning; proposal execution is separate."""
+"""Heuristic tuning studies: contracts, planning, optimization, selection and reports."""

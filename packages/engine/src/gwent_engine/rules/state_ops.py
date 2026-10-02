@@ -17,10 +17,6 @@ def append_to_row(rows: RowState, row: Row, card_id: CardInstanceId) -> RowState
             return replace(rows, siege=(*rows.siege, card_id))
 
 
-def remove_card_from_rows(rows: RowState, card_id: CardInstanceId) -> RowState:
-    return rows.without((card_id,))
-
-
 def replace_row_card(
     rows: RowState,
     row: Row,

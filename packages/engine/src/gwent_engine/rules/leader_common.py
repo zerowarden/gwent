@@ -39,7 +39,6 @@ from gwent_engine.rules.selection_validation import (
 )
 from gwent_engine.rules.state_ops import (
     append_to_row,
-    remove_card_from_rows,
     replace_card_instance,
 )
 
@@ -186,7 +185,7 @@ def move_battlefield_card_to_row(
     updated_controller = replace(
         controller,
         rows=append_to_row(
-            remove_card_from_rows(controller.rows, card_id),
+            controller.rows.without((card_id,)),
             target_row,
             card_id,
         ),
@@ -209,7 +208,7 @@ def resolve_discard_and_choose_from_deck_selection(
         selected_card_instance_ids,
         duplicate_message="Leader card selections cannot contain duplicates.",
     )
-    _ = validate_selection_count(
+    validate_selection_count(
         normalized_ids,
         min_selections=expected_count,
         max_selections=expected_count,

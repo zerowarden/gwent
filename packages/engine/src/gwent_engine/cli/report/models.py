@@ -7,7 +7,6 @@ from gwent_engine.ai.arena import MatchStepKind
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.cli.models import CliRun, CliStep
 from gwent_engine.cli.presenters import (
-    event_type_name,
     round_ended_event,
     summarize_action,
     summarize_event,
@@ -321,8 +320,8 @@ class MatchReportBuilder:
         lines = [
             f"actual={self._action_text(step.action)}",
             f"profile={explanation.profile.profile_id}",
-            f"scorch_policy={explanation.profile.policy_names.scorch_policy}",
-            f"leader_policy={explanation.profile.policy_names.leader_policy}",
+            f"scorch_policy={explanation.profile.policy_names.scorch}",
+            f"leader_policy={explanation.profile.policy_names.leader}",
             f"tempo={explanation.context.tempo.value}",
             f"pressure={explanation.context.pressure.value}",
             f"score_gap={explanation.assessment.score_gap}",
@@ -382,7 +381,7 @@ class MatchReportBuilder:
             case _:
                 summary = self.formatter.fmt(self._event_text(event))
         return {
-            "type": event_type_name(event),
+            "type": type(event).__name__,
             "summary": summary,
         }
 

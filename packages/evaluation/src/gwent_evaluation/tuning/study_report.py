@@ -33,7 +33,7 @@ def _mapping(value: object) -> Mapping[str, object]:
 
 
 def optimization_directory(root: Path) -> Path:
-    """Accept the complete workflow, historical pilot, or optimization directory."""
+    """Accept a complete workflow, pilot, or optimization directory."""
     if (root / "study.json").exists():
         return root / "optimization"
     if (root / "inputs/study.json").exists():
@@ -584,7 +584,7 @@ def render_study_markdown(report: StudyReport) -> str:
 
 def write_study_report(root: Path, *, destination: Path | None = None) -> StudyReport:
     report = build_study_report(root)
-    # Keep the optimization controller's own report intact for historical roots.
+    # Workflow roots keep the optimization controller's own report intact.
     destination = destination or (
         root if (root / "study.json").exists() else root / "reports/study"
     )

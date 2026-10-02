@@ -1,8 +1,4 @@
-"""Noninteractive evaluation commands.
-
-The planning command resolves immutable study inputs and counts matches without
-executing them.
-"""
+"""Noninteractive evaluation commands: run, report, replay, compare and tune."""
 
 from __future__ import annotations
 
@@ -25,7 +21,7 @@ from gwent_evaluation.holdout import (
     HoldoutAuthorization,
     authorize_manual_consumption,
 )
-from gwent_evaluation.models import SuiteSpec
+from gwent_evaluation.models import SpecError, SuiteSpec
 from gwent_evaluation.provenance import default_repository_root as _repository_root
 from gwent_evaluation.records import StorageError
 from gwent_evaluation.replay import (
@@ -43,11 +39,7 @@ from gwent_evaluation.reporting import (
     report_run,
 )
 from gwent_evaluation.schedule import ScheduleError
-from gwent_evaluation.specs import (
-    SpecError,
-    load_agent_catalog,
-    load_suite_catalog,
-)
+from gwent_evaluation.specs import load_agent_catalog, load_suite_catalog
 from gwent_evaluation.storage import write_output_index, write_run_guide, write_sensitivity_guide
 from gwent_evaluation.tuning.cli import tuning_parsers
 from gwent_evaluation.tuning.sensitivity import run_sensitivity

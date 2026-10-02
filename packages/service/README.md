@@ -51,12 +51,12 @@ curl -X POST http://127.0.0.1:8000/matches \
       {
         "service_player_id": "alice",
         "engine_player_id": "p1",
-        "deck_id": "monsters_sample_deck"
+        "deck_id": "monsters_muster_swarm_strict"
       },
       {
         "service_player_id": "bob",
         "engine_player_id": "p2",
-        "deck_id": "nilfgaard_sample_deck"
+        "deck_id": "nilfgaard_spy_medic_control_strict"
       }
     ],
     "rng_seed": 7
@@ -125,8 +125,7 @@ curl -X POST http://127.0.0.1:8000/matches/demo-match/actions/resolve-choice \
   -d '{
     "service_player_id": "alice",
     "choice_id": "choice_1",
-    "selected_card_instance_ids": ["p1_card_1"],
-    "selected_rows": []
+    "selected_card_instance_ids": ["p1_card_1"]
   }'
 ```
 
@@ -138,6 +137,7 @@ curl -X POST http://127.0.0.1:8000/matches/demo-match/actions/resolve-choice \
 - `POST /matches/{match_id}/mulligan`
 - `POST /matches/{match_id}/actions/play-card`
 - `POST /matches/{match_id}/actions/pass`
+- `POST /matches/{match_id}/actions/leave`
 - `POST /matches/{match_id}/actions/use-leader`
 - `POST /matches/{match_id}/actions/resolve-choice`
 

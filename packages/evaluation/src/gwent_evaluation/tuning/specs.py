@@ -16,13 +16,12 @@ from gwent_shared.extract import (
 )
 from gwent_shared.json_payloads import parse_json_document
 
-from gwent_evaluation.agents import resolve_agent, snapshot_suite
+from gwent_evaluation.agents import snapshot_suite
 from gwent_evaluation.assets import resolve_assets
-from gwent_evaluation.execution import EvidencePolicy, build_run_manifest
+from gwent_evaluation.execution import EvidencePolicy, pin_manifest
 from gwent_evaluation.metrics import BootstrapConfig
 from gwent_evaluation.models import AgentSpec, RunManifest, SpecError, SuiteSpec
 from gwent_evaluation.records import record_to_dict, run_manifest_from_dict
-from gwent_evaluation.schedule import schedule_suite
 from gwent_evaluation.specs import load_agent_catalog, load_suite_catalog, parse_suite_spec
 from gwent_evaluation.tuning.models import (
     CmaSettings,
@@ -264,15 +263,11 @@ def _load_study_spec(path: Path, *, repository_root: Path) -> StudySpec:
 
     manifests: dict[str, RunManifest] = {}
     for stage, reference in references.items():
-        suite = snapshot_suite(resolve_reference(reference))
-        manifests[stage] = build_run_manifest(
-            suite=suite,
+        manifests[stage] = pin_manifest(
+            snapshot_suite(resolve_reference(reference)),
             run_id=f"{_string(mapping['study_id'])}-{stage}",
-            matches=schedule_suite(suite),
-            candidate=resolve_agent(suite.candidate),
-            opponents=tuple(resolve_agent(agent) for agent in suite.opponents),
-            assets=assets,
             repository_root=repository_root,
+            assets=assets,
         )
     incumbent = manifests["optimization"].suite.candidate.heuristic_configuration
     if incumbent is None:

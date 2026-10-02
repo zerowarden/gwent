@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sqlite3
 from contextlib import closing
 from copy import deepcopy
@@ -10,8 +11,7 @@ from pathlib import Path
 from threading import Lock
 from typing import NoReturn, cast
 
-from gwent_shared import (
-    dump_json,
+from gwent_shared.extract import (
     expect_int,
     expect_mapping,
     expect_sequence,
@@ -77,9 +77,9 @@ MATCH_COLUMNS: tuple[str, ...] = (
 def serialize_stored_match(stored_match: StoredMatch) -> dict[str, object]:
     return {
         "match_id": stored_match.match_id,
-        "state_payload": dump_json(stored_match.state_payload),
-        "event_log_payloads": dump_json(stored_match.event_log_payloads),
-        "player_slots": dump_json(
+        "state_payload": json.dumps(stored_match.state_payload),
+        "event_log_payloads": json.dumps(stored_match.event_log_payloads),
+        "player_slots": json.dumps(
             [
                 {
                     "service_player_id": slot.service_player_id,
@@ -89,7 +89,7 @@ def serialize_stored_match(stored_match: StoredMatch) -> dict[str, object]:
                 for slot in stored_match.player_slots
             ]
         ),
-        "staged_mulligans": dump_json(
+        "staged_mulligans": json.dumps(
             [
                 {
                     "engine_player_id": submission.engine_player_id,

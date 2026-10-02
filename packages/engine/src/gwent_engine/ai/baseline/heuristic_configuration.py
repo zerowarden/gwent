@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import cast, get_type_hints
 
 from gwent_shared.extract import expect_finite_float, expect_mapping
-from gwent_shared.json_payloads import canonical_digest, parse_json_document, to_canonical
+from gwent_shared.json_payloads import canonical_digest, to_canonical
 
 from gwent_engine.ai.baseline.policies import validate_policy_selection
 from gwent_engine.ai.baseline.profile_catalog import (
@@ -18,16 +18,19 @@ from gwent_engine.ai.baseline.profile_catalog import (
     BaseProfileDefinition,
     ProfilePassOverrides,
     ProfileWeightOverrides,
-    resolve_base_profile,
 )
 from gwent_engine.ai.policy import (
     DEFAULT_BASELINE_CONFIG,
+    RANKING_SCOPES,
     ActionBonusConfig,
     BaselineConfig,
     CandidateConfig,
     CandidateScoringConfig,
     EvaluationWeights,
+    MulliganPolicyConfig,
+    MulliganScoreWeights,
     PassConfig,
+    PendingChoicePolicyConfig,
     PolicySelection,
     ProfileTuningConfig,
 )
@@ -46,16 +49,16 @@ class HeuristicConfiguration:
     def __post_init__(self) -> None:
         baseline = _record(self.baseline, BaselineConfig, path="baseline", payload=False)
         profile = _record(self.profile, BaseProfileDefinition, path="profile", payload=False)
+        if baseline.candidates.ranking_scope not in RANKING_SCOPES:
+            raise HeuristicConfigurationError(
+                f"baseline.candidates.ranking_scope must be one of {RANKING_SCOPES}."
+            )
         try:
             validate_policy_selection(profile.policies, context="profile.policies")
         except DefinitionLoadError as error:
             raise HeuristicConfigurationError(str(error)) from error
         object.__setattr__(self, "baseline", baseline)
         object.__setattr__(self, "profile", profile)
-
-    @classmethod
-    def from_profile_id(cls, profile_id: str | None = None) -> HeuristicConfiguration:
-        return cls(profile=resolve_base_profile(profile_id))
 
     @classmethod
     def from_dict(cls, value: object) -> HeuristicConfiguration:
@@ -65,14 +68,6 @@ class HeuristicConfiguration:
             profile=_record(
                 mapping["profile"], BaseProfileDefinition, path="profile", payload=True
             ),
-        )
-
-    @classmethod
-    def from_json(cls, text: str) -> HeuristicConfiguration:
-        return cls.from_dict(
-            parse_json_document(
-                text, context="heuristic configuration", error_factory=HeuristicConfigurationError
-            )
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -96,6 +91,9 @@ _RECORD_TYPES: tuple[type[object], ...] = (
     CandidateScoringConfig,
     PassConfig,
     ProfileTuningConfig,
+    MulliganPolicyConfig,
+    MulliganScoreWeights,
+    PendingChoicePolicyConfig,
     BaseProfileDefinition,
     PolicySelection,
     ProfileWeightOverrides,

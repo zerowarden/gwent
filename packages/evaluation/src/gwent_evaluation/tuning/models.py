@@ -221,11 +221,6 @@ class StudySpec:
         for name in ("resamples", "minimum_blocks"):
             _ = _positive_integer(cast(object, getattr(self.bootstrap, name)), f"bootstrap.{name}")
         _ = expect_int(self.bootstrap.seed, context="bootstrap.seed", error_factory=SpecError)
-        confidence = finite_float(
-            self.bootstrap.confidence_level, context="bootstrap.confidence_level"
-        )
-        if not 0 < confidence < 1:
-            raise SpecError("Bootstrap confidence must lie in (0, 1).")
         self._validate_suites()
         if (
             frozen_configuration_digest(self.parameter_space, self.incumbent)

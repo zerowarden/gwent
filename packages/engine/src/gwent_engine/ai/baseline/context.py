@@ -71,11 +71,8 @@ def classify_context(assessment: DecisionAssessment) -> DecisionContext:
     else:
         tempo = TempoState.EVEN
 
-    preserve_resources = not assessment.is_elimination_round and (
-        assessment.card_advantage >= 0
-        or assessment.round_number == 1
-        or assessment.opponent.hand_count >= assessment.viewer.hand_count
-    )
+    # Every round after the first is an elimination round, so only round one preserves.
+    preserve_resources = not assessment.is_elimination_round
     if assessment.opponent_passed:
         mode = TacticalMode.FINISH_AFTER_PASS
     elif assessment.is_elimination_round:

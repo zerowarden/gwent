@@ -18,7 +18,6 @@ from gwent_service.domain import (
     MatchServiceError,
     MatchVersionConflictError,
     MulliganAlreadySubmittedError,
-    MulliganSelectionError,
     UnknownDeckError,
     UnknownMatchPlayerError,
 )
@@ -233,7 +232,6 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(IllegalActionError)
     @app.exception_handler(MatchPhaseError)
     @app.exception_handler(MulliganAlreadySubmittedError)
-    @app.exception_handler(MulliganSelectionError)
     @app.exception_handler(UnknownDeckError)
     async def _handle_bad_request_errors(
         request: Request,

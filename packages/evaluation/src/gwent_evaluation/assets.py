@@ -9,10 +9,12 @@ from gwent_engine.assets import (
     load_sample_deck_map,
 )
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.decks import DeckDefinition
+from gwent_engine.decks import DeckDefinition, validate_deck
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 from gwent_shared.extract import translate_mapping_key
 from gwent_shared.json_payloads import canonical_digest
+
+from gwent_evaluation.models import SpecError
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +31,15 @@ class ResolvedAssets:
             deck_id,
             lambda _deck_id: ValueError(f"Unknown sample deck id: {deck_id!r}"),
         )
+
+    def require_valid_deck(self, deck_id: str) -> DeckDefinition:
+        """Return a deck that satisfies the official deck rules, or refuse it."""
+        deck = self.deck(deck_id)
+        errors = validate_deck(deck, self.card_registry, self.leader_registry).errors
+        if errors:
+            codes = ", ".join(dict.fromkeys(error.code for error in errors))
+            raise SpecError(f"Deck {deck_id!r} is invalid: {codes}")
+        return deck
 
     def deck_digest(self, deck_id: str) -> str:
         return canonical_digest(self.deck(deck_id))

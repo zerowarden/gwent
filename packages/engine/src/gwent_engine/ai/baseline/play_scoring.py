@@ -31,7 +31,7 @@ from gwent_engine.ai.observation_queries import viewer_hand_definition
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_EVALUATION_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core import AbilityKind, CardType
 from gwent_engine.core.actions import (
     PlayCardAction,
 )
@@ -396,7 +396,7 @@ def _adaptive_horn_commitment_value(
         return profile.action_bonus.invalid_target_penalty
     if projection.projected_net_board_swing <= 0:
         return profile.action_bonus.horn_no_valid_targets_penalty
-    row_summary = _viewer_row_summary(assessment, action.target_row)
+    row_summary = assessment.viewer.row_summary(action.target_row)
     base_value = _horn_base_value(row_summary, profile=profile)
     if row_summary.non_hero_unit_count == 0:
         return base_value
@@ -597,16 +597,6 @@ def _adaptive_unit_commitment_value(
     return 0.0
 
 
-def _viewer_row_summary(
-    assessment: DecisionAssessment,
-    row: Row,
-) -> RowSummary:
-    for summary in assessment.viewer.row_summaries():
-        if summary.row == row:
-            return summary
-    raise ValueError(f"Unknown row: {row!r}")
-
-
 def _horn_base_value(
     row_summary: RowSummary,
     *,
@@ -654,7 +644,7 @@ def _projected_overcommitment_penalty(
     overcommitment. A move only overcommits when it spends materially more than
     is needed to secure the round against the opponent's remaining pressure.
 
-    The rule is stricter than the old excess-gap check:
+    The rule:
     - if the opponent has already passed, the true finish target is just `+1`
     - if the opponent is still live, we first estimate their counter-pressure
       from remaining cards, then add a small "trickery allowance" when their
@@ -711,9 +701,8 @@ def _projected_overcommitment_penalty(
     ):
         trickery_allowance = max(
             1,
-            _estimated_opponent_tempo_per_card(
-                context=context,
-                profile=profile,
+            profile.pass_config.opponent_tempo_per_card(
+                elimination=context.pressure == PressureMode.ELIMINATION
             ),
         )
     true_overcommit_gap_after = required_score_gap_after + trickery_allowance
@@ -764,13 +753,3 @@ def _projected_overcommitment_penalty(
         overcommit_window_active=overcommit_window_active,
         legal_play_count=assessment.legal_play_count,
     )
-
-
-def _estimated_opponent_tempo_per_card(
-    *,
-    context: DecisionContext,
-    profile: HeuristicProfile,
-) -> int:
-    if context.pressure == PressureMode.ELIMINATION:
-        return profile.elimination_estimated_opponent_tempo_per_card
-    return profile.estimated_opponent_tempo_per_card

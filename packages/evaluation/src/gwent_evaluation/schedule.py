@@ -17,12 +17,9 @@ _PLAYER_IDS = (PLAYER_ONE, PLAYER_TWO)
 
 @dataclass(frozen=True, slots=True)
 class ScheduleBlock:
-    """One balanced block: a single opponent, deck pair, and declared root seed."""
+    """One balanced block: legs sharing an opponent, deck pair, and declared root seed."""
 
     block_id: str
-    opponent_agent: AgentSpec
-    deck_pair: tuple[str, str]
-    root_seed: int
     matches: tuple[ScheduledMatch, ...]
 
 
@@ -93,9 +90,6 @@ def _schedule_block(
                 "root_seed": root_seed,
             }
         ),
-        opponent_agent=opponent,
-        deck_pair=(deck_a, deck_b),
-        root_seed=root_seed,
         matches=_block_legs(
             suite=suite,
             opponent=opponent,

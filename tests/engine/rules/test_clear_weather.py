@@ -112,7 +112,7 @@ def test_clear_weather_only_clears_battlefield_weather_zone() -> None:
         card_registry=card_registry,
     )
 
-    assert next_state.battlefield_weather == RowState()
+    assert next_state.weather == RowState()
     assert next_state.card(active_frost_card_id).zone == Zone.DISCARD
     assert next_state.card(active_horn_card_id).zone == Zone.BATTLEFIELD
     assert next_state.card(active_mardroeme_card_id).zone == Zone.BATTLEFIELD

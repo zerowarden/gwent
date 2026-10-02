@@ -1,15 +1,21 @@
 from __future__ import annotations
 
-from gwent_engine.ai.actions import enumerate_legal_actions
+from dataclasses import replace
+
+import pytest
+from gwent_engine.ai.actions import enumerate_legal_actions, filter_non_leave_actions
 from gwent_engine.ai.baseline import DEFAULT_BASELINE_CONFIG, HeuristicBot
 from gwent_engine.ai.baseline.assessment import build_assessment
 from gwent_engine.ai.baseline.context import classify_context
+from gwent_engine.ai.baseline.decision_plan import DecisionPlan, build_decision_plan
 from gwent_engine.ai.baseline.evaluation import explain_action_score
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfigurationError
 from gwent_engine.ai.baseline.profiles import compose_profile
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.turn_actions import enumerate_mulligan_selections
 from gwent_engine.core import GameStatus, Phase, Row
 from gwent_engine.core.actions import (
+    GameAction,
     MulliganSelection,
     PassAction,
     PlayCardAction,
@@ -294,3 +300,81 @@ def test_heuristic_bot_completes_seeded_game_legally() -> None:
         )
 
     assert state.status == GameStatus.MATCH_ENDED
+
+
+def _ranking_scope_plans(*scopes: str) -> tuple[tuple[GameAction, ...], tuple[DecisionPlan, ...]]:
+    units = (
+        "northern_realms_catapult",
+        "northern_realms_ballista",
+        "northern_realms_siege_tower",
+        "northern_realms_trebuchet",
+        "northern_realms_keira_metz",
+        "northern_realms_sile_de_tansarville",
+        "northern_realms_dun_banner_medic",
+        "northern_realms_prince_stennis",
+    )
+    state = (
+        scenario("ranking_scope_with_cheap_spy")
+        .player(
+            "p1",
+            faction="northern_realms",
+            hand=[
+                *(card(f"p1_unit_{index}", unit) for index, unit in enumerate(units)),
+                card("p1_cheap_spy", "northern_realms_thaler"),
+            ],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    legal_actions = enumerate_legal_actions(
+        state, player_id=PLAYER_ONE_ID, card_registry=CARD_REGISTRY
+    )
+    plans = tuple(
+        build_decision_plan(
+            observation,
+            legal_actions,
+            card_registry=CARD_REGISTRY,
+            config=replace(
+                DEFAULT_BASELINE_CONFIG,
+                candidates=replace(DEFAULT_BASELINE_CONFIG.candidates, ranking_scope=scope),
+            ),
+        )
+        for scope in scopes
+    )
+    return legal_actions, plans
+
+
+def test_all_legal_ranking_scope_weighs_actions_the_shortlist_cuts() -> None:
+    legal_actions, (shortlist, all_legal) = _ranking_scope_plans("shortlist", "all_legal")
+    cheap_spy = CardInstanceId("p1_cheap_spy")
+
+    def ranked_cards(plan: DecisionPlan) -> set[CardInstanceId | None]:
+        return {
+            breakdown.action.card_instance_id
+            for breakdown in plan.ranked_actions
+            if isinstance(breakdown.action, PlayCardAction)
+        }
+
+    assert cheap_spy not in ranked_cards(shortlist)
+    assert cheap_spy in ranked_cards(all_legal)
+    assert len(all_legal.ranked_actions) == len(filter_non_leave_actions(legal_actions))
+    assert all_legal.all_candidates == shortlist.all_candidates
+
+
+def test_default_ranking_scope_is_the_shortlist() -> None:
+    _, (default, shortlist) = _ranking_scope_plans(
+        DEFAULT_BASELINE_CONFIG.candidates.ranking_scope, "shortlist"
+    )
+
+    assert default == shortlist
+    assert len(default.ranked_actions) == DEFAULT_BASELINE_CONFIG.candidates.max_candidates
+
+
+def test_unknown_ranking_scope_is_rejected() -> None:
+    config = replace(
+        DEFAULT_BASELINE_CONFIG,
+        candidates=replace(DEFAULT_BASELINE_CONFIG.candidates, ranking_scope="everything"),
+    )
+
+    with pytest.raises(HeuristicConfigurationError, match="ranking_scope"):
+        _ = HeuristicBot(config=config)

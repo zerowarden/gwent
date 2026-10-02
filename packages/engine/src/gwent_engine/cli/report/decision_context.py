@@ -239,10 +239,8 @@ def override_reason(explanation: BotDecisionExplanation | None) -> str | None:
 
 
 def pass_debug_details(explanation: HeuristicDecisionExplanation) -> dict[str, int]:
-    tempo_per_card = (
-        explanation.profile.elimination_estimated_opponent_tempo_per_card
-        if explanation.context.pressure == PressureMode.ELIMINATION
-        else explanation.profile.estimated_opponent_tempo_per_card
+    tempo_per_card = explanation.profile.pass_config.opponent_tempo_per_card(
+        elimination=explanation.context.pressure == PressureMode.ELIMINATION
     )
     estimated_opponent_response = explanation.assessment.opponent.hand_count * tempo_per_card
     required_lead = max(explanation.profile.pass_lead_margin, estimated_opponent_response)

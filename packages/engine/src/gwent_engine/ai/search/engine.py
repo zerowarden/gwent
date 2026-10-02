@@ -11,7 +11,7 @@ from gwent_engine.ai.baseline import BaseProfileDefinition, HeuristicBot, build_
 from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import SearchConfig
-from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
+from gwent_engine.ai.search.candidates import generate_search_candidates
 from gwent_engine.ai.search.simulation import PlayerSimulation, materialize_player_simulation
 from gwent_engine.ai.search.turn_resolution import TurnSearchResolver
 from gwent_engine.ai.search.types import (
@@ -93,7 +93,6 @@ class SearchEngine:
             entry=None,
             apply_elimination_pass_safeguard=True,
             success_notes=(
-                "phase=3",
                 "search_scope=full_turn_same_player_plus_reply",
                 "info_mode=player_safe_simulation",
             ),
@@ -115,7 +114,6 @@ class SearchEngine:
             entry="pending_choice",
             apply_elimination_pass_safeguard=False,
             success_notes=(
-                "phase=3",
                 "entry=pending_choice",
                 "info_mode=player_safe_simulation",
             ),
@@ -136,14 +134,12 @@ class SearchEngine:
             observation,
             card_registry=card_registry,
         )
-        ordered_candidates = order_search_candidates(
-            generate_search_candidates(
-                observation,
-                action_options,
-                config=self.config,
-                card_registry=simulation.card_registry,
-                leader_registry=leader_registry,
-            )
+        ordered_candidates = generate_search_candidates(
+            observation,
+            action_options,
+            config=self.config,
+            card_registry=simulation.card_registry,
+            leader_registry=leader_registry,
         )
         resolver = TurnSearchResolver(
             viewer_player_id=observation.viewer_player_id,
@@ -192,8 +188,8 @@ class SearchEngine:
         leader_registry: LeaderRegistry | None,
         reason: str,
         entry: str | None,
-        candidates: tuple[SearchCandidate, ...] = (),
-        evaluations: tuple[SearchCandidateEvaluation, ...] = (),
+        candidates: tuple[SearchCandidate, ...],
+        evaluations: tuple[SearchCandidateEvaluation, ...],
     ) -> SearchResult:
         chosen_action = (
             self.fallback_policy.choose_pending_choice

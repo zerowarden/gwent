@@ -10,14 +10,16 @@ from gwent_engine.ai.baseline.context import (
     TacticalMode,
     TempoState,
 )
+from gwent_engine.ai.baseline.projection import project_leader_action, project_play_action
 from gwent_engine.ai.baseline.projection.context import viewer_public
 from gwent_engine.ai.observation_queries import viewer_deck_count, viewer_hand_definition
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_TACTICAL_VALUE_POLICY, PassConfig
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType
-from gwent_engine.core.actions import GameAction, PassAction, PlayCardAction, UseLeaderAbilityAction
+from gwent_engine.core.actions import GameAction, PlayCardAction, UseLeaderAbilityAction
 from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.serialize.actions import action_to_id
 
@@ -31,11 +33,9 @@ def should_pass_now(
     if not assessment.legal_pass_available:
         return False
     if context.mode == TacticalMode.ALL_IN:
-        # Final / elimination rounds should not use the generic "protect lead
-        # and preserve resources" pass rule. In these states, passing is only
-        # correct when the opponent has already passed and the current effective
-        # board state is still winning.
-        return assessment.opponent_passed and assessment.score_gap > 0
+        # Elimination rounds never use the generic "protect lead" pass rule; an
+        # opponent pass classifies as FINISH_AFTER_PASS, not ALL_IN.
+        return False
     if assessment.opponent_passed and assessment.score_gap > 0:
         return True
     lead_margin = required_pass_lead(assessment, context=context, config=config)
@@ -46,17 +46,6 @@ def should_pass_now(
     )
 
 
-def should_continue_contesting(
-    assessment: DecisionAssessment,
-    context: DecisionContext,
-    *,
-    config: PassConfig,
-) -> bool:
-    if assessment.is_elimination_round and assessment.score_gap < 0:
-        return True
-    return not should_pass_now(assessment, context, config=config)
-
-
 def minimum_commitment_finish(
     legal_actions: tuple[GameAction, ...],
     *,
@@ -65,22 +54,27 @@ def minimum_commitment_finish(
     card_registry: CardRegistry,
     config: PassConfig,
     viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
+    leader_registry: LeaderRegistry | None = None,
 ) -> GameAction | None:
+    """Cheapest action projected to take the lead by more than the finish buffer.
+
+    Only non-spy unit plays and leader abilities with a projected effect qualify;
+    the projections account for weather, horns, bonds and other row effects.
+    """
     if not assessment.opponent_passed or assessment.score_gap >= 0:
         return None
-    required_points = abs(assessment.score_gap) + 1 + config.minimum_finish_buffer
     finishing_actions = [
         action
         for action in legal_actions
-        if action_commitment_value(
+        if _projects_finish(
             action,
             observation=observation,
+            assessment=assessment,
             card_registry=card_registry,
+            config=config,
             viewer_hand_definitions=viewer_hand_definitions,
-            units_only=True,
-            include_spies=False,
+            leader_registry=leader_registry,
         )
-        >= required_points
     ]
     if not finishing_actions:
         return None
@@ -92,12 +86,56 @@ def minimum_commitment_finish(
                 observation=observation,
                 card_registry=card_registry,
                 viewer_hand_definitions=viewer_hand_definitions,
-                units_only=True,
-                include_spies=False,
             ),
             action_to_id(action),
         ),
     )
+
+
+def _projects_finish(
+    action: GameAction,
+    *,
+    observation: PlayerObservation,
+    assessment: DecisionAssessment,
+    card_registry: CardRegistry,
+    config: PassConfig,
+    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None,
+    leader_registry: LeaderRegistry | None,
+) -> bool:
+    match action:
+        case PlayCardAction(card_instance_id=card_instance_id):
+            if (
+                _committable_unit(
+                    card_instance_id,
+                    observation=observation,
+                    card_registry=card_registry,
+                    viewer_hand_definitions=viewer_hand_definitions,
+                )
+                is None
+            ):
+                return False
+            play = project_play_action(
+                action,
+                observation=observation,
+                card_registry=card_registry,
+                viewer_hand_definitions=viewer_hand_definitions,
+            )
+            return play.projected_score_gap_after > config.minimum_finish_buffer
+        case UseLeaderAbilityAction():
+            leader = project_leader_action(
+                action,
+                observation=observation,
+                card_registry=card_registry,
+                leader_registry=leader_registry,
+            )
+            return (
+                leader is not None
+                and leader.has_effect
+                and assessment.score_gap + leader.projected_net_board_swing
+                > config.minimum_finish_buffer
+            )
+        case _:
+            return False
 
 
 def should_cut_losses_after_pass(
@@ -111,11 +149,9 @@ def should_cut_losses_after_pass(
 ) -> bool:
     """Return whether passing is the only remaining sensible line after a pass.
 
-    The old version compared the visible score gap against flat visible tempo
-    only. That is too pessimistic in rounds where the viewer can still expand
-    the hand with a spy or a decoy-reclaim line. This function now uses a more
-    conservative *reachable upside* estimate: visible commitment plus optimistic
-    draw-enabled follow-up value from the remaining deck.
+    Uses a *reachable upside* estimate: visible commitment plus optimistic
+    draw-enabled follow-up value from the remaining deck, so spy and
+    decoy-reclaim lines that can still expand the hand keep the round alive.
 
     The estimate is intentionally biased against declaring a round hopeless in
     final-round / elimination spots. If the viewer can still increase hand size
@@ -217,8 +253,6 @@ def total_commitment_potential(
                         observation=observation,
                         card_registry=card_registry,
                         viewer_hand_definitions=viewer_hand_definitions,
-                        units_only=True,
-                        include_spies=False,
                     ),
                 )
             case UseLeaderAbilityAction():
@@ -229,8 +263,6 @@ def total_commitment_potential(
                         observation=observation,
                         card_registry=card_registry,
                         viewer_hand_definitions=viewer_hand_definitions,
-                        units_only=True,
-                        include_spies=False,
                     ),
                 )
             case _:
@@ -353,12 +385,9 @@ def _estimated_opponent_response(
     context: DecisionContext,
     config: PassConfig,
 ) -> int:
-    tempo_per_card = (
-        config.elimination_estimated_opponent_tempo_per_card
-        if context.pressure == PressureMode.ELIMINATION
-        else config.estimated_opponent_tempo_per_card
+    return assessment.opponent.hand_count * config.opponent_tempo_per_card(
+        elimination=context.pressure == PressureMode.ELIMINATION
     )
-    return assessment.opponent.hand_count * tempo_per_card
 
 
 def action_commitment_value(
@@ -367,49 +396,41 @@ def action_commitment_value(
     observation: PlayerObservation,
     card_registry: CardRegistry,
     viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
-    leader_value: int = DEFAULT_TACTICAL_VALUE_POLICY.leader_commitment_value,
-    units_only: bool = False,
-    include_spies: bool = True,
 ) -> int:
-    value = 0
+    """Printed strength of a non-spy unit play, or the flat leader estimate."""
     match action:
-        case PassAction():
-            pass
         case UseLeaderAbilityAction():
-            value = leader_value
+            return DEFAULT_TACTICAL_VALUE_POLICY.leader_commitment_value
         case PlayCardAction(card_instance_id=card_instance_id):
-            value = _play_card_commitment_value(
+            definition = _committable_unit(
                 card_instance_id,
                 observation=observation,
                 card_registry=card_registry,
                 viewer_hand_definitions=viewer_hand_definitions,
-                units_only=units_only,
-                include_spies=include_spies,
             )
+            return 0 if definition is None else definition.base_strength
         case _:
-            pass
-    return value
+            return 0
 
 
-def _play_card_commitment_value(
+def _committable_unit(
     card_instance_id: CardInstanceId,
     *,
     observation: PlayerObservation,
     card_registry: CardRegistry,
     viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None,
-    units_only: bool,
-    include_spies: bool,
-) -> int:
+) -> CardDefinition | None:
+    """The hand card's definition when it is a unit that commits points to the viewer's side."""
     definition = viewer_hand_definition(
         card_instance_id,
         observation=observation,
         card_registry=card_registry,
         viewer_hand_definitions=viewer_hand_definitions,
     )
-    if definition is None:
-        return 0
-    if units_only and definition.card_type != CardType.UNIT:
-        return 0
-    if not include_spies and AbilityKind.SPY in definition.ability_kinds:
-        return 0
-    return definition.base_strength
+    if (
+        definition is None
+        or definition.card_type != CardType.UNIT
+        or AbilityKind.SPY in definition.ability_kinds
+    ):
+        return None
+    return definition

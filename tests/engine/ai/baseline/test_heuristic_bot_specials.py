@@ -168,7 +168,7 @@ def test_decoy_scores_above_leader_in_a_reclaimable_spy_spot() -> None:
             leader_id=NILFGAARD_REVEAL_HAND_LEADER_ID,
             gems_remaining=1,
             hand=[card("p1_decoy", "neutral_decoy")],
-            board=rows(ranged=[card("p1_spy_target", "neutral_mysterious_elf", owner="p2")]),
+            board=rows(close=[card("p1_spy_target", "nilfgaard_vattier_de_rideaux", owner="p2")]),
         )
         .player(
             "p2",

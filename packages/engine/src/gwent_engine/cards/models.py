@@ -36,7 +36,6 @@ class CardDefinition:
     generated_only: bool = False
     max_copies_per_deck: int | None = None
     is_hero: bool = False
-    rule_text: str | None = None
 
     def __post_init__(self) -> None:
         self._validate_common_fields()
@@ -56,10 +55,6 @@ class CardDefinition:
         self._validate_optional_non_blank(
             self.bond_group,
             "CardDefinition bond_group cannot be blank when provided.",
-        )
-        self._validate_optional_non_blank(
-            self.rule_text,
-            "CardDefinition rule_text cannot be blank when provided.",
         )
         if self.base_strength < 0:
             raise ValueError("CardDefinition base_strength cannot be negative.")
@@ -222,9 +217,8 @@ class CardDefinition:
     def explicit_copy_limit_violation(self, count: int) -> int | None:
         """Return the authored copy limit exceeded by `count`, if any.
 
-        Asset loading enforces only explicitly authored limits: bundled sample
-        decks intentionally ship more copies than the official rule permits and
-        must remain loadable. Deck validation instead applies
+        Asset loading enforces only explicitly authored limits. Decks are
+        validated by `validate_deck`, which applies
         `effective_max_copies_per_deck`.
         """
 

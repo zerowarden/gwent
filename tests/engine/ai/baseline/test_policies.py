@@ -21,7 +21,7 @@ def test_compose_profile_uses_base_profile_policy_defaults() -> None:
     profile = compose_profile(DEFAULT_BASELINE_CONFIG, assessment, context)
 
     assert profile.scorch_policy.name == "opportunistic_scorch"
-    assert profile.leader_policy == "aggressive"
+    assert profile.policy_names.leader == "aggressive"
 
 
 def test_compose_profile_uses_selected_profile_policy_defaults() -> None:
@@ -41,7 +41,7 @@ def test_compose_profile_uses_selected_profile_policy_defaults() -> None:
     )
 
     assert profile.scorch_policy.name == "reserve_scorch"
-    assert profile.leader_policy == "conservative"
+    assert profile.policy_names.leader == "conservative"
 
 
 def test_reserve_scorch_policy_scores_lower_than_opportunistic_scorch_policy() -> None:
@@ -160,7 +160,7 @@ def test_conservative_leader_policy_discourages_spending_leader_without_pressure
     )
 
     components = leader_policy_components(
-        policy_name=profile.leader_policy,
+        policy_name=profile.policy_names.leader,
         assessment=assessment,
         context=context,
         profile=profile,
@@ -195,7 +195,7 @@ def test_aggressive_leader_policy_scores_higher_under_elimination_pressure() -> 
     preserve_score = sum(
         value
         for _, value in leader_policy_components(
-            policy_name=preserve_profile.leader_policy,
+            policy_name=preserve_profile.policy_names.leader,
             assessment=preserve_assessment,
             context=preserve_context,
             profile=preserve_profile,
@@ -204,7 +204,7 @@ def test_aggressive_leader_policy_scores_higher_under_elimination_pressure() -> 
     tempo_score = sum(
         value
         for _, value in leader_policy_components(
-            policy_name=tempo_profile.leader_policy,
+            policy_name=tempo_profile.policy_names.leader,
             assessment=tempo_assessment,
             context=tempo_context,
             profile=tempo_profile,

@@ -86,8 +86,8 @@ class LeaderActionProjection:
 
     This intentionally models only the deterministic public impact that the AI
     can already audit from observation data. Unsupported leader kinds return
-    `None` from `project_leader_action(...)`, allowing evaluation to fall back
-    to legacy generic leader appetite terms.
+    `None` from `project_leader_action(...)`, and evaluation then uses the
+    generic leader appetite terms.
     """
 
     ability_kind: LeaderAbilityKind

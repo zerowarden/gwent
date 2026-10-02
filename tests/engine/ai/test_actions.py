@@ -1,6 +1,6 @@
-from gwent_engine.ai.actions import enumerate_legal_actions, legal_action_mask
+from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.turn_actions import enumerate_candidate_actions, enumerate_mulligan_selections
-from gwent_engine.core import ChoiceKind, ChoiceSourceKind, Row
+from gwent_engine.core import ChoiceKind, ChoiceSourceKind
 from gwent_engine.core.actions import PlayCardAction, ResolveChoiceAction
 from gwent_engine.core.ids import CardInstanceId, ChoiceId, PlayerId
 from gwent_engine.serialize.actions import action_to_id
@@ -86,31 +86,6 @@ def test_pending_choice_enumeration_returns_only_resolution_actions() -> None:
             selected_card_instance_ids=(CardInstanceId("p1_target_b"),),
         ),
     )
-
-
-def test_legal_action_mask_marks_illegal_candidates_as_zero() -> None:
-    close_unit_card_id = CardInstanceId("p1_close_unit_card")
-    state = (
-        scenario("legal_action_mask")
-        .player(
-            "p1",
-            hand=[card(close_unit_card_id, "scoiatael_mahakaman_defender")],
-        )
-        .build()
-    )
-    legal_actions = enumerate_legal_actions(
-        state,
-        card_registry=CARD_REGISTRY,
-        leader_registry=LEADER_REGISTRY,
-        player_id=PLAYER_ONE_ID,
-    )
-    illegal_action = PlayCardAction(
-        player_id=PLAYER_ONE_ID,
-        card_instance_id=close_unit_card_id,
-        target_row=Row.SIEGE,
-    )
-
-    assert legal_action_mask((*legal_actions, illegal_action), legal_actions)[-1] == 0
 
 
 def test_enumerate_mulligan_selections_covers_empty_and_single_card_options() -> None:

@@ -1,6 +1,15 @@
 from __future__ import annotations
 
+from gwent_engine.ai.actions import filter_non_leave_actions
 from gwent_engine.ai.baseline import HeuristicBot
+from gwent_engine.ai.baseline.assessment import build_assessment
+from gwent_engine.ai.baseline.context import classify_context
+from gwent_engine.ai.baseline.profiles import compose_profile
+from gwent_engine.ai.baseline.special_scoring import (
+    _best_decoy_target,  # pyright: ignore[reportPrivateUsage]
+)
+from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG
 from gwent_engine.core import ChoiceSourceKind
 from gwent_engine.core.actions import (
     PlayCardAction,
@@ -57,6 +66,49 @@ def test_heuristic_bot_chooses_legal_pending_choice_action() -> None:
     assert selected in legal_actions
     assert isinstance(selected, ResolveChoiceAction)
     assert selected.selected_card_instance_ids == (CardInstanceId("p1_spy_target"),)
+
+
+def test_heuristic_bot_resolves_decoy_on_the_target_play_scoring_valued() -> None:
+    state = (
+        scenario("decoy_play_and_resolution_agree")
+        .player(
+            "p1",
+            hand=[card("p1_source_decoy", "neutral_decoy")],
+            board=rows(
+                close=[card("p1_opponent_spy", "nilfgaard_vattier_de_rideaux", owner="p2")],
+                ranged=[card("p1_scorch_exposed", "nilfgaard_black_infantry_archer")],
+            ),
+        )
+        .card_choice(
+            choice_id="pending_choice_1",
+            player_id="p1",
+            source_kind=ChoiceSourceKind.DECOY,
+            source_card_instance_id="p1_source_decoy",
+            legal_target_card_instance_ids=("p1_opponent_spy", "p1_scorch_exposed"),
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    assessment = build_assessment(
+        observation,
+        CARD_REGISTRY,
+        legal_actions=filter_non_leave_actions(legal_actions_for(state, player_id=PLAYER_ONE_ID)),
+    )
+    profile = compose_profile(DEFAULT_BASELINE_CONFIG, assessment, classify_context(assessment))
+    predicted = _best_decoy_target(observation, profile=profile, card_registry=CARD_REGISTRY)
+
+    selected = choose_bot_response(
+        HeuristicBot(),
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        pending_choice=True,
+    )
+
+    assert predicted is not None
+    assert isinstance(selected, ResolveChoiceAction)
+    assert selected.selected_card_instance_ids == (predicted.instance_id,)
+    assert predicted.instance_id == CardInstanceId("p1_scorch_exposed")
 
 
 def test_heuristic_bot_prefers_stronger_medic_pending_choice_target() -> None:

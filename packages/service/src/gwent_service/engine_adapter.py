@@ -28,7 +28,7 @@ from gwent_engine.core.ids import (
     LeaderId,
     PlayerId,
 )
-from gwent_engine.core.randomness import SeededRandom, SupportsRandom
+from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 from gwent_engine.core.validators import (
@@ -71,7 +71,6 @@ class EngineTransitionResult:
 
 @dataclass(frozen=True, slots=True)
 class CardCatalogEntry:
-    definition_id: str
     name: str
     faction: str
     card_type: str
@@ -80,7 +79,6 @@ class CardCatalogEntry:
 
 @dataclass(frozen=True, slots=True)
 class LeaderCatalogEntry:
-    leader_id: str
     name: str
     faction: str
 
@@ -104,12 +102,6 @@ class GwentEngineAdapter:
         }
 
     def create_match_state(self, spec: CreateMatchStateSpec) -> GameState:
-        if len(spec.players) != 2:
-            raise ValueError("CreateMatchStateSpec requires exactly two players.")
-        player_ids = {player.player_id for player in spec.players}
-        if len(player_ids) != len(spec.players):
-            raise ValueError("CreateMatchStateSpec player ids must be unique.")
-
         first_player, second_player = spec.players
         return build_game_state(
             game_id=GameId(spec.game_id),
@@ -217,13 +209,12 @@ class GwentEngineAdapter:
         state: GameState,
         action: GameAction,
         *,
-        rng: SupportsRandom | None = None,
+        rng: SupportsRandom,
     ) -> EngineTransitionResult:
-        resolved_rng = rng if rng is not None else SeededRandom()
         next_state, events = apply_action(
             state,
             action,
-            rng=resolved_rng,
+            rng=rng,
             card_registry=self._card_registry,
             leader_registry=self._leader_registry,
         )
@@ -241,7 +232,6 @@ class GwentEngineAdapter:
     def get_card_entry(self, definition_id: str) -> CardCatalogEntry:
         definition = self._card_registry.get(CardDefinitionId(definition_id))
         return CardCatalogEntry(
-            definition_id=str(definition.definition_id),
             name=definition.name,
             faction=definition.faction.value,
             card_type=definition.card_type.value,
@@ -251,7 +241,6 @@ class GwentEngineAdapter:
     def get_leader_entry(self, leader_id: str) -> LeaderCatalogEntry:
         definition = self._leader_registry.get(LeaderId(leader_id))
         return LeaderCatalogEntry(
-            leader_id=str(definition.leader_id),
             name=definition.name,
             faction=definition.faction.value,
         )
@@ -274,11 +263,7 @@ def _optional_card_instance_id(raw_value: str | None) -> CardInstanceId | None:
     return CardInstanceId(raw_value)
 
 
-def _row(raw_value: str) -> Row:
-    return expect_enum(raw_value, Row, context="action", error_factory=IllegalActionError)
-
-
 def _optional_row(raw_value: str | None) -> Row | None:
     if raw_value is None:
         return None
-    return _row(raw_value)
+    return expect_enum(raw_value, Row, context="action", error_factory=IllegalActionError)

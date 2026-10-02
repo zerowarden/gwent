@@ -3,7 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from gwent_engine.ai.baseline.projection import projected_future_card_value
-from gwent_engine.ai.baseline.projection.context import opponent_public, viewer_public
+from gwent_engine.ai.baseline.projection.context import (
+    opponent_public,
+    viewer_public,
+    visible_battlefield_cards,
+)
+from gwent_engine.ai.baseline.special_scoring import decoy_target_priority_components
 from gwent_engine.ai.observation_queries import (
     is_non_hero_unit,
     viewer_deck_count,
@@ -11,7 +16,7 @@ from gwent_engine.ai.observation_queries import (
     visible_definitions,
 )
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
+from gwent_engine.ai.policy import ActionBonusConfig, PendingChoicePolicyConfig
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, ChoiceSourceKind, LeaderAbilityKind
 from gwent_engine.core.actions import GameAction, ResolveChoiceAction
@@ -47,6 +52,9 @@ def choose_pending_choice_action(
     legal_actions: tuple[GameAction, ...],
     *,
     card_registry: CardRegistry,
+    policy: PendingChoicePolicyConfig,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
     leader_registry: LeaderRegistry | None = None,
 ) -> ResolveChoiceAction:
     pending_choice = observation.visible_pending_choice
@@ -64,6 +72,9 @@ def choose_pending_choice_action(
                 action,
                 observation=observation,
                 card_registry=card_registry,
+                policy=policy,
+                action_bonus=action_bonus,
+                card_advantage_weight=card_advantage_weight,
                 leader_registry=leader_registry,
             ),
             -len(action.selected_card_instance_ids),
@@ -77,14 +88,20 @@ def pending_choice_score(
     *,
     observation: PlayerObservation,
     card_registry: CardRegistry,
+    policy: PendingChoicePolicyConfig,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
     leader_registry: LeaderRegistry | None = None,
-) -> int:
+) -> float:
     return sum(
         value
         for _, value in explain_pending_choice_score_components(
             action,
             observation=observation,
             card_registry=card_registry,
+            policy=policy,
+            action_bonus=action_bonus,
+            card_advantage_weight=card_advantage_weight,
             leader_registry=leader_registry,
         )
     )
@@ -95,11 +112,22 @@ def explain_pending_choice_score_components(
     *,
     observation: PlayerObservation,
     card_registry: CardRegistry,
+    policy: PendingChoicePolicyConfig,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
     leader_registry: LeaderRegistry | None = None,
-) -> tuple[tuple[str, int], ...]:
+) -> tuple[tuple[str, float], ...]:
     pending_choice = observation.visible_pending_choice
     if pending_choice is None:
         raise UnsupportedPendingChoiceError("No visible pending choice to explain.")
+    if pending_choice.source_kind == ChoiceSourceKind.DECOY:
+        return _decoy_choice_score_components(
+            action,
+            observation=observation,
+            card_registry=card_registry,
+            action_bonus=action_bonus,
+            card_advantage_weight=card_advantage_weight,
+        )
     target_definitions = visible_definitions(
         observation,
         card_registry,
@@ -111,6 +139,7 @@ def explain_pending_choice_score_components(
             observation=observation,
             card_registry=card_registry,
             target_definitions=target_definitions,
+            policy=policy,
             leader_registry=leader_registry,
         )
     components = [
@@ -118,6 +147,7 @@ def explain_pending_choice_score_components(
             target_definitions.get(card_id),
             source_kind=pending_choice.source_kind,
             observation=observation,
+            policy=policy,
         )
         for card_id in action.selected_card_instance_ids
     ]
@@ -125,12 +155,34 @@ def explain_pending_choice_score_components(
         (name, sum(component.get(name, 0) for component in components))
         for name in (
             "target_base_strength",
-            "decoy_target_spy_bonus",
-            "decoy_target_medic_bonus",
             "medic_target_spy_bonus",
             "medic_target_medic_bonus",
         )
         if any(component.get(name, 0) for component in components)
+    )
+
+
+def _decoy_choice_score_components(
+    action: ResolveChoiceAction,
+    *,
+    observation: PlayerObservation,
+    card_registry: CardRegistry,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
+) -> tuple[tuple[str, float], ...]:
+    """Score Decoy targets with the priority Decoy play scoring assumed."""
+    selected = set(action.selected_card_instance_ids)
+    return tuple(
+        component
+        for card in visible_battlefield_cards(observation)
+        if card.instance_id in selected
+        for component in decoy_target_priority_components(
+            observation,
+            card,
+            action_bonus=action_bonus,
+            card_advantage_weight=card_advantage_weight,
+            card_registry=card_registry,
+        )
     )
 
 
@@ -140,6 +192,7 @@ def _leader_choice_score_components(
     observation: PlayerObservation,
     card_registry: CardRegistry,
     target_definitions: dict[CardInstanceId, CardDefinition],
+    policy: PendingChoicePolicyConfig,
     leader_registry: LeaderRegistry | None,
 ) -> tuple[tuple[str, int], ...]:
     pending_choice = observation.visible_pending_choice
@@ -154,7 +207,7 @@ def _leader_choice_score_components(
         leader_definition=leader_definition,
         zones=_leader_choice_zones(observation),
     )
-    return _leader_selection_components(leader_definition, selection_score)
+    return _leader_selection_components(leader_definition, selection_score, policy=policy)
 
 
 def _leader_choice_zones(observation: PlayerObservation) -> _LeaderChoiceZones:
@@ -222,10 +275,12 @@ def _add_leader_selection_value(
 def _leader_selection_components(
     leader_definition: LeaderDefinition,
     score: _LeaderSelectionScore,
+    *,
+    policy: PendingChoicePolicyConfig,
 ) -> tuple[tuple[str, int], ...]:
     match leader_definition.ability_kind:
         case LeaderAbilityKind.DISCARD_AND_CHOOSE_FROM_DECK:
-            return _discard_and_choose_components(leader_definition, score)
+            return _discard_and_choose_components(leader_definition, score, policy=policy)
         case LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND:
             return _single_component("leader_return_value", score.own_discard_return_value)
         case LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND:
@@ -237,6 +292,8 @@ def _leader_selection_components(
 def _discard_and_choose_components(
     leader_definition: LeaderDefinition,
     score: _LeaderSelectionScore,
+    *,
+    policy: PendingChoicePolicyConfig,
 ) -> tuple[tuple[str, int], ...]:
     if (
         score.discarded_count != leader_definition.hand_discard_count
@@ -245,7 +302,7 @@ def _discard_and_choose_components(
         return (
             (
                 "leader_invalid_selection_penalty",
-                DEFAULT_PENDING_CHOICE_POLICY.invalid_leader_selection_penalty,
+                policy.invalid_leader_selection_penalty,
             ),
         )
     components: list[tuple[str, int]] = []
@@ -265,53 +322,36 @@ def _target_score_components(
     *,
     source_kind: ChoiceSourceKind,
     observation: PlayerObservation,
+    policy: PendingChoicePolicyConfig,
 ) -> dict[str, int]:
-    """Return explainable value terms for choosing a pending-choice target.
+    """Return explainable value terms for choosing a non-Decoy pending-choice target.
 
     The base-strength term is shared by all target choices, while each choice
-    source adds only the tactical text it can actually exploit. Decoy values
-    replayable Spy/Medic bodies directly; Medic values revived Spies using the
-    viewer's remaining deck size so an empty deck does not create fake draw
-    value.
+    source adds only the tactical text it can actually exploit. Medic values
+    revived Spies using the viewer's remaining deck size so an empty deck does
+    not create fake draw value.
     """
     if definition is None:
         return {}
     components: dict[str, int] = {"target_base_strength": definition.base_strength}
-    match source_kind:
-        case ChoiceSourceKind.DECOY:
-            components.update(_decoy_target_score_components(definition))
-        case ChoiceSourceKind.MEDIC:
-            components.update(_medic_target_score_components(definition, observation))
-        case _:
-            pass
-    return components
-
-
-def _decoy_target_score_components(definition: CardDefinition) -> dict[str, int]:
-    components: dict[str, int] = {}
-    if AbilityKind.SPY in definition.ability_kinds:
-        components["decoy_target_spy_bonus"] = DEFAULT_PENDING_CHOICE_POLICY.decoy_target_spy_bonus
-    if AbilityKind.MEDIC in definition.ability_kinds:
-        components["decoy_target_medic_bonus"] = (
-            DEFAULT_PENDING_CHOICE_POLICY.decoy_target_medic_bonus
-        )
+    if source_kind == ChoiceSourceKind.MEDIC:
+        components.update(_medic_target_score_components(definition, observation, policy))
     return components
 
 
 def _medic_target_score_components(
     definition: CardDefinition,
     observation: PlayerObservation,
+    policy: PendingChoicePolicyConfig,
 ) -> dict[str, int]:
     components: dict[str, int] = {}
     if AbilityKind.SPY in definition.ability_kinds:
-        spy_bonus = DEFAULT_PENDING_CHOICE_POLICY.medic_target_spy_draw_bonus * min(
-            DEFAULT_PENDING_CHOICE_POLICY.medic_target_spy_max_draws,
+        spy_bonus = policy.medic_target_spy_draw_bonus * min(
+            policy.medic_target_spy_max_draws,
             viewer_deck_count(observation),
         )
         if spy_bonus > 0:
             components["medic_target_spy_bonus"] = spy_bonus
     if AbilityKind.MEDIC in definition.ability_kinds:
-        components["medic_target_medic_bonus"] = (
-            DEFAULT_PENDING_CHOICE_POLICY.medic_target_medic_bonus
-        )
+        components["medic_target_medic_bonus"] = policy.medic_target_medic_bonus
     return components

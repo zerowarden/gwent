@@ -18,10 +18,6 @@ def weather_row_for(ability_kind: AbilityKind) -> Row:
     return weather_rows_for(ability_kind)[0]
 
 
-def active_weather_cards(state: GameState) -> tuple[CardInstanceId, ...]:
-    return state.battlefield_weather.all_cards()
-
-
 def clear_weather_cards(
     state: GameState,
     cleared_weather_ids: tuple[CardInstanceId, ...],

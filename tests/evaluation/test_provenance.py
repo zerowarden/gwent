@@ -6,7 +6,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from gwent_evaluation import execution
 from gwent_evaluation.assets import resolve_assets
+from gwent_evaluation.models import SpecError
 from gwent_evaluation.provenance import (
     RepositoryProvenance,
     RuntimeProvenance,
@@ -15,7 +17,7 @@ from gwent_evaluation.provenance import (
 )
 from gwent_shared.json_payloads import canonical_digest, canonical_json
 
-from tests.evaluation.support import REPOSITORY_ROOT
+from tests.evaluation.support import DECK_A, REPOSITORY_ROOT, execute_suite
 
 
 def test_canonical_digest_is_deterministic_and_key_order_independent() -> None:
@@ -102,3 +104,18 @@ def test_deck_digest_changes_with_deck_contents() -> None:
     mutated = replace(deck, card_definition_ids=deck.card_definition_ids[:-1])
 
     assert canonical_digest(deck) != canonical_digest(mutated)
+
+
+def test_run_refuses_an_invalid_deck_before_writing_a_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assets = resolve_assets()
+    deck = assets.deck(DECK_A)
+    truncated = replace(deck, card_definition_ids=deck.card_definition_ids[:10])
+    invalid = replace(assets, decks={**assets.decks, DECK_A: truncated})
+    monkeypatch.setattr(execution, "resolve_assets", lambda: invalid)
+
+    with pytest.raises(SpecError, match=f"Deck '{DECK_A}' is invalid: too_few_unit_cards"):
+        _ = execute_suite(tmp_path / "runs")
+
+    assert not (tmp_path / "runs").exists()

@@ -262,20 +262,12 @@ def enumerate_play_weather_from_deck_actions(
     )
     if not matching_card_ids:
         return (UseLeaderAbilityAction(player_id=player.player_id),)
-    if leader_definition.selection_mode == LeaderSelectionMode.CHOOSE or len(matching_card_ids) > 1:
-        return tuple(
-            UseLeaderAbilityAction(
-                player_id=player.player_id,
-                target_card_instance_id=card_id,
-            )
-            for card_id in matching_card_ids
-        )
-    first_card_id = next(iter(matching_card_ids))
-    return (
+    return tuple(
         UseLeaderAbilityAction(
             player_id=player.player_id,
-            target_card_instance_id=first_card_id,
-        ),
+            target_card_instance_id=card_id,
+        )
+        for card_id in matching_card_ids
     )
 
 

@@ -96,7 +96,7 @@ def test_compose_profile_uses_base_profile_definition() -> None:
     )
 
     assert profile.scorch_policy.name == "opportunistic_scorch"
-    assert profile.leader_policy == "aggressive"
+    assert profile.policy_names.leader == "aggressive"
     assert profile.pass_lead_margin == 9
     assert profile.pass_config.safe_lead_margin == 9
     assert profile.weights.immediate_points > DEFAULT_BASELINE_CONFIG.weights.immediate_points

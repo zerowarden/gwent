@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from gwent_engine.ai.baseline.assessment import DecisionAssessment, PlayerAssessment, RowSummary
+from gwent_engine.ai.baseline.assessment import DecisionAssessment
 from gwent_engine.ai.baseline.context import DecisionContext
 from gwent_engine.ai.baseline.features import weather_row_delta
 from gwent_engine.ai.baseline.profiles import HeuristicProfile
@@ -17,13 +17,15 @@ from gwent_engine.ai.baseline.score_terms import (
     term_detail,
     weighted_term,
 )
+from gwent_engine.ai.observation_queries import is_non_hero_unit
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY
+from gwent_engine.ai.policy import ActionBonusConfig
 from gwent_engine.cards import CardRegistry
-from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core import AbilityKind, CardType
 from gwent_engine.core.actions import (
     PlayCardAction,
 )
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.rules.weather import weather_rows_for
 
@@ -38,21 +40,11 @@ def weather_action_value(
     for row in weather_rows_for(ability_kind):
         if row in assessment.active_weather_rows:
             continue
-        swing += weather_row_delta(_player_row_summary(assessment.opponent, row))
-        swing -= weather_row_delta(_player_row_summary(assessment.viewer, row))
+        swing += weather_row_delta(assessment.opponent.row_summary(row))
+        swing -= weather_row_delta(assessment.viewer.row_summary(row))
     if swing == 0:
         return profile.action_bonus.weather_no_swing_penalty
     return 0.0
-
-
-def _player_row_summary(
-    player_assessment: PlayerAssessment,
-    row: Row,
-) -> RowSummary:
-    for summary in player_assessment.row_summaries():
-        if summary.row == row:
-            return summary
-    raise ValueError(f"Unknown row: {row!r}")
 
 
 def scorch_score_terms(
@@ -216,7 +208,7 @@ def _is_scorch_risk_target(
     if not all_strengths:
         return False
     highest = max(all_strengths)
-    if highest < DEFAULT_FEATURE_POLICY.scorch_threshold:
+    if highest < SCORCH_THRESHOLD:
         return False
     return (
         _visible_battlefield_card_strength(
@@ -295,41 +287,66 @@ def _best_decoy_target(
     profile: HeuristicProfile,
     card_registry: CardRegistry,
 ) -> ObservedCard | None:
-    viewer_side_cards = tuple(
+    """Predict the target Decoy resolution will take: a non-hero unit on the viewer's side."""
+    targets = tuple(
         card
         for card in visible_battlefield_cards(observation)
         if card.battlefield_side == observation.viewer_player_id
+        and is_non_hero_unit(card_registry.get(card.definition_id))
     )
-    if not viewer_side_cards:
+    if not targets:
         return None
     return max(
-        viewer_side_cards,
-        key=lambda card: _decoy_target_priority(
+        targets,
+        key=lambda card: decoy_target_priority(
             observation,
             card,
-            profile=profile,
+            action_bonus=profile.action_bonus,
+            card_advantage_weight=profile.weights.card_advantage,
             card_registry=card_registry,
         ),
     )
 
 
-def _decoy_target_priority(
+def decoy_target_priority(
     observation: PlayerObservation,
     target_card: ObservedCard,
     *,
-    profile: HeuristicProfile,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
     card_registry: CardRegistry,
 ) -> float:
+    """Value of reclaiming `target_card`, shared by Decoy play scoring and resolution."""
+    return sum(
+        value
+        for _, value in decoy_target_priority_components(
+            observation,
+            target_card,
+            action_bonus=action_bonus,
+            card_advantage_weight=card_advantage_weight,
+            card_registry=card_registry,
+        )
+    )
+
+
+def decoy_target_priority_components(
+    observation: PlayerObservation,
+    target_card: ObservedCard,
+    *,
+    action_bonus: ActionBonusConfig,
+    card_advantage_weight: float,
+    card_registry: CardRegistry,
+) -> tuple[tuple[str, float], ...]:
     definition = card_registry.get(target_card.definition_id)
-    score = float(definition.base_strength)
+    components = [("decoy_target_strength", float(definition.base_strength))]
     if AbilityKind.SPY in definition.ability_kinds:
-        score += profile.action_bonus.decoy_spy_reclaim_bonus
+        components.append(("decoy_spy_reclaim", action_bonus.decoy_spy_reclaim_bonus))
     if _is_scorch_risk_target(
         observation,
         target_card.instance_id,
         card_registry=card_registry,
     ):
-        score += profile.action_bonus.decoy_scorch_save_bonus
+        components.append(("decoy_scorch_save", action_bonus.decoy_scorch_save_bonus))
     if target_card.owner != observation.viewer_player_id:
-        score += profile.weights.card_advantage
-    return score
+        components.append(("decoy_opponent_resource_swing", card_advantage_weight))
+    return tuple(components)

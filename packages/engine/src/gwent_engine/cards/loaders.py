@@ -57,7 +57,6 @@ def _build_card_definition(raw_card: object, *, path: Path) -> CardDefinition:
         generated_only=optional_bool(entry, "generated_only", context=context) or False,
         max_copies_per_deck=optional_int(entry, "max_copies_per_deck", context=context),
         is_hero=optional_bool(entry, "is_hero", context=context) or False,
-        rule_text=optional_str(entry, "rule_text", context=context),
     )
 
 

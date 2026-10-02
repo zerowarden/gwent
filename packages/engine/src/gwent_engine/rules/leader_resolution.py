@@ -26,7 +26,7 @@ from gwent_engine.rules.leader_common import (
     resolve_discard_and_choose_from_deck_selection,
     selected_weather_card_in_deck,
 )
-from gwent_engine.rules.players import other_player_from_pair, replace_player
+from gwent_engine.rules.players import other_player_from_state, replace_player
 from gwent_engine.rules.round_continuation import advance_turn_after_action
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.scoring import calculate_effective_strength
@@ -124,7 +124,7 @@ def _resolve_disable_opponent_leader_passives(
         return state, ()
 
     targets_to_disable = frozenset(
-        other_player_from_pair(state.players, player.player_id).player_id for player in disablers
+        other_player_from_state(state, player.player_id).player_id for player in disablers
     )
     updated_players = tuple(
         replace(player, leader=replace(player.leader, disabled=True))
@@ -139,7 +139,7 @@ def _resolve_disable_opponent_leader_passives(
             leader_id=player.leader.leader_id,
             ability_kind=LeaderAbilityKind.DISABLE_OPPONENT_LEADER,
             ability_mode=LeaderAbilityMode.PASSIVE,
-            disabled_player_id=other_player_from_pair(state.players, player.player_id).player_id,
+            disabled_player_id=other_player_from_state(state, player.player_id).player_id,
         )
         for index, player in enumerate(disablers, start=1)
     )
@@ -198,7 +198,7 @@ def _activate_clear_weather_leader(
     leader_registry: LeaderRegistry,
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del action, card_registry, rng, leader_registry
-    cleared_weather_ids = state.battlefield_weather.all_cards()
+    cleared_weather_ids = state.weather.all_cards()
     updated_players, updated_cards = clear_weather_cards(state, cleared_weather_ids)
     events: tuple[GameEvent, ...] = (
         LeaderAbilityResolvedEvent(
@@ -312,7 +312,7 @@ def _activate_scorch_opponent_row_leader(
 ) -> tuple[GameState, tuple[GameEvent, ...]]:
     del action, rng
     assert leader_definition.affected_row is not None
-    opponent = other_player_from_pair(state.players, player.player_id)
+    opponent = other_player_from_state(state, player.player_id)
     affected_row = leader_definition.affected_row
     next_state, destroyed_card_ids, destroy_events = resolve_row_scorch(
         state,
@@ -432,7 +432,7 @@ def _activate_discard_to_hand_leader(
     source = player
     missing_target_message = "Leader target must be a card in your own discard pile."
     if leader_definition.ability_kind == LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND:
-        source = other_player_from_pair(state.players, player.player_id)
+        source = other_player_from_state(state, player.player_id)
         missing_target_message = "Leader target must be a card in the opponent discard pile."
     return _move_discard_card_to_leader_hand(
         state,
@@ -456,7 +456,7 @@ def _activate_reveal_random_opponent_hand_cards_leader(
     del action, card_registry, leader_registry
     if rng is None:
         raise IllegalActionError("Random reveal leader abilities require an injected RNG.")
-    opponent = other_player_from_pair(state.players, player.player_id)
+    opponent = other_player_from_state(state, player.player_id)
     revealed_card_ids = pick_random_card_ids(
         opponent.hand,
         min(len(opponent.hand), leader_definition.reveal_count),

@@ -123,23 +123,6 @@ class BotFamilyDefinition:
             bot_id=bot_id, profile=profile, configuration=configuration, seed=seed
         )
 
-    def build_seeded(
-        self,
-        *,
-        bot_id: str,
-        profile_id: str | None = None,
-        heuristic_configuration: HeuristicConfiguration | None = None,
-        seed: int | None = None,
-    ) -> BotAgent:
-        """Build with the seed applied only when the family declares seed support."""
-
-        return self.build(
-            bot_id=bot_id,
-            profile_id=profile_id,
-            heuristic_configuration=heuristic_configuration,
-            seed=seed if self.accepts_seed else None,
-        )
-
 
 def _construct_random(
     *,
@@ -304,9 +287,10 @@ def create_seeded_bot(
     """Create a bot, applying the seed only when its family supports one."""
 
     family, profile_id = parse_bot_spec(spec)
-    return bot_family(family).build_seeded(
+    definition = bot_family(family)
+    return definition.build(
         bot_id=bot_id,
         profile_id=profile_id,
         heuristic_configuration=heuristic_configuration,
-        seed=seed,
+        seed=seed if definition.accepts_seed else None,
     )

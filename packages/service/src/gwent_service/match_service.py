@@ -15,11 +15,9 @@ from gwent_service.domain import (
     MatchRepository,
     MatchSnapshot,
     MulliganAlreadySubmittedError,
-    MulliganSelectionError,
     StagedMulliganSubmission,
     StoredMatch,
     StoredPlayerSlot,
-    UnknownMatchPlayerError,
 )
 from gwent_service.dto import (
     CreateMatchCommand,
@@ -39,8 +37,7 @@ from gwent_service.engine_adapter import (
 )
 from gwent_service.projections import project_match_for_player
 
-MatchRngFactory = Callable[[int | None, int], SupportsRandom | None]
-Clock = Callable[[], datetime]
+MatchRngFactory = Callable[[int | None, int], SupportsRandom]
 BuildAction = Callable[[MatchSnapshot, StoredPlayerSlot], GameAction]
 
 
@@ -51,12 +48,10 @@ class MatchService:
         adapter: GwentEngineAdapter,
         *,
         rng_factory: MatchRngFactory | None = None,
-        clock: Clock | None = None,
     ) -> None:
         self._repository: MatchRepository = repository
         self._adapter: GwentEngineAdapter = adapter
         self._rng_factory: MatchRngFactory = rng_factory or _default_rng_factory
-        self._clock: Clock = clock or _utc_now
 
     def create_match(
         self,
@@ -88,7 +83,7 @@ class MatchService:
             ),
             rng=self._rng_for_state(initial_state),
         )
-        now = self._clock()
+        now = _utc_now()
         snapshot = MatchSnapshot(
             stored=StoredMatch(
                 match_id=command.match_id,
@@ -114,7 +109,7 @@ class MatchService:
             state=start_transition.next_state,
         )
         _ = self._require_player_slot(snapshot, viewer_service_player_id)
-        self._repository.create(stored_match_from_snapshot(snapshot, adapter=self._adapter))
+        self._repository.create(snapshot.stored)
         return project_match_for_player(
             snapshot,
             viewer_service_player_id,
@@ -147,12 +142,14 @@ class MatchService:
                 engine_player_id=viewer_slot.engine_player_id,
                 card_instance_ids=command.card_instance_ids,
             ),
-            valid_engine_player_ids=frozenset(
-                slot.engine_player_id for slot in snapshot.stored.player_slots
-            ),
         )
-        if not mulligans_are_complete(next_staged_mulligans):
-            updated_snapshot = self._record_staged_mulligans(snapshot, next_staged_mulligans)
+        if len(next_staged_mulligans) < len(snapshot.stored.player_slots):
+            updated_snapshot = MatchSnapshot(
+                stored=_next_version(
+                    replace(snapshot.stored, staged_mulligans=next_staged_mulligans)
+                ),
+                state=snapshot.state,
+            )
             self._save(snapshot, updated_snapshot)
             return project_match_for_player(
                 updated_snapshot,
@@ -251,10 +248,7 @@ class MatchService:
 
     @staticmethod
     def _require_player_slot(snapshot: MatchSnapshot, service_player_id: str) -> StoredPlayerSlot:
-        try:
-            return snapshot.stored.slot_for_service_player(service_player_id)
-        except KeyError as exc:
-            raise UnknownMatchPlayerError(service_player_id, snapshot.stored.match_id) from exc
+        return snapshot.stored.slot_for_service_player(service_player_id)
 
     def _apply_transition(
         self,
@@ -275,39 +269,24 @@ class MatchService:
         staged_mulligans: tuple[StagedMulliganSubmission, ...] | None = None,
     ) -> MatchSnapshot:
         updated_snapshot = MatchSnapshot(
-            stored=replace(
-                snapshot.stored,
-                event_log_payloads=(
-                    snapshot.stored.event_log_payloads
-                    + self._adapter.serialize_events(transition.events)
-                ),
-                staged_mulligans=(
-                    snapshot.stored.staged_mulligans
-                    if staged_mulligans is None
-                    else staged_mulligans
-                ),
-                version=snapshot.stored.version + 1,
-                updated_at=self._clock(),
+            stored=_next_version(
+                replace(
+                    snapshot.stored,
+                    event_log_payloads=(
+                        snapshot.stored.event_log_payloads
+                        + self._adapter.serialize_events(transition.events)
+                    ),
+                    staged_mulligans=(
+                        snapshot.stored.staged_mulligans
+                        if staged_mulligans is None
+                        else staged_mulligans
+                    ),
+                )
             ),
             state=transition.next_state,
         )
         self._save(snapshot, updated_snapshot)
         return updated_snapshot
-
-    def _record_staged_mulligans(
-        self,
-        snapshot: MatchSnapshot,
-        staged_mulligans: tuple[StagedMulliganSubmission, ...],
-    ) -> MatchSnapshot:
-        return MatchSnapshot(
-            stored=replace(
-                snapshot.stored,
-                staged_mulligans=staged_mulligans,
-                version=snapshot.stored.version + 1,
-                updated_at=self._clock(),
-            ),
-            state=snapshot.state,
-        )
 
     def _save(self, previous_snapshot: MatchSnapshot, updated_snapshot: MatchSnapshot) -> None:
         self._repository.update(
@@ -315,30 +294,26 @@ class MatchService:
             expected_version=previous_snapshot.stored.version,
         )
 
-    def _rng_for_state(self, state: GameState) -> SupportsRandom | None:
+    def _rng_for_state(self, state: GameState) -> SupportsRandom:
         return self._rng_factory(state.rng_seed, state.event_counter)
 
 
-def _default_rng_factory(seed: int | None, event_counter: int) -> SupportsRandom | None:
-    if seed is None:
-        return None
-    return SeededRandom(seed + event_counter)
+def _default_rng_factory(seed: int | None, event_counter: int) -> SupportsRandom:
+    return SeededRandom(None if seed is None else seed + event_counter)
 
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _next_version(stored: StoredMatch) -> StoredMatch:
+    return replace(stored, version=stored.version + 1, updated_at=_utc_now())
+
+
 def stage_mulligan_submission(
     staged_mulligans: tuple[StagedMulliganSubmission, ...],
     submission: StagedMulliganSubmission,
-    *,
-    valid_engine_player_ids: frozenset[str],
 ) -> tuple[StagedMulliganSubmission, ...]:
-    if submission.engine_player_id not in valid_engine_player_ids:
-        raise MulliganSelectionError(
-            f"Unknown engine player id {submission.engine_player_id!r} for mulligan staging."
-        )
     if any(staged.engine_player_id == submission.engine_player_id for staged in staged_mulligans):
         raise MulliganAlreadySubmittedError(submission.engine_player_id)
     return (*staged_mulligans, submission)
@@ -350,14 +325,6 @@ def mulligan_submission_map(
     return {
         submission.engine_player_id: submission.card_instance_ids for submission in staged_mulligans
     }
-
-
-def mulligans_are_complete(
-    staged_mulligans: tuple[StagedMulliganSubmission, ...],
-    *,
-    expected_count: int = 2,
-) -> bool:
-    return len(staged_mulligans) == expected_count
 
 
 def snapshot_from_stored_match(

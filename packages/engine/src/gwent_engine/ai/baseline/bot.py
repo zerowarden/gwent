@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Sequence
 from typing import final
 
-from gwent_engine.ai.baseline.assessment import DecisionAssessment, build_assessment
+from gwent_engine.ai.actions import filter_non_leave_actions
+from gwent_engine.ai.baseline.assessment import build_assessment
+from gwent_engine.ai.baseline.context import classify_context
 from gwent_engine.ai.baseline.decision_plan import build_decision_plan
 from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.baseline.pending_choice import choose_pending_choice_action
@@ -13,10 +14,11 @@ from gwent_engine.ai.baseline.profile_catalog import (
     BaseProfileDefinition,
     profile_bot_display_name,
 )
+from gwent_engine.ai.baseline.profiles import compose_profile
 from gwent_engine.ai.mulligan_scoring import best_mulligan_selection
 from gwent_engine.ai.observation_queries import build_viewer_hand_definition_index
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, DEFAULT_MULLIGAN_POLICY, BaselineConfig
+from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     GameAction,
@@ -35,9 +37,6 @@ class HeuristicBot:
         profile_definition: BaseProfileDefinition = DEFAULT_BASE_PROFILE,
         bot_id: str = "heuristic_bot",
     ) -> None:
-        # Keep the configuration codec independent of baseline's eager exports.
-        from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
-
         self._configuration = HeuristicConfiguration(baseline=config, profile=profile_definition)
         self.bot_id = bot_id
         self.display_name = profile_bot_display_name("HeuristicBot", self._configuration.profile)
@@ -58,12 +57,11 @@ class HeuristicBot:
         options = tuple(legal_selections)
         if not options:
             raise ValueError("HeuristicBot requires at least one mulligan selection.")
-        assessment = build_assessment(observation, card_registry)
         return choose_mulligan_selection(
             observation,
             options,
-            assessment=assessment,
             card_registry=card_registry,
+            config=self._configuration.baseline,
         )
 
     def choose_action(
@@ -95,10 +93,23 @@ class HeuristicBot:
         card_registry: CardRegistry,
         leader_registry: LeaderRegistry | None = None,
     ) -> ResolveChoiceAction:
+        actions = tuple(legal_actions)
+        assessment = build_assessment(
+            observation, card_registry, legal_actions=filter_non_leave_actions(actions)
+        )
+        profile = compose_profile(
+            self._configuration.baseline,
+            assessment,
+            classify_context(assessment),
+            base_profile=self._configuration.profile,
+        )
         return choose_pending_choice_action(
             observation,
-            tuple(legal_actions),
+            actions,
             card_registry=card_registry,
+            policy=profile.pending_choice,
+            action_bonus=profile.action_bonus,
+            card_advantage_weight=profile.weights.card_advantage,
             leader_registry=leader_registry,
         )
 
@@ -107,15 +118,15 @@ def choose_mulligan_selection(
     observation: PlayerObservation,
     legal_selections: tuple[MulliganSelection, ...],
     *,
-    assessment: DecisionAssessment,
     card_registry: CardRegistry,
+    config: BaselineConfig,
 ) -> MulliganSelection:
     if not legal_selections:
         raise ValueError("choose_mulligan_selection requires at least one legal selection.")
     return best_mulligan_selection(
         legal_selections,
         build_viewer_hand_definition_index(observation, card_registry),
-        Counter(definition.definition_id for definition in assessment.viewer.hand_definitions),
-        weights=DEFAULT_MULLIGAN_POLICY.baseline,
+        weights=config.mulligan.baseline,
+        policy=config.mulligan,
         prefer_highest_card_ids=True,
     )

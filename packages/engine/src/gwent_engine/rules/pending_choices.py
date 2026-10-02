@@ -196,22 +196,6 @@ def _pending_choice_for_special_play(
     )
 
 
-def maybe_create_pending_choice_for_leader(
-    state: GameState,
-    action: UseLeaderAbilityAction,
-    *,
-    card_registry: CardRegistry,
-    leader_registry: LeaderRegistry,
-) -> PendingChoice | None:
-    player = state.player(action.player_id)
-    return create_pending_choice_for_leader(
-        state,
-        player,
-        card_registry=card_registry,
-        leader_registry=leader_registry,
-    )
-
-
 def resolve_pending_choice(
     state: GameState,
     action: ResolveChoiceAction,
@@ -361,7 +345,7 @@ def _validate_single_card_selection(
     *,
     invalid_count_message: str,
 ) -> None:
-    _ = validate_selection_count(
+    validate_selection_count(
         action.selected_card_instance_ids,
         min_selections=1,
         max_selections=1,
@@ -390,7 +374,6 @@ def _build_pending_choice(
     legal_target_card_instance_ids: tuple[CardInstanceId, ...] = (),
     min_selections: int = 1,
     max_selections: int = 1,
-    source_row: Row | None = None,
 ) -> PendingChoice:
     return PendingChoice(
         choice_id=_pending_choice_id(
@@ -407,5 +390,4 @@ def _build_pending_choice(
         legal_target_card_instance_ids=legal_target_card_instance_ids,
         min_selections=min_selections,
         max_selections=max_selections,
-        source_row=source_row,
     )

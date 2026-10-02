@@ -17,9 +17,9 @@ from gwent_engine.ai.baseline.projection.context import (
 )
 from gwent_engine.ai.baseline.projection.models import PublicBoardProjection, ScorchImpact
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.rules.row_effects import special_ability_kind
 
@@ -110,8 +110,8 @@ class BattlefieldProjectionResolver:
             ProjectedBattlefieldCard(
                 definition=self.card_registry.get(card.definition_id),
                 owner=card.owner,
-                battlefield_side=card.battlefield_side or self.observation.viewer_player_id,
-                row=card.row or Row.CLOSE,
+                battlefield_side=card.battlefield_side,
+                row=card.row,
             )
             for card in visible_battlefield_cards(self.observation)
             if card.row is not None and card.battlefield_side is not None
@@ -165,7 +165,7 @@ class BattlefieldProjectionResolver:
         if not strengths:
             return cards
         highest = max(strengths.values())
-        if highest < DEFAULT_FEATURE_POLICY.scorch_threshold:
+        if highest < SCORCH_THRESHOLD:
             return cards
         destroyed_indexes = {index for index, strength in strengths.items() if strength == highest}
         return self.resolve_destruction(cards, destroyed_indexes=destroyed_indexes)
@@ -197,7 +197,7 @@ class BattlefieldProjectionResolver:
             )
             for index in row_indexes
         )
-        if row_total < DEFAULT_FEATURE_POLICY.scorch_threshold:
+        if row_total < SCORCH_THRESHOLD:
             return cards
         strengths = {
             index: effective_card_strength(

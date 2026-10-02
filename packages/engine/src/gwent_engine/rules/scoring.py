@@ -13,7 +13,7 @@ from gwent_engine.rules.leader_common import (
     any_enabled_passive_leader_has_ability,
     player_has_enabled_passive_leader_ability,
 )
-from gwent_engine.rules.weather import active_weather_cards, weather_card_affects_row
+from gwent_engine.rules.weather import weather_card_affects_row
 
 _ROW_SCORE_CONTEXT_CACHE_PREFIX = "row_score_context"
 
@@ -299,7 +299,7 @@ def _build_row_score_context(
 
 
 def _weathered_rows(state: GameState, card_registry: CardRegistry) -> frozenset[Row]:
-    weather_card_ids = active_weather_cards(state)
+    weather_card_ids = state.weather.all_cards()
     return frozenset(
         row
         for row in Row

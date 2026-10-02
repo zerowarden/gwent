@@ -28,10 +28,10 @@ from gwent_evaluation.models import (
     AgentSpec,
     BotFamily,
     SchedulingPolicy,
+    SpecError,
     SuitePurpose,
     SuiteSpec,
 )
-from gwent_evaluation.models import SpecError as SpecError
 
 type AgentResolver = Callable[[str], AgentSpec]
 
