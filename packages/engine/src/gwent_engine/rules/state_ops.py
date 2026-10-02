@@ -1,7 +1,7 @@
 from dataclasses import replace
 
 from gwent_engine.core import Row, Zone
-from gwent_engine.core.config import MAX_HAND_SIZE
+from gwent_engine.core.enums import MAX_HAND_SIZE
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
 from gwent_engine.rules.players import replace_player

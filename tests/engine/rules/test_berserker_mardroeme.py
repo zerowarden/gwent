@@ -7,12 +7,13 @@ from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.scoring import calculate_effective_strength
 
+from tests.support import PLAYER_ONE_ID
+
 from ..scenario_builder import card, rows, scenario
 from ..support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
     NILFGAARD_RAIN_FROM_DECK_LEADER_ID,
-    PLAYER_ONE_ID,
     SKELLIGE_KING_BRAN_LEADER_ID,
 )
 

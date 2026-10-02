@@ -17,13 +17,17 @@ from gwent_engine.ai.baseline.projection.board import (
 )
 from gwent_engine.ai.baseline.projection.context import active_weather_rows, viewer_public
 from gwent_engine.ai.baseline.projection.models import ProjectedRowState, PublicBoardProjection
+from gwent_engine.ai.observation_queries import (
+    is_non_hero_unit,
+    viewer_deck_count,
+    viewer_deck_definitions,
+)
 from gwent_engine.ai.observations import ObservedCard, PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
-from gwent_engine.ai.utils import is_non_hero_unit, viewer_deck_count, viewer_deck_definitions
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
-from gwent_engine.rules.battlefield_effects import is_weather_ability, weather_rows_for
 from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.rules.weather import is_weather_ability, weather_rows_for
 
 
 def projected_future_card_value(

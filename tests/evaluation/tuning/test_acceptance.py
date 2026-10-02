@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from gwent_engine.ai.arena.catalog import load_policy_bot
 from gwent_engine.ai.baseline.bot import HeuristicBot
-from gwent_engine.ai.policy_artifacts import PolicyArtifact, PolicyStatus
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact, PolicyStatus
 from gwent_evaluation import execution
 from gwent_evaluation.agents import candidate_from_artifact
 from gwent_evaluation.execution import EvidencePolicy, execute_case, execute_run
@@ -18,7 +18,7 @@ from gwent_evaluation.tuning.selection import finalize_study, select_challenger
 from gwent_evaluation.tuning.sensitivity import SensitivityReport
 from gwent_evaluation.tuning.study import StudyResult, run_study
 
-from tests.engine.ai.test_policy_artifacts import decision_plan
+from tests.engine.ai.support import verified_decision_plan
 from tests.evaluation.support import REPOSITORY_ROOT
 from tests.evaluation.tuning.test_selection import Experiment
 from tests.evaluation.tuning.test_selection import experiment as experiment
@@ -102,9 +102,9 @@ def test_synthetic_confirmation_exports_nondefault_policy_for_actual_m1_reproduc
     assert artifact.configuration.digest() != experiment.study.incumbent.digest()
     bot = load_policy_bot(artifact_path, bot_id="reloaded")
     assert isinstance(bot, HeuristicBot)
-    assert decision_plan(bot).chosen_action is not None
+    assert verified_decision_plan(bot).chosen_action is not None
 
-    # Evaluate the exported configuration through M1's actual match loop.
+    # Evaluate the exported configuration through the evaluation match loop.
     monkeypatch.setattr(execution, "execute_case", execute_case)
     base = experiment.study.optimization.suite
     suite = replace(
@@ -123,7 +123,7 @@ def test_synthetic_confirmation_exports_nondefault_policy_for_actual_m1_reproduc
         evidence_policy=EvidencePolicy.ALL,
     )
     assert run.report.failed_matches == 0 and run.report.missing_matches == 0
-    # Full configuration lives in M1; reproducing does not consult the artifact.
+    # The run manifest records the full configuration; replay does not consult the artifact.
     artifact_path.unlink()
     outcome = reproduce_case(run.root, run.results[0].case_id, repository_root=REPOSITORY_ROOT)
     assert outcome.execution_identity_matches and outcome.semantics_reproduced

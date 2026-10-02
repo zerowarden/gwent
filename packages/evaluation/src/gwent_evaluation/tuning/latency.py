@@ -4,13 +4,13 @@ from pathlib import Path
 from time import perf_counter
 
 from gwent_engine.ai.arena.catalog import create_bot
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.serialize.actions import action_from_id
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.execution import validate_run_environment
-from gwent_evaluation.provenance import canonical_digest
-from gwent_evaluation.storage import RunStore
+from gwent_evaluation.storage import RunConflictError, RunStore
 from gwent_evaluation.tuning.models import StudySpec
 from gwent_evaluation.tuning.sensitivity import sample_observations
 from gwent_evaluation.tuning.storage import read_checked_document, write_checked_document
@@ -78,7 +78,5 @@ def load_latency(root: Path, study: StudySpec) -> dict[str, object] | None:
         return None
     payload = read_checked_document(root / "latency.json")
     if payload["study_digest"] != study.digest():
-        from gwent_evaluation.storage import RunConflictError
-
         raise RunConflictError("Latency diagnostics belong to another study.")
     return dict(payload)

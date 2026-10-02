@@ -48,12 +48,8 @@ from gwent_engine.serialize import (
 )
 
 from tests.engine.scenario_builder import card, rows, scenario
-from tests.engine.support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    run_scripted_round,
-)
+from tests.engine.support import CARD_REGISTRY, run_scripted_round
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_game_state_serialization_roundtrip() -> None:

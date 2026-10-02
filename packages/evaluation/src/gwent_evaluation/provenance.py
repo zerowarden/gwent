@@ -8,16 +8,13 @@ from importlib.metadata import distributions
 from importlib.util import find_spec
 from pathlib import Path
 
-from gwent_shared.digests import (
-    canonical_hexdigest as canonical_hexdigest,
-)
-from gwent_shared.digests import (
+from gwent_shared.json_payloads import (
+    DIGEST_PREFIX,
+    canonical_digest,
     seed_from_text,
     sha256_bytes_hexdigest,
 )
-from gwent_shared.json_payloads import canonical_json as canonical_json
 
-DIGEST_PREFIX = "sha256:"
 SEED_DERIVATION_VERSION = 1
 
 _LOCKFILE_NAME = "uv.lock"
@@ -45,10 +42,6 @@ class RuntimeProvenance:
     python_implementation: str
     python_version: str
     packages: tuple[tuple[str, str | None], ...]
-
-
-def canonical_digest(payload: object) -> str:
-    return DIGEST_PREFIX + canonical_hexdigest(payload)
 
 
 def derive_seed(*, namespace: str, identity: str, root_seed: int) -> int:

@@ -4,9 +4,9 @@ from gwent_engine.core.events import UnitScorchResolvedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_unit_row_scorch_uses_only_the_mirrored_opponent_row_and_respects_hero_immunity() -> None:

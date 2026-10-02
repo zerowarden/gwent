@@ -11,34 +11,40 @@ from gwent_engine.ai.baseline import (
     BaseProfileDefinition,
     get_base_profile_definition,
 )
-from gwent_engine.ai.debug import DecisionExplainer
+from gwent_engine.ai.baseline.explain import DecisionExplainer
 from gwent_engine.ai.observations import PlayerObservation, build_player_observation
-from gwent_engine.ai.search import (
-    DEFAULT_SEARCH_CONFIG,
-    SearchDecisionExplanation,
-    build_search_engine,
+from gwent_engine.ai.policy import DEFAULT_SEARCH_CONFIG
+from gwent_engine.ai.search import SearchDecisionExplanation, build_search_engine
+from gwent_engine.assets import (
+    load_card_registry,
+    load_leader_registry,
+    load_sample_deck_map,
+    load_sample_decks,
 )
-from gwent_engine.cards import CardRegistry, DeckDefinition
-from gwent_engine.cli.card_metadata import build_card_metadata_maps
+from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.cli.models import (
     BotDecisionExplanation,
+    CardMetadata,
     CliMatchExecutionError,
     CliMetadata,
     CliRun,
 )
 from gwent_engine.cli.recording import CliMatchRecorder
 from gwent_engine.core.actions import GameAction
-from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, DeckId, GameId, PlayerId
+from gwent_engine.core.enums import AbilityKind
+from gwent_engine.core.ids import (
+    PLAYER_ONE,
+    PLAYER_TWO,
+    CardInstanceId,
+    DeckId,
+    GameId,
+    PlayerId,
+)
 from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.state import GameState
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 from gwent_engine.rules.scoring import battlefield_effective_strengths
-from gwent_engine.runtime_assets import (
-    load_card_registry,
-    load_leader_registry,
-    load_sample_deck_map,
-    load_sample_decks,
-)
 
 DEFAULT_PLAYER_ONE_DECK_ID_STR = "monsters_hs_373"
 DEFAULT_PLAYER_TWO_DECK_ID_STR = "nilfgaard_optimised"
@@ -111,15 +117,6 @@ def run_bot_match_cli(
     if not execution.completed or final_state is None:
         raise CliMatchExecutionError(execution)
     state = final_state
-    (
-        card_names_by_instance_id,
-        card_values_by_instance_id,
-        card_kinds_by_instance_id,
-        card_spy_by_instance_id,
-        card_medic_by_instance_id,
-        card_horn_by_instance_id,
-        card_scorch_by_instance_id,
-    ) = build_card_metadata_maps(state, card_registry=card_registry)
     final_strengths_by_instance_id = battlefield_effective_strengths(
         state,
         card_registry=card_registry,
@@ -166,13 +163,7 @@ def run_bot_match_cli(
         ),
         pending_choice_state=recorder.pending_choice_state,
         final_state=state,
-        card_names_by_instance_id=card_names_by_instance_id,
-        card_values_by_instance_id=card_values_by_instance_id,
-        card_kinds_by_instance_id=card_kinds_by_instance_id,
-        card_spy_by_instance_id=card_spy_by_instance_id,
-        card_medic_by_instance_id=card_medic_by_instance_id,
-        card_horn_by_instance_id=card_horn_by_instance_id,
-        card_scorch_by_instance_id=card_scorch_by_instance_id,
+        cards=build_card_metadata(state, card_registry=card_registry),
         final_strengths_by_instance_id=final_strengths_by_instance_id,
     )
 
@@ -287,3 +278,38 @@ def _search_explanation(
         )
     )
     return search_engine.explain_result(result)
+
+
+def build_card_metadata(
+    state: GameState,
+    *,
+    card_registry: CardRegistry,
+) -> dict[CardInstanceId, CardMetadata]:
+    return {
+        card.instance_id: _card_metadata(card_registry.get(card.definition_id))
+        for card in state.card_instances
+    }
+
+
+def _card_metadata(definition: CardDefinition) -> CardMetadata:
+    abilities = definition.ability_kinds
+    return CardMetadata(
+        name=definition.name,
+        base_value=definition.base_strength,
+        kind=_card_kind(definition),
+        is_spy=AbilityKind.SPY in abilities,
+        is_medic=AbilityKind.MEDIC in abilities,
+        is_horn=(
+            AbilityKind.COMMANDERS_HORN in abilities
+            or AbilityKind.UNIT_COMMANDERS_HORN in abilities
+        ),
+        is_scorch=AbilityKind.SCORCH in abilities or AbilityKind.UNIT_SCORCH_ROW in abilities,
+    )
+
+
+def _card_kind(definition: CardDefinition) -> str:
+    if definition.is_hero:
+        return "hero"
+    if definition.card_type.value == "special":
+        return "special"
+    return "unit"

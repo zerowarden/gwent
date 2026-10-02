@@ -1,15 +1,31 @@
+from dataclasses import replace
+
+from gwent_engine.ai.actions import enumerate_legal_actions
+from gwent_engine.ai.baseline import HeuristicBot
 from gwent_engine.ai.baseline.assessment import DecisionAssessment, PlayerAssessment, RowSummary
+from gwent_engine.ai.baseline.decision_plan import DecisionPlan, build_decision_plan
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact, PolicyStatus
+from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.cards.models import CardRegistry
 from gwent_engine.core import ChoiceSourceKind, GameStatus, Phase, Row
-from gwent_engine.core.ids import PlayerId
+from gwent_engine.core.actions import PlayCardAction
+from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.state import GameState
+
+from tests.support import PLAYER_ONE_ID
 
 from ..scenario_builder import ScenarioCard, ScenarioRows, card, rows, scenario
 from ..support import (
+    CARD_REGISTRY,
+    LEADER_REGISTRY,
     NILFGAARD_WHITE_FLAME_LEADER_ID,
     NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
     NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID,
     SCOIATAEL_AGILE_OPTIMIZER_LEADER_ID,
     SCOIATAEL_FROST_FROM_DECK_LEADER_ID,
+    choose_bot_response,
+    legal_actions_for,
 )
 
 ScenarioCards = tuple[ScenarioCard, ...] | list[ScenarioCard]
@@ -73,7 +89,7 @@ def make_assessment(
         passed=opponent_passed,
     )
     return DecisionAssessment(
-        viewer_player_id=PlayerId("p1"),
+        viewer_player_id=PLAYER_ONE_ID,
         phase=Phase.IN_ROUND,
         status=GameStatus.IN_PROGRESS,
         round_number=1,
@@ -424,4 +440,64 @@ def make_final_round_cow_setup_state() -> GameState:
             ],
         )
         .build()
+    )
+
+
+def sample_policy_artifact() -> PolicyArtifact:
+    """Unpromoted artifact whose configuration differs from the default in one weight."""
+
+    default = HeuristicConfiguration()
+    configuration = replace(
+        default,
+        baseline=replace(
+            default.baseline, weights=replace(default.baseline.weights, immediate_points=3.125)
+        ),
+    )
+    return PolicyArtifact(
+        configuration,
+        PolicyStatus.UNPROMOTED,
+        "study",
+        "selection",
+        "evidence",
+        "commit",
+        "implementation",
+    )
+
+
+def verified_decision_plan(bot: HeuristicBot) -> DecisionPlan:
+    """Round-three decision plan, asserting the bot's live choice matches it."""
+
+    state = make_round_three_visible_win_state()
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    actions = legal_actions_for(state, player_id=PLAYER_ONE_ID, leader_registry=LEADER_REGISTRY)
+    plan = build_decision_plan(
+        observation,
+        actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+        config=bot.configuration.baseline,
+        profile_definition=bot.configuration.profile,
+    )
+    assert (
+        choose_bot_response(bot, state, player_id=PLAYER_ONE_ID, leader_registry=LEADER_REGISTRY)
+        == plan.chosen_action
+    )
+    return plan
+
+
+def play_action_for(
+    state: GameState,
+    *,
+    card_registry: CardRegistry,
+    card_instance_id: CardInstanceId,
+) -> PlayCardAction:
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=card_registry,
+    )
+    return next(
+        action
+        for action in legal_actions
+        if isinstance(action, PlayCardAction) and action.card_instance_id == card_instance_id
     )

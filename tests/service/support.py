@@ -6,29 +6,34 @@ from datetime import UTC, datetime
 from gwent_engine.core import ChoiceSourceKind
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import game_state_to_dict
-from gwent_service.application.commands import (
-    CreateMatchCommand,
-    CreateMatchParticipantCommand,
-    SubmitMulliganCommand,
-)
-from gwent_service.application.match_service import MatchService
-from gwent_service.domain.models import (
+from gwent_service.domain import (
+    MatchRepository,
     StagedMulliganSubmission,
     StoredMatch,
     StoredPlayerSlot,
 )
-from gwent_service.domain.repositories import MatchRepository
-from gwent_service.engine.adapter import GwentEngineAdapter
-from gwent_service.infrastructure.memory_repo import InMemoryMatchRepository
+from gwent_service.dto import (
+    CreateMatchCommand,
+    CreateMatchParticipantCommand,
+    SubmitMulliganCommand,
+)
+from gwent_service.engine_adapter import GwentEngineAdapter
+from gwent_service.match_service import MatchService
+from gwent_service.persistence import InMemoryMatchRepository
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, rows, scenario
-from tests.support import IdentityShuffle
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
+
+ALICE = "alice"
+BOB = "bob"
+ALICE_DECK_ID = "monsters_muster_swarm_strict"
+BOB_DECK_ID = "nilfgaard_spy_medic_control_strict"
+DEFAULT_RNG_SEED = 7
 
 
-def identity_rng_factory(seed: int | None, event_counter: int) -> IdentityShuffle:
+def identity_rng_factory(seed: int | None, event_counter: int) -> IdentityRandom:
     del seed, event_counter
-    return IdentityShuffle()
+    return IdentityRandom()
 
 
 def build_service() -> tuple[MatchService, InMemoryMatchRepository]:
@@ -83,8 +88,12 @@ def build_stored_match(
         ),
         event_log_payloads=event_log_payloads,
         player_slots=(
-            StoredPlayerSlot(service_player_id="alice", engine_player_id="p1", deck_id="deck_one"),
-            StoredPlayerSlot(service_player_id="bob", engine_player_id="p2", deck_id="deck_two"),
+            StoredPlayerSlot(
+                service_player_id=ALICE, engine_player_id=str(PLAYER_ONE_ID), deck_id="deck_one"
+            ),
+            StoredPlayerSlot(
+                service_player_id=BOB, engine_player_id=str(PLAYER_TWO_ID), deck_id="deck_two"
+            ),
         ),
         staged_mulligans=staged_mulligans,
         version=version,
@@ -96,21 +105,21 @@ def build_stored_match(
 def build_create_match_command(
     *,
     match_id: str = "service_match",
-    alice_deck_id: str = "monsters_muster_swarm_strict",
-    bob_deck_id: str = "nilfgaard_spy_medic_control_strict",
-    rng_seed: int | None = 7,
+    alice_deck_id: str = ALICE_DECK_ID,
+    bob_deck_id: str = BOB_DECK_ID,
+    rng_seed: int | None = DEFAULT_RNG_SEED,
 ) -> CreateMatchCommand:
     return CreateMatchCommand(
         match_id=match_id,
         participants=(
             CreateMatchParticipantCommand(
-                service_player_id="alice",
-                engine_player_id="p1",
+                service_player_id=ALICE,
+                engine_player_id=str(PLAYER_ONE_ID),
                 deck_id=alice_deck_id,
             ),
             CreateMatchParticipantCommand(
-                service_player_id="bob",
-                engine_player_id="p2",
+                service_player_id=BOB,
+                engine_player_id=str(PLAYER_TWO_ID),
                 deck_id=bob_deck_id,
             ),
         ),
@@ -121,9 +130,9 @@ def build_create_match_command(
 def build_started_match(
     *,
     match_id: str = "service_match",
-    alice_deck_id: str = "monsters_muster_swarm_strict",
-    bob_deck_id: str = "nilfgaard_spy_medic_control_strict",
-    rng_seed: int | None = 7,
+    alice_deck_id: str = ALICE_DECK_ID,
+    bob_deck_id: str = BOB_DECK_ID,
+    rng_seed: int | None = DEFAULT_RNG_SEED,
 ) -> tuple[MatchService, InMemoryMatchRepository]:
     service, repository = build_service()
     _ = service.create_match(
@@ -133,7 +142,7 @@ def build_started_match(
             bob_deck_id=bob_deck_id,
             rng_seed=rng_seed,
         ),
-        viewer_service_player_id="alice",
+        viewer_service_player_id=ALICE,
     )
     resolve_empty_mulligans(service, match_id=match_id)
     return service, repository
@@ -187,14 +196,14 @@ def resolve_empty_mulligans(service: MatchService, *, match_id: str) -> None:
     _ = service.submit_mulligan(
         SubmitMulliganCommand(
             match_id=match_id,
-            service_player_id="alice",
+            service_player_id=ALICE,
             card_instance_ids=(),
         )
     )
     _ = service.submit_mulligan(
         SubmitMulliganCommand(
             match_id=match_id,
-            service_player_id="bob",
+            service_player_id=BOB,
             card_instance_ids=(),
         )
     )

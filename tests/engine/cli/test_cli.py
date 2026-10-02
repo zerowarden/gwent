@@ -4,22 +4,36 @@ from typing import cast
 
 import pytest
 from gwent_engine.ai.search import SearchDecisionExplanation
-from gwent_engine.cli.args import parse_args
 from gwent_engine.cli.bot_matches import (
     available_leaders,
     available_sample_decks,
     run_bot_match_cli,
 )
 from gwent_engine.cli.interactive import BotMatchSelection
-from gwent_engine.cli.main import main
-from gwent_engine.cli.models import CliRun
+from gwent_engine.cli.main import main, parse_args
+from gwent_engine.cli.models import CardMetadata, CliRun
 from gwent_engine.cli.presenters import summarize_event
+from gwent_engine.cli.report import write_bot_match_review
 from gwent_engine.cli.report.models import build_report_context
 from gwent_engine.core import AbilityKind
 from gwent_engine.core.events import SpecialCardResolvedEvent
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId
+
+from tests.support import PLAYER_TWO_ID
 
 type WriteBotMatchReview = Callable[..., Path]
+
+
+def _card_metadata(name: str, base_value: int) -> CardMetadata:
+    return CardMetadata(
+        name=name,
+        base_value=base_value,
+        kind="unit",
+        is_spy=False,
+        is_medic=False,
+        is_horn=False,
+        is_scorch=False,
+    )
 
 
 def test_summarize_event_surfaces_global_scorch_targets() -> None:
@@ -29,18 +43,14 @@ def test_summarize_event_surfaces_global_scorch_targets() -> None:
     summary = summarize_event(
         SpecialCardResolvedEvent(
             event_id=14,
-            player_id=PlayerId("p2"),
+            player_id=PLAYER_TWO_ID,
             card_instance_id=scorch_card_id,
             ability_kind=AbilityKind.SCORCH,
             discarded_card_instance_ids=(scorched_card_id, scorch_card_id),
         ),
-        card_names_by_instance_id={
-            scorch_card_id: "Scorch",
-            scorched_card_id: "Catapult",
-        },
-        card_values_by_instance_id={
-            scorch_card_id: 0,
-            scorched_card_id: 8,
+        cards={
+            scorch_card_id: _card_metadata("Scorch", 0),
+            scorched_card_id: _card_metadata("Catapult", 8),
         },
     )
 
@@ -233,3 +243,34 @@ def _fake_write_bot_match_review(report_path: Path) -> WriteBotMatchReview:
         return report_path
 
     return fake_write_bot_match_review
+
+
+def test_write_bot_match_review_renders_diagnostic_panels(tmp_path: Path) -> None:
+    run = run_bot_match_cli(
+        player_one_bot_spec="heuristic:neutral",
+        player_two_bot_spec="greedy",
+        seed=5,
+        include_bot_explanations=True,
+    )
+
+    report_path = write_bot_match_review(
+        run,
+        player_one_bot_spec="heuristic:neutral",
+        player_two_bot_spec="greedy",
+        seed=5,
+        output_dir=tmp_path,
+    )
+    html = report_path.read_text(encoding="utf-8")
+    audit = (report_path.parent / "report.json").read_text(encoding="utf-8")
+
+    for marker in (
+        'id="match-trace"',
+        'class="action-badge"',
+        "Mulligan Review",
+        "Bot Debug",
+        "round-summary-panel",
+        "Board State at",
+        'id="match-timeline"',
+    ):
+        assert marker in html
+    assert '"step_kind"' in audit

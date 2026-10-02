@@ -5,12 +5,10 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.scoring import calculate_player_score
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-)
+from ..support import CARD_REGISTRY
 
 
 def test_spy_is_played_to_opponent_side_and_draws_up_to_two_cards() -> None:

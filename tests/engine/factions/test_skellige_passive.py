@@ -11,17 +11,12 @@ from gwent_engine.core.events import (
 )
 from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
 from gwent_engine.core.reducer import apply_action
-from gwent_engine.factions.passives import resolve_round_start_passives
+from gwent_engine.rules.faction_passives import resolve_round_start_passives
+
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IndexedRandom
 
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    SCOIATAEL_RANGED_HORN_LEADER_ID,
-    SKELLIGE_KING_BRAN_LEADER_ID,
-    IndexedRandom,
-)
+from ..support import CARD_REGISTRY, SCOIATAEL_RANGED_HORN_LEADER_ID, SKELLIGE_KING_BRAN_LEADER_ID
 
 
 def test_skellige_never_summons_heroes_from_discard_on_round_three() -> None:

@@ -1,5 +1,10 @@
 from enum import StrEnum
 
+MAX_HAND_SIZE = 17
+OPENING_HAND_SIZE = 10
+MAX_MULLIGAN_REPLACEMENTS = 2
+SCORCH_THRESHOLD = 10
+
 
 class Row(StrEnum):
     CLOSE = "close"

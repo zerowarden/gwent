@@ -9,7 +9,6 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SeededRandom
 from gwent_evaluation.metrics import BootstrapConfig, bootstrap_interval
 from gwent_evaluation.models import SpecError, TerminationReason
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.tuning import optimizers
 from gwent_evaluation.tuning.models import CmaSettings, OptimizerMethod, OptimizerSpec
 from gwent_evaluation.tuning.objective import TrialEvaluation, TrialResultReference, TrialStatus
@@ -24,6 +23,7 @@ from gwent_evaluation.tuning.optimizers import (
     ScoredCandidate,
     summarize_search,
 )
+from gwent_shared.json_payloads import canonical_digest
 
 
 def settings(*, seed: int = 0, budget: int = 4, batch: int = 2) -> OptimizerSpec:

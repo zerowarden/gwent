@@ -342,3 +342,19 @@ def horn_rows(
             replacement_cards=replacement_cards,
         ).horn_rows
     )
+
+
+@dataclass(frozen=True)
+class ProjectionResolverContext(PublicPlayerContext):
+    """Shared cached public context for deterministic projection resolvers."""
+
+    observation: PlayerObservation
+    card_registry: CardRegistry
+
+    @cached_property
+    def current_board(self) -> PublicBoardProjection:
+        return current_public_board_projection(self.observation, card_registry=self.card_registry)
+
+    @cached_property
+    def current_weather_rows(self) -> tuple[Row, ...]:
+        return active_weather_rows(self.observation)

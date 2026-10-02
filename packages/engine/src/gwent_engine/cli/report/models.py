@@ -273,8 +273,7 @@ class MatchReportBuilder:
     def _action_text(self, action: GameAction) -> str:
         return summarize_action(
             action,
-            card_names_by_instance_id=self.run.card_names_by_instance_id,
-            card_values_by_instance_id=self.run.card_values_by_instance_id,
+            cards=self.run.cards,
         )
 
     def _step_action_text(self, action: GameAction) -> str:
@@ -288,8 +287,7 @@ class MatchReportBuilder:
     def _event_text(self, event: GameEvent) -> str:
         return summarize_event(
             event,
-            card_names_by_instance_id=self.run.card_names_by_instance_id,
-            card_values_by_instance_id=self.run.card_values_by_instance_id,
+            cards=self.run.cards,
         )
 
     def _debug_lines(self, step: CliStep) -> tuple[str, ...]:

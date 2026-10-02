@@ -72,8 +72,11 @@ uv run --locked tune finalize
 Read `.output/tuning/weight-pilot/report.md` for the stage, sensitivity findings,
 optimizer work, validation evidence, and promotion verdict. The matching
 `report.json` contains the full settings and measurements. `run` stops after
-validation; `finalize` explicitly consumes held-out evidence. Repeating a command
-verifies and reuses recorded work. An inconclusive study retains the incumbent.
+validation; `finalize` explicitly consumes held-out evidence and is the only
+workflow that authorizes it. Generic `run` commands refuse `test`-purpose suites;
+the deliberate emergency hatch `--consume-heldout CONSUME-HELDOUT-PARTITION`
+records the consumption. Repeating a command verifies and reuses recorded work.
+An inconclusive study retains the incumbent.
 
 Terminal progress updates in place; `--no-progress` disables it, and `--json`
 prints machine-readable output. Paths have defaults and can be overridden with
@@ -131,8 +134,8 @@ diagnostic seeds. The command writes HTML charts, JSON, game records and a
 checksummed measurement journal under `.output/range-throughput`:
 
 ```bash
-uv run --locked python -m gwent_evaluation.tuning.throughput
-uv run --locked python -m gwent_evaluation.tuning.throughput --report-only
+uv run --locked tune throughput
+uv run --locked tune throughput --report-only
 ```
 
 It compares 1, 4, 8, 16 and 32 workers twice, checks identical outcomes and

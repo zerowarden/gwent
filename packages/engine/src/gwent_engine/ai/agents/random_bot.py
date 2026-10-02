@@ -4,16 +4,16 @@ from collections.abc import Sequence
 from random import Random
 from typing import final
 
+from gwent_engine.ai.actions import filter_non_leave_actions
+from gwent_engine.ai.agents.protocol import require_resolve_choice
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     GameAction,
-    LeaveAction,
     MulliganSelection,
     PassAction,
     ResolveChoiceAction,
 )
-from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.leaders import LeaderRegistry
 
 
@@ -44,13 +44,11 @@ class RandomBot:
         leader_registry: LeaderRegistry | None = None,
     ) -> GameAction:
         del observation, card_registry, leader_registry
-        non_leave_actions = tuple(
-            action for action in legal_actions if not isinstance(action, LeaveAction)
-        )
+        candidates = filter_non_leave_actions(legal_actions)
         non_pass_actions = tuple(
-            action for action in non_leave_actions if not isinstance(action, PassAction)
+            action for action in candidates if not isinstance(action, PassAction)
         )
-        return _choose_random(self._random, non_pass_actions or non_leave_actions or legal_actions)
+        return _choose_random(self._random, non_pass_actions or candidates)
 
     def choose_pending_choice(
         self,
@@ -61,10 +59,9 @@ class RandomBot:
         leader_registry: LeaderRegistry | None = None,
     ) -> ResolveChoiceAction:
         del observation, card_registry, leader_registry
-        action = _choose_random(self._random, legal_actions)
-        if not isinstance(action, ResolveChoiceAction):
-            raise IllegalActionError("Pending choice selection requires ResolveChoiceAction.")
-        return action
+        return require_resolve_choice(
+            _choose_random(self._random, legal_actions), self.display_name
+        )
 
 
 def _choose_random[T](random_source: Random, options: Sequence[T]) -> T:

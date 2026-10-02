@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline import build_candidate_pool
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
@@ -10,6 +9,7 @@ from gwent_engine.ai.search.types import SearchCandidate
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import GameAction
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.serialize.actions import action_to_id
 
 
 def generate_search_candidates(

@@ -1,7 +1,7 @@
 import pytest
 from gwent_engine.core.errors import IllegalActionError
-from gwent_service.application.commands import SubmitMulliganCommand
-from gwent_service.application.errors import MatchVersionConflictError
+from gwent_service.domain import MatchVersionConflictError
+from gwent_service.dto import SubmitMulliganCommand
 
 from tests.service.support import (
     StaleSnapshotRepository,

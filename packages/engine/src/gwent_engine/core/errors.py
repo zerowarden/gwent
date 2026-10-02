@@ -39,18 +39,6 @@ class UnknownAbilityKindError(_UnknownDefinitionFieldError):
     field_name: ClassVar[str] = "ability_kind"
 
 
-class UnknownPassiveKindError(_UnknownDefinitionFieldError):
-    """Raised when a faction YAML file references an unknown passive kind."""
-
-    field_name: ClassVar[str] = "passive_kind"
-
-
-class UnknownFactionError(_UnknownEntityError):
-    """Raised when a faction lookup fails."""
-
-    entity_name: ClassVar[str] = "faction"
-
-
 class UnknownCardDefinitionError(_UnknownEntityError):
     """Raised when a card-definition lookup fails."""
 

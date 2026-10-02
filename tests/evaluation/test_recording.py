@@ -4,7 +4,6 @@ from collections.abc import Callable, Sequence
 from typing import cast
 
 import pytest
-from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.agents import GreedyBot
 from gwent_engine.ai.arena import (
     MatchDecisionKind,
@@ -20,6 +19,7 @@ from gwent_engine.core.actions import GameAction, MulliganSelection, PassAction,
 from gwent_engine.core.enums import Row
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.serialize.actions import action_to_id
 from gwent_evaluation.execution import semantic_digest
 from gwent_evaluation.models import DecisionSample
 from gwent_evaluation.recording import ExperimentRecorder, SummaryRecorder
@@ -29,6 +29,7 @@ from tests.engine.support import (
     LEADER_REGISTRY,
     execute_recorded_match,
 )
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 _GAME_ID = "experiment_recording_test"
 
@@ -96,8 +97,6 @@ def test_second_mulligan_failure_retains_both_decision_attempts(
     from gwent_engine.ai.agents import GreedyBot
     from gwent_engine.ai.arena import TerminationReason
 
-    from tests.engine.support import PLAYER_TWO_ID
-
     original = GreedyBot.choose_mulligan
 
     def choose(
@@ -139,8 +138,6 @@ def test_illegal_returned_action_is_recorded_before_rejection(
     from gwent_engine.ai.baseline import HeuristicBot
     from gwent_engine.core.actions import PassAction
 
-    from tests.engine.support import PLAYER_TWO_ID
-
     def choose(
         self: HeuristicBot,
         observation: PlayerObservation,
@@ -171,7 +168,7 @@ def test_illegal_returned_action_is_recorded_before_rejection(
         (
             "choose_action",
             lambda: PlayCardAction(
-                player_id=PlayerId("p1"),
+                player_id=PLAYER_ONE_ID,
                 card_instance_id=CardInstanceId("missing"),
                 target_row=cast(Row, object()),
             ),
@@ -181,7 +178,7 @@ def test_illegal_returned_action_is_recorded_before_rejection(
         (
             "choose_mulligan",
             lambda: MulliganSelection(
-                player_id=PlayerId("p1"), cards_to_replace=(cast(CardInstanceId, object()),)
+                player_id=PLAYER_ONE_ID, cards_to_replace=(cast(CardInstanceId, object()),)
             ),
         ),
     ],

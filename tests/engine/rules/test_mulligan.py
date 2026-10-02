@@ -7,42 +7,43 @@ from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.validators import validate_mulligan_selection
 
-from tests.engine.support import IdentityShuffle, build_sample_game_state
+from tests.engine.support import build_sample_game_state
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
 
 
 def test_resolve_mulligans_replaces_cards_for_both_players_and_transitions_to_round() -> None:
     initial_state = build_sample_game_state()
     started_state, _ = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p2")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_TWO_ID),
+        rng=IdentityRandom(),
     )
-    player_one_deck_size_before = len(started_state.player(PlayerId("p1")).deck)
-    player_two_deck_size_before = len(started_state.player(PlayerId("p2")).deck)
+    player_one_deck_size_before = len(started_state.player(PLAYER_ONE_ID).deck)
+    player_two_deck_size_before = len(started_state.player(PLAYER_TWO_ID).deck)
 
-    player_two_replaced = started_state.player(PlayerId("p2")).hand[:2]
-    player_one_replaced = (started_state.player(PlayerId("p1")).hand[0],)
+    player_two_replaced = started_state.player(PLAYER_TWO_ID).hand[:2]
+    player_one_replaced = (started_state.player(PLAYER_ONE_ID).hand[0],)
     final_state, events = apply_action(
         started_state,
         ResolveMulligansAction(
             selections=(
                 MulliganSelection(
-                    player_id=PlayerId("p1"),
+                    player_id=PLAYER_ONE_ID,
                     cards_to_replace=player_one_replaced,
                 ),
                 MulliganSelection(
-                    player_id=PlayerId("p2"),
+                    player_id=PLAYER_TWO_ID,
                     cards_to_replace=player_two_replaced,
                 ),
             )
         ),
     )
 
-    player_one_after = final_state.player(PlayerId("p1"))
-    player_two_after = final_state.player(PlayerId("p2"))
+    player_one_after = final_state.player(PLAYER_ONE_ID)
+    player_two_after = final_state.player(PLAYER_TWO_ID)
 
     assert final_state.phase == Phase.IN_ROUND
-    assert final_state.current_player == PlayerId("p2")
+    assert final_state.current_player == PLAYER_TWO_ID
     assert len(player_one_after.hand) == 10
     assert len(player_two_after.hand) == 10
     assert len(player_one_after.deck) == player_one_deck_size_before
@@ -60,17 +61,17 @@ def test_resolve_mulligans_replaces_cards_for_both_players_and_transitions_to_ro
     assert events == (
         MulliganPerformedEvent(
             event_id=5,
-            player_id=PlayerId("p1"),
+            player_id=PLAYER_ONE_ID,
             replaced_card_instance_ids=player_one_replaced,
-            drawn_card_instance_ids=(started_state.player(PlayerId("p1")).deck[0],),
+            drawn_card_instance_ids=(started_state.player(PLAYER_ONE_ID).deck[0],),
         ),
         MulliganPerformedEvent(
             event_id=6,
-            player_id=PlayerId("p2"),
+            player_id=PLAYER_TWO_ID,
             replaced_card_instance_ids=player_two_replaced,
             drawn_card_instance_ids=(
-                started_state.player(PlayerId("p2")).deck[0],
-                started_state.player(PlayerId("p2")).deck[1],
+                started_state.player(PLAYER_TWO_ID).deck[0],
+                started_state.player(PLAYER_TWO_ID).deck[1],
             ),
         ),
     )
@@ -86,22 +87,22 @@ def test_resolve_mulligans_requires_mulligan_phase_and_both_players() -> None:
             initial_state,
             ResolveMulligansAction(
                 selections=(
-                    MulliganSelection(player_id=PlayerId("p1"), cards_to_replace=()),
-                    MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_ONE_ID, cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
                 )
             ),
         )
 
     started_state, _ = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p2")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_TWO_ID),
+        rng=IdentityRandom(),
     )
 
     with pytest.raises(IllegalActionError, match="one selection per player"):
         _ = apply_action(
             started_state,
-            ResolveMulligansAction(selections=(MulliganSelection(player_id=PlayerId("p1")),)),
+            ResolveMulligansAction(selections=(MulliganSelection(player_id=PLAYER_ONE_ID),)),
         )
 
     with pytest.raises(IllegalActionError, match="include both players exactly once"):
@@ -109,8 +110,8 @@ def test_resolve_mulligans_requires_mulligan_phase_and_both_players() -> None:
             started_state,
             ResolveMulligansAction(
                 selections=(
-                    MulliganSelection(player_id=PlayerId("p1")),
-                    MulliganSelection(player_id=PlayerId("p1")),
+                    MulliganSelection(player_id=PLAYER_ONE_ID),
+                    MulliganSelection(player_id=PLAYER_ONE_ID),
                 )
             ),
         )
@@ -119,8 +120,8 @@ def test_resolve_mulligans_requires_mulligan_phase_and_both_players() -> None:
         started_state,
         ResolveMulligansAction(
             selections=(
-                MulliganSelection(player_id=PlayerId("p1"), cards_to_replace=()),
-                MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                MulliganSelection(player_id=PLAYER_ONE_ID, cards_to_replace=()),
+                MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
             )
         ),
     )
@@ -130,8 +131,8 @@ def test_resolve_mulligans_requires_mulligan_phase_and_both_players() -> None:
             in_round_state,
             ResolveMulligansAction(
                 selections=(
-                    MulliganSelection(player_id=PlayerId("p1"), cards_to_replace=()),
-                    MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_ONE_ID, cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
                 )
             ),
         )
@@ -141,16 +142,16 @@ def test_validate_mulligan_selection_checks_player_eligibility() -> None:
     initial_state = build_sample_game_state()
     started_state, _ = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p1")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_ONE_ID),
+        rng=IdentityRandom(),
     )
-    player_one = started_state.player(PlayerId("p1"))
+    player_one = started_state.player(PLAYER_ONE_ID)
 
     with pytest.raises(IllegalActionError, match="is not in player"):
         validate_mulligan_selection(
             started_state,
             MulliganSelection(
-                player_id=PlayerId("p1"),
+                player_id=PLAYER_ONE_ID,
                 cards_to_replace=(CardInstanceId("p1_card_16"),),
             ),
         )
@@ -159,7 +160,7 @@ def test_validate_mulligan_selection_checks_player_eligibility() -> None:
         validate_mulligan_selection(
             started_state,
             MulliganSelection(
-                player_id=PlayerId("p1"),
+                player_id=PLAYER_ONE_ID,
                 cards_to_replace=player_one.hand[:3],
             ),
         )
@@ -172,7 +173,7 @@ def test_validate_mulligan_selection_checks_player_eligibility() -> None:
 
     validate_mulligan_selection(
         started_state,
-        MulliganSelection(player_id=PlayerId("p1"), cards_to_replace=player_one.hand[:2]),
+        MulliganSelection(player_id=PLAYER_ONE_ID, cards_to_replace=player_one.hand[:2]),
     )
 
 
@@ -180,10 +181,10 @@ def test_resolve_mulligans_rejects_duplicate_or_excessive_card_selection() -> No
     initial_state = build_sample_game_state()
     started_state, _ = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p1")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_ONE_ID),
+        rng=IdentityRandom(),
     )
-    player_one = started_state.player(PlayerId("p1"))
+    player_one = started_state.player(PLAYER_ONE_ID)
     duplicated_card_id = player_one.hand[0]
 
     with pytest.raises(IllegalActionError, match="same card twice"):
@@ -192,10 +193,10 @@ def test_resolve_mulligans_rejects_duplicate_or_excessive_card_selection() -> No
             ResolveMulligansAction(
                 selections=(
                     MulliganSelection(
-                        player_id=PlayerId("p1"),
+                        player_id=PLAYER_ONE_ID,
                         cards_to_replace=(duplicated_card_id, duplicated_card_id),
                     ),
-                    MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
                 )
             ),
         )
@@ -206,10 +207,10 @@ def test_resolve_mulligans_rejects_duplicate_or_excessive_card_selection() -> No
             ResolveMulligansAction(
                 selections=(
                     MulliganSelection(
-                        player_id=PlayerId("p1"),
+                        player_id=PLAYER_ONE_ID,
                         cards_to_replace=player_one.hand[:3],
                     ),
-                    MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
                 )
             ),
         )
@@ -220,10 +221,10 @@ def test_resolve_mulligans_rejects_duplicate_or_excessive_card_selection() -> No
             ResolveMulligansAction(
                 selections=(
                     MulliganSelection(
-                        player_id=PlayerId("p1"),
+                        player_id=PLAYER_ONE_ID,
                         cards_to_replace=(CardInstanceId("p1_card_16"),),
                     ),
-                    MulliganSelection(player_id=PlayerId("p2"), cards_to_replace=()),
+                    MulliganSelection(player_id=PLAYER_TWO_ID, cards_to_replace=()),
                 )
             ),
         )

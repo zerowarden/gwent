@@ -3,18 +3,12 @@ from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.actions import LeaveAction, PlayCardAction, StartGameAction
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import MatchEndedEvent, PlayerLeftEvent
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
 from tests.engine.scenario_builder import card, rows, scenario
-from tests.engine.support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    IdentityShuffle,
-    build_in_round_game_state,
-    build_sample_game_state,
-)
+from tests.engine.support import CARD_REGISTRY, build_in_round_game_state, build_sample_game_state
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
 
 
 def test_player_can_leave_before_start_and_lose_the_match() -> None:
@@ -42,7 +36,7 @@ def test_player_can_leave_during_mulligan_before_both_players_finish() -> None:
     started_state, _ = apply_action(
         initial_state,
         StartGameAction(starting_player=PLAYER_ONE_ID),
-        rng=IdentityShuffle(),
+        rng=IdentityRandom(),
     )
 
     ended_state, events = apply_action(
@@ -125,9 +119,8 @@ def test_leave_action_is_illegal_after_the_match_has_already_ended() -> None:
         LeaveAction(player_id=PLAYER_ONE_ID),
     )
 
-    ## TODO: Fixed unused assignment
     with pytest.raises(IllegalActionError, match="before the match has ended"):
         _ = apply_action(
             ended_state,
-            LeaveAction(player_id=PlayerId("p2")),
+            LeaveAction(player_id=PLAYER_TWO_ID),
         )

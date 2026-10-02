@@ -1,14 +1,9 @@
 from gwent_engine.core.actions import StartGameAction
 from gwent_engine.core.events import FactionPassiveTriggeredEvent, StartingPlayerChosenEvent
-from gwent_engine.core.ids import PlayerId
 from gwent_engine.core.reducer import apply_action
 
-from tests.engine.support import (
-    MONSTERS_DECK_ID,
-    SCOIATAEL_DECK_ID,
-    IdentityShuffle,
-    build_sample_game_state,
-)
+from tests.engine.support import MONSTERS_DECK_ID, SCOIATAEL_DECK_ID, build_sample_game_state
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
 
 
 def test_scoiatael_starter_choice_works() -> None:
@@ -19,14 +14,14 @@ def test_scoiatael_starter_choice_works() -> None:
 
     next_state, events = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p2")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_TWO_ID),
+        rng=IdentityRandom(),
     )
 
-    assert next_state.starting_player == PlayerId("p2")
+    assert next_state.starting_player == PLAYER_TWO_ID
     assert next_state.current_player is None
     assert isinstance(events[0], FactionPassiveTriggeredEvent)
-    assert events[0].player_id == PlayerId("p1")
-    assert events[0].chosen_player_id == PlayerId("p2")
+    assert events[0].player_id == PLAYER_ONE_ID
+    assert events[0].chosen_player_id == PLAYER_TWO_ID
     assert isinstance(events[1], StartingPlayerChosenEvent)
-    assert events[1].player_id == PlayerId("p2")
+    assert events[1].player_id == PLAYER_TWO_ID

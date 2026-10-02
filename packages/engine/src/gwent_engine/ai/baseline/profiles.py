@@ -5,14 +5,7 @@ from typing import cast
 
 from gwent_engine.ai.baseline.assessment import DecisionAssessment
 from gwent_engine.ai.baseline.context import DecisionContext, TacticalMode
-from gwent_engine.ai.baseline.policies import (
-    LeaderPolicy,
-    ScorchPolicy,
-)
-from gwent_engine.ai.baseline.policies.registry import (
-    POLICY_CATALOG,
-    PolicyBundle,
-)
+from gwent_engine.ai.baseline.policies import SCORCH_POLICIES, ScorchPolicy
 from gwent_engine.ai.baseline.profile_catalog import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
@@ -60,7 +53,7 @@ class HeuristicProfile:
     minimum_commitment_bias: float
     preserve_resources_bias: float
     scorch_policy: ScorchPolicy
-    leader_policy: LeaderPolicy
+    leader_policy: str
 
     @property
     def resource_bias(self) -> PolicyResourceBias:
@@ -75,7 +68,6 @@ class HeuristicProfile:
         *,
         profile_id: str,
         policy_names: PolicySelection,
-        resolved_policies: PolicyBundle,
         weights: EvaluationWeights,
         weight_provenance: tuple[WeightProvenance, ...],
         action_bonus: ActionBonusConfig,
@@ -108,8 +100,8 @@ class HeuristicProfile:
             ),
             minimum_commitment_bias=minimum_commitment_bias,
             preserve_resources_bias=preserve_resources_bias,
-            scorch_policy=resolved_policies.scorch,
-            leader_policy=resolved_policies.leader,
+            scorch_policy=SCORCH_POLICIES[policy_names.scorch],
+            leader_policy=policy_names.leader,
         )
 
 
@@ -149,7 +141,6 @@ def compose_profile(
     return HeuristicProfile.from_components(
         profile_id=base_profile.profile_id,
         policy_names=policy_names,
-        resolved_policies=POLICY_CATALOG.resolve(policy_names),
         weights=weights,
         weight_provenance=weight_provenance,
         action_bonus=config.action_bonus,

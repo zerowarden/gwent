@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import cast
 
 from gwent_evaluation import load_agent_catalog, load_suite_catalog
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.schedule import schedule_suite
+from gwent_shared.json_payloads import canonical_digest
 
 from tests.evaluation.support import REPOSITORY_ROOT, read_json_object
 

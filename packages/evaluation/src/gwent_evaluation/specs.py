@@ -4,7 +4,7 @@ from collections.abc import Callable, Mapping
 from enum import Enum
 from pathlib import Path
 
-from gwent_engine.ai.heuristic_configuration import (
+from gwent_engine.ai.baseline.heuristic_configuration import (
     HeuristicConfiguration,
     HeuristicConfigurationError,
 )

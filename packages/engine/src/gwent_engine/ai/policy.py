@@ -12,13 +12,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from gwent_engine.core import AbilityKind
-from gwent_engine.core.config import SCORCH_THRESHOLD
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 
 OPPORTUNISTIC_SCORCH_POLICY_ID = "opportunistic_scorch"
 RESERVE_SCORCH_POLICY_ID = "reserve_scorch"
 CONSERVATIVE_LEADER_POLICY_ID = "conservative"
 AGGRESSIVE_LEADER_POLICY_ID = "aggressive"
-LEGACY_PRESERVE_LEADER_POLICY_ID = "preserve_leader"
 
 
 @dataclass(frozen=True, slots=True)
@@ -346,7 +345,6 @@ __all__ = [
     "DEFAULT_PROJECTION_POLICY",
     "DEFAULT_SEARCH_CONFIG",
     "DEFAULT_TACTICAL_VALUE_POLICY",
-    "LEGACY_PRESERVE_LEADER_POLICY_ID",
     "OPPORTUNISTIC_SCORCH_POLICY_ID",
     "RESERVE_SCORCH_POLICY_ID",
     "AIHandTunedPolicy",

@@ -14,11 +14,13 @@ from gwent_engine.core.actions import (
 )
 from gwent_engine.core.enums import Row
 from gwent_engine.core.errors import SerializationError
-from gwent_engine.core.ids import CardInstanceId, ChoiceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId, ChoiceId
 from gwent_engine.serialize import action_from_id, action_to_id
 
-_PLAYER_ONE = PlayerId("p1")
-_PLAYER_TWO = PlayerId("p2")
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
+_PLAYER_ONE = PLAYER_ONE_ID
+_PLAYER_TWO = PLAYER_TWO_ID
 
 
 def _actions() -> tuple[GameAction, ...]:

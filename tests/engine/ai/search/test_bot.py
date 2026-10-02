@@ -1,0 +1,350 @@
+from __future__ import annotations
+
+from gwent_engine.ai.actions import enumerate_legal_actions
+from gwent_engine.ai.baseline.profile_catalog import DEFAULT_BASE_PROFILE
+from gwent_engine.ai.observations import (
+    build_player_observation,
+)
+from gwent_engine.ai.policy import DEFAULT_SEARCH_CONFIG, SearchConfig
+from gwent_engine.ai.search import SearchBot, SearchDecisionExplanation, build_search_engine
+from gwent_engine.core import ChoiceSourceKind, Row
+from gwent_engine.core.actions import (
+    PassAction,
+    PlayCardAction,
+    ResolveChoiceAction,
+)
+from gwent_engine.core.ids import (
+    CardInstanceId,
+)
+
+from tests.support import PLAYER_ONE_ID
+
+from ...scenario_builder import card, rows, scenario
+from ...support import (
+    CARD_REGISTRY,
+    LEADER_REGISTRY,
+    MONSTERS_DISCARD_AND_CHOOSE_LEADER_ID,
+)
+
+
+def test_search_engine_resolves_same_turn_medic_choice_in_principal_line() -> None:
+    state = (
+        scenario("search_medic_full_turn")
+        .player(
+            "p1",
+            hand=[
+                card("p1_medic", "nilfgaard_etolian_auxilary_archer"),
+                card("p1_small_archer", "scoiatael_dol_blathanna_archer"),
+            ],
+            discard=[
+                card("p1_discard_large", "northern_realms_catapult"),
+            ],
+        )
+        .player(
+            "p2",
+            hand=[card("p2_hidden_unit", "scoiatael_mahakaman_defender")],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    engine = build_search_engine(
+        config=DEFAULT_SEARCH_CONFIG,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="search_test",
+    )
+
+    result = engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert result.used_fallback_policy is False
+    assert result.principal_line is not None
+    assert result.principal_line.actions[0] == PlayCardAction(
+        player_id=PLAYER_ONE_ID,
+        card_instance_id=CardInstanceId("p1_medic"),
+        target_row=Row.RANGED,
+    )
+    second_action = result.principal_line.actions[1]
+    assert isinstance(second_action, ResolveChoiceAction)
+    assert second_action.player_id == PLAYER_ONE_ID
+    assert second_action.selected_card_instance_ids == (CardInstanceId("p1_discard_large"),)
+    assert result.chosen_action == result.principal_line.actions[0]
+    assert result.principal_line.reply_actions == ()
+
+
+def test_search_bot_pending_choice_uses_search_line_when_state_is_present() -> None:
+    state = (
+        scenario("search_pending_choice_state")
+        .player(
+            "p1",
+            hand=[card("p1_source_decoy", "neutral_decoy")],
+            board=rows(
+                ranged=[
+                    card("p1_spy_target", "neutral_mysterious_elf", owner="p2"),
+                    card("p1_archer_target", "scoiatael_dol_blathanna_archer"),
+                ]
+            ),
+        )
+        .card_choice(
+            choice_id="pending_choice_1",
+            player_id="p1",
+            source_kind=ChoiceSourceKind.DECOY,
+            source_card_instance_id="p1_source_decoy",
+            legal_target_card_instance_ids=("p1_spy_target", "p1_archer_target"),
+        )
+        .build()
+    )
+    bot = SearchBot()
+
+    selected = bot.choose_pending_choice(
+        build_player_observation(state, PLAYER_ONE_ID),
+        enumerate_legal_actions(
+            state,
+            player_id=PLAYER_ONE_ID,
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert selected.player_id == PLAYER_ONE_ID
+    assert selected.selected_card_instance_ids == (CardInstanceId("p1_spy_target"),)
+
+
+def test_search_bot_pending_choice_resolves_deck_targets_via_simulation() -> None:
+    legal_target_ids = (
+        CardInstanceId("p1_discard_recruit"),
+        CardInstanceId("p1_discard_archer"),
+        CardInstanceId("p1_pick_geralt"),
+        CardInstanceId("p1_skip_trebuchet"),
+    )
+    state = (
+        scenario("search_leader_pending_choice_deck_targets")
+        .player(
+            "p1",
+            faction="monsters",
+            leader_id=str(MONSTERS_DISCARD_AND_CHOOSE_LEADER_ID),
+            hand=[
+                card("p1_discard_recruit", "scoiatael_vrihedd_brigade_recruit"),
+                card("p1_discard_archer", "scoiatael_dol_blathanna_archer"),
+            ],
+            deck=[
+                card("p1_pick_geralt", "neutral_geralt"),
+                card("p1_skip_trebuchet", "northern_realms_trebuchet"),
+            ],
+        )
+        .leader_choice(
+            choice_id="leader_discard_and_choose_choice",
+            player_id="p1",
+            source_leader_id=str(MONSTERS_DISCARD_AND_CHOOSE_LEADER_ID),
+            legal_target_card_instance_ids=tuple(str(card_id) for card_id in legal_target_ids),
+            min_selections=3,
+            max_selections=3,
+        )
+        .build()
+    )
+    bot = SearchBot()
+
+    selected = bot.choose_pending_choice(
+        build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY),
+        enumerate_legal_actions(
+            state,
+            player_id=PLAYER_ONE_ID,
+            card_registry=CARD_REGISTRY,
+            leader_registry=LEADER_REGISTRY,
+        ),
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert selected.player_id == PLAYER_ONE_ID
+    assert len(selected.selected_card_instance_ids) == 3
+    assert set(selected.selected_card_instance_ids) <= set(legal_target_ids)
+
+
+def test_search_engine_prefers_final_round_decoy_reclaim_spy_over_pass() -> None:
+    state = (
+        scenario("search_final_round_decoy_reclaim_spy")
+        .round(3)
+        .player(
+            "p1",
+            leader_used=True,
+            gems_remaining=1,
+            round_wins=1,
+            hand=[
+                card("p1_decoy", "neutral_decoy"),
+                card("p1_cow", "neutral_avenger_cow"),
+            ],
+            deck=[
+                card("p1_deck_geralt", "neutral_geralt"),
+                card("p1_deck_scorpion", "nilfgaard_heavy_zerrikanian_fire_scorpion"),
+                card("p1_deck_vill", "neutral_villentretenmerth"),
+                card("p1_deck_archer", "nilfgaard_black_infantry_archer"),
+            ],
+            board=rows(
+                close=[
+                    card(
+                        "p1_board_enemy_spy",
+                        "nilfgaard_shilard_fitz_oesterlen",
+                        owner="p2",
+                    )
+                ]
+            ),
+        )
+        .player(
+            "p2",
+            leader_used=True,
+            gems_remaining=1,
+            round_wins=1,
+            hand=[card("p2_hidden_finisher", "neutral_geralt")],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID)
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    engine = build_search_engine(
+        config=DEFAULT_SEARCH_CONFIG,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="search_test",
+    )
+
+    result = engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    explanation = engine.explain_result(result)
+    decoy_action = PlayCardAction(
+        player_id=PLAYER_ONE_ID,
+        card_instance_id=CardInstanceId("p1_decoy"),
+    )
+    decoy_evaluation = next(
+        evaluation for evaluation in explanation.evaluations if evaluation.action == decoy_action
+    )
+    pass_evaluation = next(
+        evaluation
+        for evaluation in explanation.evaluations
+        if isinstance(evaluation.action, PassAction)
+    )
+
+    assert decoy_evaluation.line.value > pass_evaluation.line.value
+    assert "root_adjustment=elimination_pass_with_live_lines" in pass_evaluation.line.notes
+    assert not isinstance(result.chosen_action, PassAction)
+
+
+def test_search_engine_explanation_includes_evaluated_lines() -> None:
+    state = (
+        scenario("search_explanation_evaluated_lines")
+        .player(
+            "p1",
+            hand=[
+                card("p1_archer", "scoiatael_dol_blathanna_archer"),
+                card("p1_defender", "scoiatael_mahakaman_defender"),
+            ],
+        )
+        .player(
+            "p2",
+            hand=[card("p2_hidden", "scoiatael_mahakaman_defender")],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    engine = build_search_engine(
+        config=DEFAULT_SEARCH_CONFIG,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="search_test",
+    )
+
+    result = engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    explanation = engine.explain_result(result)
+
+    assert isinstance(explanation, SearchDecisionExplanation)
+    assert explanation.profile_id == "neutral"
+    assert explanation.evaluations
+    assert explanation.principal_line is not None
+    assert explanation.principal_line.explanation.leaf_terms
+    assert any(item.selected for item in explanation.evaluations)
+    assert explanation.comparison is not None
+    assert explanation.comparison.chosen_action == result.chosen_action
+
+
+def test_search_engine_respects_leaf_value_scales() -> None:
+    state = (
+        scenario("search_leaf_value_scales")
+        .player(
+            "p1",
+            hand=[card("p1_archer", "scoiatael_dol_blathanna_archer")],
+        )
+        .player(
+            "p2",
+            hand=[card("p2_hidden", "scoiatael_mahakaman_defender")],
+        )
+        .build()
+    )
+    observation = build_player_observation(state, PLAYER_ONE_ID, LEADER_REGISTRY)
+    legal_actions = enumerate_legal_actions(
+        state,
+        player_id=PLAYER_ONE_ID,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    default_engine = build_search_engine(
+        config=DEFAULT_SEARCH_CONFIG,
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="search_default",
+    )
+    weighted_engine = build_search_engine(
+        config=SearchConfig(
+            score_gap_scale=2.0,
+            card_advantage_scale=0.5,
+            hand_value_scale=0.5,
+            leader_delta_scale=0.5,
+            exact_finish_bonus_scale=2.0,
+        ),
+        profile_definition=DEFAULT_BASE_PROFILE,
+        bot_id="search_weighted",
+    )
+
+    default_result = default_engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+    weighted_result = weighted_engine.choose_action(
+        observation,
+        legal_actions,
+        card_registry=CARD_REGISTRY,
+        leader_registry=LEADER_REGISTRY,
+    )
+
+    assert default_result.principal_line is not None
+    assert weighted_result.principal_line is not None
+    assert default_result.principal_line.value != weighted_result.principal_line.value

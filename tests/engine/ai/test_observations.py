@@ -6,14 +6,10 @@ from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    LEADER_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    build_in_round_game_state,
-)
+from ..support import CARD_REGISTRY, LEADER_REGISTRY, build_in_round_game_state
 
 
 def test_player_observation_hides_opponent_hand_identities() -> None:

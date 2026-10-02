@@ -1,6 +1,7 @@
-from gwent_engine.ai.actions import enumerate_legal_actions, enumerate_mulligan_selections
+from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.agents.greedy_bot import GreedyBot
 from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.turn_actions import enumerate_mulligan_selections
 from gwent_engine.core import ChoiceSourceKind, GameStatus, Phase, Row
 from gwent_engine.core.actions import (
     MulliganSelection,
@@ -13,14 +14,10 @@ from gwent_engine.core.ids import CardInstanceId, ChoiceId
 from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.reducer import apply_action
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    LEADER_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    build_sample_game_state,
-)
+from ..support import CARD_REGISTRY, LEADER_REGISTRY, build_sample_game_state
 
 
 def test_greedy_bot_prefers_stronger_playable_unit() -> None:

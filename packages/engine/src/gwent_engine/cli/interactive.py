@@ -8,8 +8,8 @@ from questionary import Choice
 
 from gwent_engine.ai.arena import bot_family, supported_bot_families
 from gwent_engine.ai.baseline import available_base_profile_ids
-from gwent_engine.cards import DeckDefinition
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, PlayerId
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.leaders import LeaderDefinition
 
 

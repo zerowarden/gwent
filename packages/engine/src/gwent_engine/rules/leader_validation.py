@@ -7,11 +7,11 @@ from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 from gwent_engine.rules.leader_common import (
     ActiveLeaderValidator,
+    leader_definition_for_player,
     require_no_targets,
     require_only_card_target,
     selected_weather_card_in_deck,
 )
-from gwent_engine.rules.leader_effects import leader_definition_for_player
 from gwent_engine.rules.row_effects import row_has_commanders_horn
 
 

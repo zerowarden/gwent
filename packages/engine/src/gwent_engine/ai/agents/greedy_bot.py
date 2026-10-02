@@ -4,14 +4,16 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import final
 
-from gwent_engine.ai.actions import action_to_id
-from gwent_engine.ai.mulligan_scoring import mulligan_selection_score
+from gwent_engine.ai.agents.protocol import require_resolve_choice
+from gwent_engine.ai.mulligan_scoring import best_mulligan_selection
+from gwent_engine.ai.observation_queries import (
+    build_viewer_hand_definition_index,
+    visible_definitions,
+)
 from gwent_engine.ai.observations import (
     PlayerObservation,
 )
 from gwent_engine.ai.policy import DEFAULT_GREEDY_ACTION_POLICY, DEFAULT_MULLIGAN_POLICY
-from gwent_engine.ai.row_preference import row_preference
-from gwent_engine.ai.utils import visible_definitions
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import (
@@ -23,9 +25,9 @@ from gwent_engine.core.actions import (
     StartGameAction,
     UseLeaderAbilityAction,
 )
-from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.serialize.actions import action_to_id
 
 
 @final
@@ -45,26 +47,14 @@ class GreedyBot:
         del leader_registry
         if not legal_selections:
             raise ValueError("GreedyBot requires at least one mulligan selection.")
-        viewer_hand_by_id = {
-            card.instance_id: card_registry.get(card.definition_id)
-            for card in observation.viewer_hand
-        }
-        definition_counts = Counter(
-            definition.definition_id for definition in viewer_hand_by_id.values()
-        )
-        ranked = sorted(
+        hand_by_id = build_viewer_hand_definition_index(observation, card_registry)
+        return best_mulligan_selection(
             legal_selections,
-            key=lambda selection: (
-                -mulligan_selection_score(
-                    selection,
-                    viewer_hand_by_id,
-                    definition_counts,
-                    weights=DEFAULT_MULLIGAN_POLICY.greedy,
-                ),
-                _mulligan_key(selection),
-            ),
+            hand_by_id,
+            Counter(definition.definition_id for definition in hand_by_id.values()),
+            weights=DEFAULT_MULLIGAN_POLICY.greedy,
+            prefer_highest_card_ids=False,
         )
-        return ranked[0]
 
     def choose_action(
         self,
@@ -101,13 +91,7 @@ class GreedyBot:
             legal_actions,
             card_registry=card_registry,
         )
-        if not isinstance(action, ResolveChoiceAction):
-            raise IllegalActionError("Pending choice selection requires ResolveChoiceAction.")
-        return action
-
-
-def _mulligan_key(selection: MulliganSelection) -> tuple[int, tuple[str, ...]]:
-    return (len(selection.cards_to_replace), tuple(map(str, selection.cards_to_replace)))
+        return require_resolve_choice(action, "GreedyBot")
 
 
 def _action_score(
@@ -154,8 +138,11 @@ def _non_play_action_score(action: GameAction) -> int:
 def _play_card_score(definition: CardDefinition, *, target_row: Row | None) -> int:
     score = definition.base_strength + _card_type_bonus(definition)
     if target_row is not None:
-        score += row_preference(target_row)
+        score += _ROW_PREFERENCE[target_row]
     return score
+
+
+_ROW_PREFERENCE = {Row.CLOSE: 3, Row.RANGED: 2, Row.SIEGE: 1}
 
 
 def _card_type_bonus(definition: CardDefinition) -> int:

@@ -1,34 +1,47 @@
 from __future__ import annotations
 
+import argparse
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
 
 from rich.console import Console
 
-from gwent_engine.cli.args import parse_args
 from gwent_engine.cli.bot_matches import (
     available_leaders,
     available_sample_decks,
     run_bot_match_cli,
 )
-from gwent_engine.cli.html_report import write_bot_match_review
 from gwent_engine.cli.interactive import prompt_bot_match_selection
+from gwent_engine.cli.report import write_bot_match_review
 from gwent_engine.core.errors import IllegalActionError
 
 
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description="Run deterministic bot-vs-bot Gwent matches for developer inspection."
+    )
+    _ = parser.add_argument(
+        "--mode",
+        choices=("bot-match",),
+        default="bot-match",
+        help="Run the interactive bot match builder.",
+    )
+    return parser
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    return build_parser().parse_args(argv)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    args = parse_args(argv)
-    mode = cast(str, args.mode)
+    _ = parse_args(argv)
     try:
-        return _run_report_mode(mode=mode)
+        return _run_bot_match()
     except (IllegalActionError, RuntimeError, ValueError) as exc:
         return _cli_failure(exc)
 
 
-def _run_report_mode(*, mode: str) -> int:
-    if mode != "bot-match":
-        raise ValueError(f"Unsupported CLI mode: {mode!r}")
+def _run_bot_match() -> int:
     selection = prompt_bot_match_selection(
         decks=available_sample_decks(),
         leaders=available_leaders(),

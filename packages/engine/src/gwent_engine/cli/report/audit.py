@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict
+from typing import cast
 
-from gwent_engine.ai.debug import HeuristicDecisionExplanation, heuristic_decision_to_dict
+from gwent_engine.ai.baseline.explain import (
+    HeuristicDecisionExplanation,
+    heuristic_decision_to_dict,
+)
 from gwent_engine.ai.search import (
     SearchCandidate,
     SearchCandidateEvaluation,
@@ -15,10 +19,11 @@ from gwent_engine.ai.search import (
     SearchTraceFact,
     SearchValueTerm,
 )
-from gwent_engine.cli.models import BotDecisionExplanation, CliRun, CliStep
-from gwent_engine.cli.render_json import action_to_dict, metadata_to_dict
+from gwent_engine.cli.models import BotDecisionExplanation, CliMetadata, CliRun, CliStep
+from gwent_engine.core.actions import GameAction
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.serialize import event_to_dict, game_state_to_dict
+from gwent_engine.serialize.actions import ActionPayloadValue, action_payload
 
 AUDIT_SCHEMA_VERSION = 1
 
@@ -42,18 +47,7 @@ def build_bot_match_audit_payload(
             "p2": player_two_bot_spec,
         },
         "metadata": metadata_to_dict(run.metadata),
-        "card_metadata": {
-            str(card_id): {
-                "name": run.card_names_by_instance_id[card_id],
-                "base_value": run.card_values_by_instance_id[card_id],
-                "kind": run.card_kinds_by_instance_id[card_id],
-                "is_spy": run.card_spy_by_instance_id[card_id],
-                "is_medic": run.card_medic_by_instance_id[card_id],
-                "is_horn": run.card_horn_by_instance_id[card_id],
-                "is_scorch": run.card_scorch_by_instance_id[card_id],
-            }
-            for card_id in run.card_names_by_instance_id
-        },
+        "card_metadata": {str(card_id): asdict(card) for card_id, card in run.cards.items()},
         "pending_choice_state": (
             None
             if run.pending_choice_state is None
@@ -226,3 +220,49 @@ def _strengths_to_dict(
     strengths_by_instance_id: Mapping[CardInstanceId, int],
 ) -> dict[str, int]:
     return {str(card_id): strength for card_id, strength in strengths_by_instance_id.items()}
+
+
+def metadata_to_dict(metadata: CliMetadata) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "game_id": str(metadata.game_id),
+        "p1_id": str(metadata.player_one_id),
+        "p2_id": str(metadata.player_two_id),
+        "p1_deck_id": str(metadata.player_one_deck_id),
+        "p2_deck_id": str(metadata.player_two_deck_id),
+        "p1_leader_id": str(metadata.player_one_leader_id),
+        "p2_leader_id": str(metadata.player_two_leader_id),
+        "p1_leader_name": metadata.player_one_leader_name,
+        "p2_leader_name": metadata.player_two_leader_name,
+        "rng_name": metadata.rng_name,
+        "environment_seed": metadata.environment_seed,
+        "pending_choice_encountered": metadata.pending_choice_encountered,
+    }
+    if metadata.player_one_actor is not None:
+        payload["p1_actor"] = metadata.player_one_actor
+    if metadata.player_two_actor is not None:
+        payload["p2_actor"] = metadata.player_two_actor
+    return payload
+
+
+def action_to_dict(action: GameAction) -> dict[str, object]:
+    payload = action_payload(action)
+    type_name = cast(str, payload["type"])
+    if type_name == "ResolveMulligansAction":
+        selections = cast(
+            tuple[tuple[str, tuple[str, ...]], ...],
+            payload["selections"],
+        )
+        return {
+            "type": type_name,
+            "selections": [
+                {"player_id": player_id, "cards_to_replace": list(cards)}
+                for player_id, cards in selections
+            ],
+        }
+    return {key: _json_field(value) for key, value in payload.items()}
+
+
+def _json_field(value: ActionPayloadValue) -> object:
+    if isinstance(value, tuple):
+        return list(value)
+    return None if value == "" else value

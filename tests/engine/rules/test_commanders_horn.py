@@ -7,12 +7,10 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.scoring import calculate_row_score
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-)
+from ..support import CARD_REGISTRY
 
 
 def test_commanders_horn_doubles_a_row_and_is_limited_to_one_per_row() -> None:

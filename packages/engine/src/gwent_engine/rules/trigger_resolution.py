@@ -5,13 +5,13 @@ from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import GameEvent
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState
-from gwent_engine.factions.passives import (
+from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.rules.faction_passives import (
     resolve_after_round_winner_finalized,
     resolve_before_round_cleanup,
     resolve_round_outcome_modifiers,
     resolve_round_start_passives,
 )
-from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.round_cleanup import (
     cleanup_battlefield,
     determine_match_winner,

@@ -10,10 +10,10 @@ from gwent_engine.ai.baseline import (
     compose_profile,
 )
 from gwent_engine.ai.baseline.projection import projected_future_card_value
+from gwent_engine.ai.observation_queries import viewer_deck_count, viewer_deck_definitions
 from gwent_engine.ai.observations import PlayerObservation, build_player_observation
 from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, SearchConfig
 from gwent_engine.ai.search.types import SearchTraceFact, SearchValueTerm
-from gwent_engine.ai.utils import viewer_deck_count, viewer_deck_definitions
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import AbilityKind, CardType, GameStatus
 from gwent_engine.core.ids import PlayerId
@@ -219,9 +219,9 @@ def _terminal_match_value(winner_label: str, *, config: SearchConfig) -> float:
 def _effective_viewer_hand_value_for_search(assessment: DecisionAssessment) -> int:
     """Return the hand value term that should survive into the search leaf.
 
-    Search phase 2/3 stops after the viewer turn plus an optional opponent
-    reply. That makes the leaf especially vulnerable to overvaluing "safe"
-    passes in final or elimination rounds: once the viewer has passed, those
+    Search stops after the viewer turn plus an optional opponent reply. That
+    makes the leaf especially vulnerable to overvaluing "safe" passes in final
+    or elimination rounds: once the viewer has passed, those
     held cards are no longer future-round resources, they are dead.
 
     We therefore keep ordinary hand preservation in non-elimination rounds, but

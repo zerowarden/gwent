@@ -18,15 +18,16 @@ from typing import NoReturn, cast, final
 from unittest.mock import patch
 
 import pytest
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_evaluation import execution
 from gwent_evaluation.execution import EvidencePolicy, RunExecution
 from gwent_evaluation.models import MatchResult, RunManifest, ScheduledMatch, SpecError, SuiteSpec
 from gwent_evaluation.progress import Progress, observe
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.schedule import schedule_suite
-from gwent_evaluation.storage import RunStore
+from gwent_evaluation.storage import RunStore, read_record_mapping
 from gwent_evaluation.tuning.storage import StudyLockedError, exclusive_writer
+from gwent_shared.json_payloads import dump_pretty_json
 
 from tests.evaluation.support import REPOSITORY_ROOT, heuristic_agent, suite_spec
 
@@ -244,9 +245,9 @@ def test_real_process_action_limit_remains_explicit_and_corruption_precedes_pool
     monkeypatch.setattr(execution, "ProcessPoolExecutor", _no_pool)
     assert _run(tmp_path, workers=3, suite=_suite(action_budget=1)).results == run.results
     path = run.root / "matches" / f"{run.results[-1].case_id}.json"
-    _ = path.write_text(
-        path.read_text().replace('"accepted_transitions": 1', '"accepted_transitions": 2')
-    )
+    record = read_record_mapping(path)
+    assert record["accepted_transitions"] == 1
+    _ = path.write_text(dump_pretty_json({**record, "accepted_transitions": 2}))
     with pytest.raises(CorruptRecordError):
         _ = _run(tmp_path, workers=2, suite=_suite(action_budget=1))
 

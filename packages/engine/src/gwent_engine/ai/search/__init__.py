@@ -1,13 +1,10 @@
-from gwent_engine.ai.policy import DEFAULT_SEARCH_CONFIG, SearchConfig
 from gwent_engine.ai.search.bot import SearchBot
 from gwent_engine.ai.search.engine import SearchEngine, build_search_engine
-from gwent_engine.ai.search.explain import (
-    SearchDecisionComparison,
-    SearchDecisionExplanation,
-)
 from gwent_engine.ai.search.types import (
     SearchCandidate,
     SearchCandidateEvaluation,
+    SearchDecisionComparison,
+    SearchDecisionExplanation,
     SearchLine,
     SearchLineExplanation,
     SearchReplyExplanation,
@@ -17,11 +14,9 @@ from gwent_engine.ai.search.types import (
 )
 
 __all__ = [
-    "DEFAULT_SEARCH_CONFIG",
     "SearchBot",
     "SearchCandidate",
     "SearchCandidateEvaluation",
-    "SearchConfig",
     "SearchDecisionComparison",
     "SearchDecisionExplanation",
     "SearchEngine",

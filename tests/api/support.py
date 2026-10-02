@@ -4,13 +4,21 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from fastapi.testclient import TestClient
-from gwent_service.application.match_service import MatchService
-from gwent_service.dependencies import get_match_service
-from gwent_service.engine.adapter import GwentEngineAdapter
-from gwent_service.infrastructure.memory_repo import InMemoryMatchRepository
+from gwent_service.api import get_match_service
+from gwent_service.engine_adapter import GwentEngineAdapter
 from gwent_service.main import app
+from gwent_service.match_service import MatchService
+from gwent_service.persistence import InMemoryMatchRepository
 
-from tests.service.support import identity_rng_factory
+from tests.service.support import (
+    ALICE,
+    ALICE_DECK_ID,
+    BOB,
+    BOB_DECK_ID,
+    DEFAULT_RNG_SEED,
+    identity_rng_factory,
+)
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 @contextmanager
@@ -32,23 +40,23 @@ def api_client() -> Generator[tuple[TestClient, InMemoryMatchRepository], None, 
 def create_match_payload(
     *,
     match_id: str,
-    viewer_player_id: str = "alice",
-    player_one_deck: str = "monsters_muster_swarm_strict",
-    player_two_deck: str = "nilfgaard_spy_medic_control_strict",
-    rng_seed: int = 7,
+    viewer_player_id: str = ALICE,
+    player_one_deck: str = ALICE_DECK_ID,
+    player_two_deck: str = BOB_DECK_ID,
+    rng_seed: int = DEFAULT_RNG_SEED,
 ) -> dict[str, object]:
     return {
         "match_id": match_id,
         "viewer_player_id": viewer_player_id,
         "participants": [
             {
-                "service_player_id": "alice",
-                "engine_player_id": "p1",
+                "service_player_id": ALICE,
+                "engine_player_id": str(PLAYER_ONE_ID),
                 "deck_id": player_one_deck,
             },
             {
-                "service_player_id": "bob",
-                "engine_player_id": "p2",
+                "service_player_id": BOB,
+                "engine_player_id": str(PLAYER_TWO_ID),
                 "deck_id": player_two_deck,
             },
         ],
@@ -58,7 +66,7 @@ def create_match_payload(
 
 def complete_mulligans(client: TestClient, match_id: str) -> None:
     """Submit empty mulligans for both seats so the match reaches in-round play."""
-    for service_player_id in ("alice", "bob"):
+    for service_player_id in (ALICE, BOB):
         response = client.post(
             f"/matches/{match_id}/mulligan",
             json={"service_player_id": service_player_id, "card_instance_ids": []},

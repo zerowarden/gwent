@@ -3,11 +3,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import final
 
+from gwent_engine.ai.agents.protocol import require_resolve_choice
 from gwent_engine.ai.baseline import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
     profile_bot_display_name,
-    resolve_base_profile,
 )
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import DEFAULT_SEARCH_CONFIG, SearchConfig
@@ -18,7 +18,6 @@ from gwent_engine.core.actions import (
     MulliganSelection,
     ResolveChoiceAction,
 )
-from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.leaders import LeaderRegistry
 
 
@@ -37,13 +36,6 @@ class SearchBot:
             config=config,
             profile_definition=profile_definition,
             bot_id=bot_id,
-        )
-
-    @staticmethod
-    def from_profile_id(*, bot_id: str, profile_id: str | None) -> SearchBot:
-        return SearchBot(
-            bot_id=bot_id,
-            profile_definition=resolve_base_profile(profile_id),
         )
 
     def choose_mulligan(
@@ -91,6 +83,4 @@ class SearchBot:
             card_registry=card_registry,
             leader_registry=leader_registry,
         )
-        if not isinstance(result.chosen_action, ResolveChoiceAction):
-            raise IllegalActionError("SearchBot pending choice requires ResolveChoiceAction.")
-        return result.chosen_action
+        return require_resolve_choice(result.chosen_action, "SearchBot")

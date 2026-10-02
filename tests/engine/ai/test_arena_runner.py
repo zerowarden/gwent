@@ -12,11 +12,11 @@ from gwent_engine.ai.arena import (
     execute_match,
 )
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.cards import DeckDefinition
 from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.errors import GwentEngineError
 from gwent_engine.core.ids import GameId, LeaderId
 from gwent_engine.core.randomness import SeededRandom
+from gwent_engine.decks import DeckDefinition
 
 from tests.engine.ai.bots import (
     CountingBot,
@@ -24,12 +24,8 @@ from tests.engine.ai.bots import (
     IllegalActionBot,
     LeaderChoiceBot,
 )
-from tests.engine.support import (
-    CARD_REGISTRY,
-    LEADER_REGISTRY,
-    PLAYER_ONE_ID,
-    sample_deck_map,
-)
+from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY, sample_deck_map
+from tests.support import PLAYER_ONE_ID
 
 _STARTING_DECK_IDS = ("monsters_muster_swarm_strict", "nilfgaard_spy_medic_control_strict")
 _DESTROYER_LEADER_ID = LeaderId("monsters_eredin_destroyer_of_worlds")

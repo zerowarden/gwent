@@ -9,8 +9,7 @@ from gwent_engine.core.actions import (
     StartGameAction,
     UseLeaderAbilityAction,
 )
-from gwent_engine.core.config import MAX_MULLIGAN_REPLACEMENTS, OPENING_HAND_SIZE
-from gwent_engine.core.enums import GameStatus, Phase
+from gwent_engine.core.enums import MAX_MULLIGAN_REPLACEMENTS, OPENING_HAND_SIZE, GameStatus, Phase
 from gwent_engine.core.errors import (
     IllegalActionError,
     UnknownCardDefinitionError,
@@ -19,7 +18,7 @@ from gwent_engine.core.errors import (
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.rules.leader_abilities import validate_use_leader_ability_legality
+from gwent_engine.rules.leader_validation import validate_use_leader_ability_legality
 from gwent_engine.rules.legality import (
     validate_in_round_player_can_act,
     validate_play_card_legality,

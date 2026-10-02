@@ -35,8 +35,6 @@ from gwent_engine.core.errors import (
     UnknownAbilityKindError,
     UnknownCardDefinitionError,
     UnknownCardInstanceError,
-    UnknownFactionError,
-    UnknownPassiveKindError,
     UnknownPlayerError,
 )
 from gwent_engine.core.events import (
@@ -98,8 +96,6 @@ __all__ = [
     "UnknownAbilityKindError",
     "UnknownCardDefinitionError",
     "UnknownCardInstanceError",
-    "UnknownFactionError",
-    "UnknownPassiveKindError",
     "UnknownPlayerError",
     "Zone",
 ]

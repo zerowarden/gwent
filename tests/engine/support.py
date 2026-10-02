@@ -1,7 +1,4 @@
-from dataclasses import replace
-
-from gwent_engine.ai.action_legality import is_legal_action
-from gwent_engine.ai.actions import enumerate_legal_actions
+from gwent_engine.ai.actions import enumerate_legal_actions, is_legal_action
 from gwent_engine.ai.agents import BotAgent
 from gwent_engine.ai.arena import (
     MatchExecution,
@@ -10,15 +7,13 @@ from gwent_engine.ai.arena import (
     execute_match,
 )
 from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.assets import bundled_data_dir
 from gwent_engine.cards.loaders import load_card_definitions
-from gwent_engine.cards.models import DeckDefinition
-from gwent_engine.cards.registry import CardRegistry
+from gwent_engine.cards.models import CardRegistry
 from gwent_engine.core import (
     CardType,
     FactionId,
-    GameStatus,
     LeaderAbilityKind,
-    Phase,
     Row,
 )
 from gwent_engine.core.actions import (
@@ -40,26 +35,14 @@ from gwent_engine.core.ids import (
 from gwent_engine.core.randomness import SeededRandom, SupportsRandom
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import (
-    CardInstance,
     GameState,
-    PendingChoice,
-    RowState,
 )
-from gwent_engine.decks import load_sample_decks
+from gwent_engine.decks import DeckDefinition, load_sample_decks
 from gwent_engine.leaders.loaders import load_leader_definitions
-from gwent_engine.leaders.registry import LeaderRegistry
-from gwent_engine.resources import bundled_data_dir
+from gwent_engine.leaders.models import LeaderRegistry
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 
-from tests.engine.primitives import (
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-    battlefield_card,
-    make_card_instance,
-    weather_card,
-)
-from tests.engine.scenario_builder import ScenarioCard, ScenarioRows, card, rows, scenario
-from tests.support import IdentityShuffle, IndexedRandom
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
 
 __all__ = (
     "CARD_REGISTRY",
@@ -83,8 +66,6 @@ __all__ = (
     "NORTHERN_REALMS_RANGED_SCORCH_LEADER_ID",
     "NORTHERN_REALMS_SIEGE_HORN_LEADER_ID",
     "NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID",
-    "PLAYER_ONE_ID",
-    "PLAYER_TWO_ID",
     "SCOIATAEL_AGILE_OPTIMIZER_LEADER_ID",
     "SCOIATAEL_CLOSE_SCORCH_LEADER_ID",
     "SCOIATAEL_DAISY_OF_THE_VALLEY_LEADER_ID",
@@ -95,19 +76,13 @@ __all__ = (
     "SKELLIGE_KING_BRAN_LEADER_ID",
     "SKELLIGE_SHUFFLE_DISCARDS_LEADER_ID",
     "SKELLIGE_TRANSFORM_AND_AVENGER_DECK_ID",
-    "IdentityShuffle",
-    "IndexedRandom",
-    "battlefield_card",
     "execute_recorded_match",
     "first_hand_unit_for_row",
-    "make_card_instance",
     "sample_deck_id_for",
     "sample_deck_map",
-    "weather_card",
 )
 
 DATA_DIR = bundled_data_dir()
-EMPTY_ROWS = RowState()
 
 MONSTERS_CLOSE_HORN_LEADER_ID = LeaderId("monsters_eredin_commander_of_the_red_riders")
 MONSTERS_ANY_WEATHER_LEADER_ID = LeaderId("monsters_eredin_king_of_the_wild_hunt")
@@ -254,7 +229,7 @@ def build_started_game_state(
     started_state, _ = apply_action(
         initial_state,
         StartGameAction(starting_player=starting_player),
-        rng=IdentityShuffle(),
+        rng=IdentityRandom(),
         leader_registry=leader_registry,
     )
     return started_state, card_registry
@@ -311,7 +286,7 @@ def run_scripted_round() -> tuple[GameState, tuple[GameEvent, ...]]:
         player_one_deck_id=NILFGAARD_DECK_ID,
         player_two_deck_id=NILFGAARD_DECK_ID,
     )
-    rng = IdentityShuffle()
+    rng = IdentityRandom()
     events: list[GameEvent] = []
     state, action_events = apply_action(
         state,
@@ -444,81 +419,4 @@ def choose_bot_response(
         legal_actions,
         card_registry=resolved_card_registry,
         leader_registry=leader_registry,
-    )
-
-
-## TODO: Should this use the scenario builder?
-def build_custom_in_round_state(
-    *,
-    card_instances: tuple[CardInstance, ...],
-    player_one_deck: tuple[CardInstanceId, ...] = (),
-    player_one_hand: tuple[CardInstanceId, ...] = (),
-    player_one_discard: tuple[CardInstanceId, ...] = (),
-    player_one_rows: RowState = EMPTY_ROWS,
-    player_two_deck: tuple[CardInstanceId, ...] = (),
-    player_two_hand: tuple[CardInstanceId, ...] = (),
-    player_two_discard: tuple[CardInstanceId, ...] = (),
-    player_two_rows: RowState = EMPTY_ROWS,
-    player_one_faction: FactionId = FactionId.SCOIATAEL,
-    player_two_faction: FactionId = FactionId.SCOIATAEL,
-    player_one_leader_id: LeaderId | None = None,
-    player_two_leader_id: LeaderId | None = None,
-    current_player: PlayerId = PLAYER_ONE_ID,
-    starting_player: PlayerId = PLAYER_ONE_ID,
-    round_starter: PlayerId = PLAYER_ONE_ID,
-    weather: RowState = EMPTY_ROWS,
-    pending_choice: PendingChoice | None = None,
-) -> GameState:
-    """Compatibility adapter that routes legacy test setup through the shared scenario DSL."""
-    cards_by_id = {card_instance.instance_id: card_instance for card_instance in card_instances}
-
-    def scenario_cards(card_ids: tuple[CardInstanceId, ...]) -> tuple[ScenarioCard, ...]:
-        return tuple(
-            card(
-                instance_id=card_id,
-                definition_id=str(cards_by_id[card_id].definition_id),
-                owner=cards_by_id[card_id].owner,
-            )
-            for card_id in card_ids
-        )
-
-    def scenario_rows(row_state: RowState) -> ScenarioRows:
-        return rows(
-            close=scenario_cards(row_state.close),
-            ranged=scenario_cards(row_state.ranged),
-            siege=scenario_cards(row_state.siege),
-        )
-
-    built_state = (
-        scenario("custom_in_round_game")
-        .round(1)
-        .phase(Phase.IN_ROUND)
-        .status(GameStatus.IN_PROGRESS)
-        .current_player(current_player)
-        .turn_order(starting_player=starting_player, round_starter=round_starter)
-        .player(
-            PLAYER_ONE_ID,
-            faction=player_one_faction,
-            leader_id=player_one_leader_id or SCOIATAEL_RANGED_HORN_LEADER_ID,
-            hand=scenario_cards(player_one_hand),
-            deck=scenario_cards(player_one_deck),
-            discard=scenario_cards(player_one_discard),
-            board=scenario_rows(player_one_rows),
-        )
-        .player(
-            PLAYER_TWO_ID,
-            faction=player_two_faction,
-            leader_id=player_two_leader_id or SCOIATAEL_RANGED_HORN_LEADER_ID,
-            hand=scenario_cards(player_two_hand),
-            deck=scenario_cards(player_two_deck),
-            discard=scenario_cards(player_two_discard),
-            board=scenario_rows(player_two_rows),
-        )
-        .weather(scenario_rows(weather))
-        .build()
-    )
-    return replace(
-        built_state,
-        card_instances=card_instances,
-        pending_choice=pending_choice,
     )

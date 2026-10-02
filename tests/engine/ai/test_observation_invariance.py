@@ -3,16 +3,18 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.arena import create_seeded_bot
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.hashing import observation_fingerprint
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.core.state import GameState
+from gwent_engine.serialize.actions import action_to_id
+
+from tests.support import PLAYER_ONE_ID
 
 from ..scenario_builder import ScenarioCard, card, rows, scenario
-from ..support import CARD_REGISTRY, LEADER_REGISTRY, PLAYER_ONE_ID
+from ..support import CARD_REGISTRY, LEADER_REGISTRY
 
 SCENARIO_NAME = "observation_invariance"
 

@@ -1,10 +1,3 @@
-from gwent_shared.digests import (
-    canonical_hexdigest,
-    seed_from_text,
-    sha256_bytes,
-    sha256_bytes_hexdigest,
-    sha256_hexdigest,
-)
 from gwent_shared.extract import (
     expect_bool,
     expect_constructor,
@@ -38,22 +31,35 @@ from gwent_shared.extract import (
     stringify,
     stringify_list,
     stringify_optional,
+    translate_mapping_key,
 )
 from gwent_shared.json_payloads import (
+    DIGEST_PREFIX,
+    canonical_digest,
+    canonical_hexdigest,
     canonical_json,
+    digest_hex,
     dump_canonical_json,
     dump_json,
     dump_pretty_json,
+    is_digest,
     load_json_list,
     load_json_mapping,
     load_json_object_list,
     parse_json_document,
+    seed_from_text,
+    sha256_bytes,
+    sha256_bytes_hexdigest,
+    sha256_hexdigest,
     to_canonical,
 )
 
 __all__ = [
+    "DIGEST_PREFIX",
+    "canonical_digest",
     "canonical_hexdigest",
     "canonical_json",
+    "digest_hex",
     "dump_canonical_json",
     "dump_json",
     "dump_pretty_json",
@@ -71,6 +77,7 @@ __all__ = [
     "expect_pair_sequence",
     "expect_sequence",
     "expect_str",
+    "is_digest",
     "load_json_list",
     "load_json_mapping",
     "load_json_object_list",
@@ -98,4 +105,5 @@ __all__ = [
     "stringify_list",
     "stringify_optional",
     "to_canonical",
+    "translate_mapping_key",
 ]

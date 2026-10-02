@@ -1,20 +1,22 @@
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, final
+from typing import final
 
-from gwent_engine.ai.baseline.assessment import build_assessment
+from gwent_engine.ai.baseline.assessment import DecisionAssessment, build_assessment
 from gwent_engine.ai.baseline.decision_plan import build_decision_plan
-from gwent_engine.ai.baseline.mulligan import choose_mulligan_selection
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.baseline.pending_choice import choose_pending_choice_action
 from gwent_engine.ai.baseline.profile_catalog import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
     profile_bot_display_name,
-    resolve_base_profile,
 )
+from gwent_engine.ai.mulligan_scoring import best_mulligan_selection
+from gwent_engine.ai.observation_queries import build_viewer_hand_definition_index
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig
+from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, DEFAULT_MULLIGAN_POLICY, BaselineConfig
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     GameAction,
@@ -22,9 +24,6 @@ from gwent_engine.core.actions import (
     ResolveChoiceAction,
 )
 from gwent_engine.leaders import LeaderRegistry
-
-if TYPE_CHECKING:
-    from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 
 
 @final
@@ -37,7 +36,7 @@ class HeuristicBot:
         bot_id: str = "heuristic_bot",
     ) -> None:
         # Keep the configuration codec independent of baseline's eager exports.
-        from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+        from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 
         self._configuration = HeuristicConfiguration(baseline=config, profile=profile_definition)
         self.bot_id = bot_id
@@ -46,13 +45,6 @@ class HeuristicBot:
     @property
     def configuration(self) -> HeuristicConfiguration:
         return self._configuration
-
-    @staticmethod
-    def from_profile_id(*, bot_id: str, profile_id: str | None) -> HeuristicBot:
-        return HeuristicBot(
-            bot_id=bot_id,
-            profile_definition=resolve_base_profile(profile_id),
-        )
 
     def choose_mulligan(
         self,
@@ -109,3 +101,21 @@ class HeuristicBot:
             card_registry=card_registry,
             leader_registry=leader_registry,
         )
+
+
+def choose_mulligan_selection(
+    observation: PlayerObservation,
+    legal_selections: tuple[MulliganSelection, ...],
+    *,
+    assessment: DecisionAssessment,
+    card_registry: CardRegistry,
+) -> MulliganSelection:
+    if not legal_selections:
+        raise ValueError("choose_mulligan_selection requires at least one legal selection.")
+    return best_mulligan_selection(
+        legal_selections,
+        build_viewer_hand_definition_index(observation, card_registry),
+        Counter(definition.definition_id for definition in assessment.viewer.hand_definitions),
+        weights=DEFAULT_MULLIGAN_POLICY.baseline,
+        prefer_highest_card_ids=True,
+    )

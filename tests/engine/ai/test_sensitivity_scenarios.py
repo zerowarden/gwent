@@ -10,7 +10,8 @@ from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG
 
 from tests.engine.ai.support import make_clear_weather_leader_state
 from tests.engine.scenario_builder import card, rows, scenario
-from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY, PLAYER_ONE_ID
+from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY
+from tests.support import PLAYER_ONE_ID
 
 
 @pytest.mark.parametrize(

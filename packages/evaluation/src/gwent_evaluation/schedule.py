@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, GameId, PlayerId
+from gwent_shared.json_payloads import canonical_hexdigest
 
 from gwent_evaluation.models import AgentSpec, ScheduledMatch, SuiteSpec
-from gwent_evaluation.provenance import canonical_hexdigest, derive_seed
+from gwent_evaluation.provenance import derive_seed
 
 CASE_ID_VERSION = 1
 BLOCK_ID_VERSION = 1

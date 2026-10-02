@@ -1,9 +1,8 @@
 from dataclasses import dataclass, replace
 
-from gwent_engine.cards import DeckDefinition
 from gwent_engine.core import GameStatus, Phase, Zone
 from gwent_engine.core.actions import ResolveMulligansAction, StartGameAction
-from gwent_engine.core.config import OPENING_HAND_SIZE
+from gwent_engine.core.enums import OPENING_HAND_SIZE
 from gwent_engine.core.events import (
     CardsDrawnEvent,
     GameEvent,
@@ -14,9 +13,10 @@ from gwent_engine.core.events import (
 from gwent_engine.core.ids import CardInstanceId, GameId, PlayerId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import CardInstance, GameState, LeaderState, PlayerState, RowState
-from gwent_engine.factions.passives import resolve_starting_player_choice
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.rules.leader_abilities import resolve_setup_passive_leader_effects
+from gwent_engine.rules.faction_passives import resolve_starting_player_choice
+from gwent_engine.rules.leader_resolution import resolve_setup_passive_leader_effects
 from gwent_engine.rules.state_ops import card_in_zone, replace_card_instances
 
 

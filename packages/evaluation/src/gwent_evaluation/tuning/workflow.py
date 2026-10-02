@@ -8,7 +8,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import final
 
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_json, dump_pretty_json
 
 from gwent_evaluation.agents import resolve_agent, snapshot_suite
 from gwent_evaluation.assets import resolve_assets
@@ -19,14 +19,22 @@ from gwent_evaluation.execution import (
     validate_run_environment,
 )
 from gwent_evaluation.models import RunManifest, SpecError, SuitePurpose, TerminationReason
-from gwent_evaluation.output import write_output_index, write_run_guide, write_sensitivity_guide
-from gwent_evaluation.provenance import canonical_json
+from gwent_evaluation.progress import stage
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.schedule import schedule_suite
 from gwent_evaluation.specs import load_agent_catalog, load_suite_catalog
-from gwent_evaluation.storage import RunConflictError, atomic_write_text
+from gwent_evaluation.storage import (
+    RunConflictError,
+    atomic_write_text,
+    write_output_index,
+    write_run_guide,
+    write_sensitivity_guide,
+)
+from gwent_evaluation.tuning.html import write_plan_html
+from gwent_evaluation.tuning.latency import measure_selected_latency
 from gwent_evaluation.tuning.models import StudyMode, StudySpec
 from gwent_evaluation.tuning.reporting import render_pilot_readme, write_pilot_exports
+from gwent_evaluation.tuning.selection import select_challenger
 from gwent_evaluation.tuning.sensitivity import (
     SensitivityReport,
     require_sensitivity,
@@ -39,6 +47,7 @@ from gwent_evaluation.tuning.storage import (
     write_checked_document,
 )
 from gwent_evaluation.tuning.study import StudyResult, run_study
+from gwent_evaluation.tuning.study_report import write_study_report
 
 STAGES = ("plan", "smoke", "sensitivity", "optimization", "replay", "reports")
 
@@ -244,12 +253,6 @@ def run_tuning(
     recover_lock: bool = False,
 ) -> None:
     """Freeze inputs, run preflight and optimization, then freeze validation selection."""
-    from gwent_evaluation.progress import stage
-    from gwent_evaluation.tuning.html import write_plan_html
-    from gwent_evaluation.tuning.latency import measure_selected_latency
-    from gwent_evaluation.tuning.selection import select_challenger
-    from gwent_evaluation.tuning.study_report import write_study_report
-
     validate_run_environment(study.optimization, repository_root=repository_root)
     if study.mode is StudyMode.SCIENTIFIC and not study.optimization.repository.is_clean_checkout:
         raise SpecError("Scientific tuning requires a clean committed checkout.")

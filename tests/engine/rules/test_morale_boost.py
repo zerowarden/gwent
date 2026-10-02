@@ -3,11 +3,10 @@ from gwent_engine.core import Row
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.rules.scoring import calculate_effective_strength, calculate_row_score
 
+from tests.support import PLAYER_ONE_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-)
+from ..support import CARD_REGISTRY
 
 
 @pytest.mark.parametrize(

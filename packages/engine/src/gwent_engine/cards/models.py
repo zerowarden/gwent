@@ -1,7 +1,13 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
+from typing import ClassVar
 
 from gwent_engine.core import AbilityKind, CardType, FactionId, Row
-from gwent_engine.core.ids import CardDefinitionId, DeckId, LeaderId
+from gwent_engine.core.errors import UnknownCardDefinitionError
+from gwent_engine.core.ids import CardDefinitionId
+from gwent_engine.core.registry import MappingRegistry, build_registry
 
 _UNIT_ONLY_METADATA_FIELDS: tuple[str, ...] = (
     "musters_group",
@@ -235,12 +241,33 @@ class CardDefinition:
 
 
 @dataclass(frozen=True, slots=True)
-class DeckDefinition:
-    deck_id: DeckId
-    faction: FactionId
-    leader_id: LeaderId
-    card_definition_ids: tuple[CardDefinitionId, ...]
+class CardRegistry(MappingRegistry[CardDefinitionId, CardDefinition]):
+    _unknown_error: ClassVar[Callable[[object], Exception]] = UnknownCardDefinitionError
 
-    def __post_init__(self) -> None:
-        if not self.card_definition_ids:
-            raise ValueError("DeckDefinition must contain at least one card definition id.")
+    @classmethod
+    def from_definitions(cls, definitions: Iterable[CardDefinition]) -> CardRegistry:
+        return cls(
+            build_registry(
+                definitions,
+                key=_definition_id,
+                label="card",
+                validate=_validate_references,
+            )
+        )
+
+
+def _definition_id(definition: CardDefinition) -> CardDefinitionId:
+    return definition.definition_id
+
+
+def _validate_references(materialized: Mapping[CardDefinitionId, CardDefinition]) -> None:
+    for definition in materialized.values():
+        for referenced_definition_id in (
+            definition.transforms_into_definition_id,
+            definition.avenger_summon_definition_id,
+        ):
+            if (
+                referenced_definition_id is not None
+                and referenced_definition_id not in materialized
+            ):
+                raise UnknownCardDefinitionError(referenced_definition_id)

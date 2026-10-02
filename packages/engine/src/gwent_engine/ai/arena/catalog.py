@@ -14,7 +14,8 @@ from gwent_engine.ai.baseline import (
     HeuristicBot,
     resolve_base_profile,
 )
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact
 from gwent_engine.ai.policy import (
     DEFAULT_BASELINE_CONFIG,
     DEFAULT_GREEDY_ACTION_POLICY,
@@ -23,7 +24,6 @@ from gwent_engine.ai.policy import (
     BaselineConfig,
     SearchConfig,
 )
-from gwent_engine.ai.policy_artifacts import PolicyArtifact
 from gwent_engine.ai.search import SearchBot
 
 

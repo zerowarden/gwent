@@ -11,16 +11,17 @@ import pytest
 from gwent_evaluation import EvidencePolicy, SuitePurpose, replay_case
 from gwent_evaluation import execution as execution_module
 from gwent_evaluation import validation as validation_module
+from gwent_evaluation.holdout import ACKNOWLEDGEMENT_PHRASE, authorize_manual_consumption
 from gwent_evaluation.models import SpecError, SuiteSpec
 from gwent_evaluation.provenance import (
     RepositoryProvenance,
-    canonical_digest,
     file_digest,
     read_repository_provenance,
 )
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.reporting import build_run_comparison, build_run_report, load_run
 from gwent_evaluation.storage import RunConflictError, RunStore
+from gwent_shared.json_payloads import canonical_digest
 
 from tests.evaluation.support import (
     DECK_A,
@@ -133,8 +134,14 @@ def test_evidence_runs_require_clean_checkout(
         return replace(provenance, dirty=True)
 
     monkeypatch.setattr(execution_module, "read_repository_provenance", dirty_provenance)
+    suite = replace(tiny_suite(), purpose=purpose)
+    authorization = (
+        authorize_manual_consumption(suite, acknowledgement=ACKNOWLEDGEMENT_PHRASE)
+        if purpose.is_heldout
+        else None
+    )
     with pytest.raises(RunConflictError, match="clean checkout"):
-        _ = execute_suite(tmp_path, suite=replace(tiny_suite(), purpose=purpose))
+        _ = execute_suite(tmp_path, suite=suite, holdout_authorization=authorization)
     assert not (tmp_path / "run").exists()
 
 
@@ -229,7 +236,7 @@ def test_result_domain_validation_is_shared(tmp_path: Path, field: str, value: o
     ],
 )
 def test_checksums_do_not_replace_result_binding(tmp_path: Path, field: str, value: object) -> None:
-    from gwent_evaluation.provenance import canonical_digest
+    from gwent_shared.json_payloads import canonical_digest
 
     from tests.evaluation.support import read_json_object, write_json_object
 

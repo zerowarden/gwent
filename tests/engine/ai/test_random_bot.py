@@ -1,10 +1,7 @@
-from gwent_engine.ai.actions import (
-    action_to_id,
-    enumerate_legal_actions,
-    enumerate_mulligan_selections,
-)
+from gwent_engine.ai.actions import enumerate_legal_actions
 from gwent_engine.ai.agents.random_bot import RandomBot
 from gwent_engine.ai.observations import build_player_observation
+from gwent_engine.ai.turn_actions import enumerate_mulligan_selections
 from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.actions import (
     MulliganSelection,
@@ -17,13 +14,14 @@ from gwent_engine.core.actions import (
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.serialize.actions import action_to_id
+
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
     build_sample_game_state,
     build_started_game_state,
 )

@@ -5,11 +5,8 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
 from tests.engine.scenario_builder import card, rows, scenario
-from tests.engine.support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-)
+from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_scorch_kills_all_tied_strongest_units_and_discards_itself() -> None:

@@ -10,7 +10,7 @@ from gwent_engine.core.events import (
     PlayerPassedEvent,
     RoundEndedEvent,
 )
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
 from tests.engine.scenario_builder import card, scenario
@@ -20,53 +20,52 @@ from tests.engine.support import (
     MONSTERS_ANY_WEATHER_LEADER_ID,
     MONSTERS_DOUBLE_SPY_LEADER_ID,
     NORTHERN_REALMS_CLEAR_WEATHER_LEADER_ID,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
     SCOIATAEL_DECK_ID,
     build_in_round_game_state,
 )
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_pass_turn_advances_to_opponent_and_opponent_may_keep_playing() -> None:
-    state, card_registry = build_in_round_game_state(starting_player=PlayerId("p1"))
+    state, card_registry = build_in_round_game_state(starting_player=PLAYER_ONE_ID)
 
     passed_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
     )
 
-    assert passed_state.player(PlayerId("p1")).has_passed is True
-    assert passed_state.current_player == PlayerId("p2")
+    assert passed_state.player(PLAYER_ONE_ID).has_passed is True
+    assert passed_state.current_player == PLAYER_TWO_ID
     assert passed_state.phase == Phase.IN_ROUND
     assert isinstance(events[0], PlayerPassedEvent)
 
-    player_two_card = passed_state.player(PlayerId("p2")).hand[0]
+    player_two_card = passed_state.player(PLAYER_TWO_ID).hand[0]
     next_state, _ = apply_action(
         passed_state,
         PlayCardAction(
-            player_id=PlayerId("p2"),
+            player_id=PLAYER_TWO_ID,
             card_instance_id=player_two_card,
             target_row=Row.CLOSE,
         ),
         card_registry=card_registry,
     )
 
-    assert next_state.current_player == PlayerId("p2")
+    assert next_state.current_player == PLAYER_TWO_ID
 
 
 def test_passed_player_cannot_act_again() -> None:
-    state, card_registry = build_in_round_game_state(starting_player=PlayerId("p1"))
+    state, card_registry = build_in_round_game_state(starting_player=PLAYER_ONE_ID)
     passed_state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
     )
-    player_one_card = state.player(PlayerId("p1")).hand[0]
+    player_one_card = state.player(PLAYER_ONE_ID).hand[0]
 
     with pytest.raises(IllegalActionError, match="Passed players cannot act again"):
         _ = apply_action(
             passed_state,
             PlayCardAction(
-                player_id=PlayerId("p1"),
+                player_id=PLAYER_ONE_ID,
                 card_instance_id=player_one_card,
                 target_row=Row.CLOSE,
             ),
@@ -76,23 +75,23 @@ def test_passed_player_cannot_act_again() -> None:
 
 def test_two_passes_resolve_round_and_start_next_round() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=SCOIATAEL_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
     first_pass_state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
     )
 
     final_state, events = apply_action(
         first_pass_state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
     )
 
     assert final_state.phase == Phase.IN_ROUND
-    assert final_state.current_player == PlayerId("p1")
+    assert final_state.current_player == PLAYER_ONE_ID
     assert isinstance(events[1], RoundEndedEvent)
     assert isinstance(events[3], NextRoundStartedEvent)
 

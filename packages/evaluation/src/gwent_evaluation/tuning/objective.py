@@ -6,7 +6,8 @@ from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_shared.json_payloads import canonical_digest, digest_hex
 
 from gwent_evaluation.execution import (
     EvidencePolicy,
@@ -15,9 +16,10 @@ from gwent_evaluation.execution import (
     validate_run_environment,
     validate_worker_count,
 )
+from gwent_evaluation.holdout import HoldoutAuthorization, require_partition_authorization
 from gwent_evaluation.models import RunManifest, SpecError, TerminationReason
 from gwent_evaluation.progress import advance
-from gwent_evaluation.provenance import canonical_digest, default_repository_root
+from gwent_evaluation.provenance import default_repository_root
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.reporting import RunReport, build_run_report
 from gwent_evaluation.storage import RunConflictError, RunStore
@@ -270,11 +272,13 @@ def evaluate_recorded_candidate(
     *,
     repository_root: Path,
     workers: int = 1,
+    holdout_authorization: HoldoutAuthorization | None = None,
 ) -> RecordedEvaluation:
     validate_worker_count(workers)
+    authorization = require_partition_authorization(template.suite, holdout_authorization)
     advance(f"{template.suite.purpose.value}: checking candidate {configuration.digest()}")
     digest = configuration.digest()
-    run_id = "candidate-" + digest.removeprefix("sha256:")
+    run_id = "candidate-" + digest_hex(digest)
     expected = candidate_manifest(template, configuration, run_id=run_id)
     validate_run_environment(expected, repository_root=repository_root)
     entry = store.next_entry
@@ -299,6 +303,7 @@ def evaluate_recorded_candidate(
             evidence_policy=EvidencePolicy.NONE,
             expected_manifest=expected,
             workers=workers,
+            holdout_authorization=authorization,
         )
         loaded = RunStore.from_root(execution.root).load()
         report = build_run_report(loaded, bootstrap=study.bootstrap)

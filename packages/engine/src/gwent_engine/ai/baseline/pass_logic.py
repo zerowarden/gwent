@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from math import ceil
 
-from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.assessment import DecisionAssessment
 from gwent_engine.ai.baseline.context import (
     DecisionContext,
@@ -12,15 +11,15 @@ from gwent_engine.ai.baseline.context import (
     TempoState,
 )
 from gwent_engine.ai.baseline.projection.context import viewer_public
+from gwent_engine.ai.observation_queries import viewer_deck_count, viewer_hand_definition
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import PassConfig
-from gwent_engine.ai.tactical_values import action_commitment_value, estimated_response_value
-from gwent_engine.ai.utils import viewer_deck_count, viewer_hand_definition
+from gwent_engine.ai.policy import DEFAULT_TACTICAL_VALUE_POLICY, PassConfig
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType
-from gwent_engine.core.actions import GameAction, PlayCardAction, UseLeaderAbilityAction
+from gwent_engine.core.actions import GameAction, PassAction, PlayCardAction, UseLeaderAbilityAction
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.serialize.actions import action_to_id
 
 
 def should_pass_now(
@@ -354,11 +353,63 @@ def _estimated_opponent_response(
     context: DecisionContext,
     config: PassConfig,
 ) -> int:
-    return estimated_response_value(
-        hand_count=assessment.opponent.hand_count,
-        tempo_per_card=(
-            config.elimination_estimated_opponent_tempo_per_card
-            if context.pressure == PressureMode.ELIMINATION
-            else config.estimated_opponent_tempo_per_card
-        ),
+    tempo_per_card = (
+        config.elimination_estimated_opponent_tempo_per_card
+        if context.pressure == PressureMode.ELIMINATION
+        else config.estimated_opponent_tempo_per_card
     )
+    return assessment.opponent.hand_count * tempo_per_card
+
+
+def action_commitment_value(
+    action: GameAction,
+    *,
+    observation: PlayerObservation,
+    card_registry: CardRegistry,
+    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
+    leader_value: int = DEFAULT_TACTICAL_VALUE_POLICY.leader_commitment_value,
+    units_only: bool = False,
+    include_spies: bool = True,
+) -> int:
+    value = 0
+    match action:
+        case PassAction():
+            pass
+        case UseLeaderAbilityAction():
+            value = leader_value
+        case PlayCardAction(card_instance_id=card_instance_id):
+            value = _play_card_commitment_value(
+                card_instance_id,
+                observation=observation,
+                card_registry=card_registry,
+                viewer_hand_definitions=viewer_hand_definitions,
+                units_only=units_only,
+                include_spies=include_spies,
+            )
+        case _:
+            pass
+    return value
+
+
+def _play_card_commitment_value(
+    card_instance_id: CardInstanceId,
+    *,
+    observation: PlayerObservation,
+    card_registry: CardRegistry,
+    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None,
+    units_only: bool,
+    include_spies: bool,
+) -> int:
+    definition = viewer_hand_definition(
+        card_instance_id,
+        observation=observation,
+        card_registry=card_registry,
+        viewer_hand_definitions=viewer_hand_definitions,
+    )
+    if definition is None:
+        return 0
+    if units_only and definition.card_type != CardType.UNIT:
+        return 0
+    if not include_spies and AbilityKind.SPY in definition.ability_kinds:
+        return 0
+    return definition.base_strength

@@ -6,12 +6,10 @@ from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.row_effects import row_has_commanders_horn
 from gwent_engine.rules.scoring import calculate_effective_strength
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-)
+from ..support import CARD_REGISTRY
 
 
 def test_unit_horn_activates_and_doubles_non_hero_units_on_its_row() -> None:

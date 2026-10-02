@@ -6,19 +6,21 @@ import argparse
 import os
 import platform
 import statistics
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from time import perf_counter
 from typing import cast
 
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.execution import EvidencePolicy, execute_run, validate_worker_count
 from gwent_evaluation.html_report import chart, table
 from gwent_evaluation.models import SpecError, SuitePurpose, SuiteSpec
 from gwent_evaluation.progress import TerminalProgress, advance, stage
-from gwent_evaluation.provenance import canonical_digest, default_repository_root
+from gwent_evaluation.provenance import default_repository_root
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.storage import RunConflictError
 from gwent_evaluation.tuning.range_reports import write_report
@@ -307,7 +309,7 @@ def measure_throughput(spec: Path, root: Path, *, workers: tuple[int, ...], repe
             write_throughput_report(root, snapshot, rows, status=status)
 
 
-def main() -> None:
+def throughput_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     _ = parser.add_argument(
         "--spec",
@@ -320,21 +322,20 @@ def main() -> None:
     _ = parser.add_argument("--workers", type=int, nargs="+", default=[1, 4, 8, 16, 32])
     _ = parser.add_argument("--repeats", type=int, default=2)
     _ = parser.add_argument("--report-only", action="store_true")
-    args = parser.parse_args()
+    parser.set_defaults(handler=throughput_command)
+    return parser
+
+
+def throughput_command(args: argparse.Namespace) -> int:
     root = cast(Path, args.output)
     if cast(bool, args.report_only):
         rebuild_throughput_report(root)
-    else:
-        import sys
-
-        with TerminalProgress(sys.stderr).display():
-            measure_throughput(
-                cast(Path, args.spec),
-                root,
-                workers=tuple(cast(list[int], args.workers)),
-                repeats=cast(int, args.repeats),
-            )
-
-
-if __name__ == "__main__":
-    main()
+        return 0
+    with TerminalProgress(sys.stderr).display():
+        measure_throughput(
+            cast(Path, args.spec),
+            root,
+            workers=tuple(cast(list[int], args.workers)),
+            repeats=cast(int, args.repeats),
+        )
+    return 0

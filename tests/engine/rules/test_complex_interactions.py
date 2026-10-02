@@ -5,13 +5,17 @@ from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.rules.scoring import calculate_effective_strength, calculate_row_score
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
-## TODO: Add docstring explaining the interaction
 def test_weather_bond_horn_and_morale_follow_the_documented_pipeline() -> None:
+    """Frost sets base strength to 1, tight bond doubles, morale adds 1, horn doubles.
+
+    Bond units resolve 1 -> 2 -> 3 -> 6; the morale source is not boosted by itself,
+    so it resolves 1 -> 2.
+    """
     card_registry = CARD_REGISTRY
     first_bond_card_id = CardInstanceId("p1_first_bond_vanguard")
     second_bond_card_id = CardInstanceId("p1_second_bond_vanguard")
@@ -41,7 +45,7 @@ def test_weather_bond_horn_and_morale_follow_the_documented_pipeline() -> None:
     assert calculate_row_score(state, card_registry, PLAYER_ONE_ID, Row.CLOSE) == 14
 
 
-def test_scorch_uses_phase9_effective_strength_when_destroying_units() -> None:
+def test_scorch_uses_final_effective_strength_when_destroying_units() -> None:
     card_registry = CARD_REGISTRY
     scorch_card_id = CardInstanceId("p1_scorch_finisher")
     first_bond_card_id = CardInstanceId("p1_first_bond_vanguard")

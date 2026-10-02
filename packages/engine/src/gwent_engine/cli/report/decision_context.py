@@ -4,7 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from gwent_engine.ai.baseline import ActionScoreBreakdown, PressureMode
-from gwent_engine.ai.debug import CandidateExplanation, HeuristicDecisionExplanation
+from gwent_engine.ai.baseline.explain import CandidateExplanation, HeuristicDecisionExplanation
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.cli.models import BotDecisionExplanation, CliStep
 from gwent_engine.cli.report.common import formatted_summary

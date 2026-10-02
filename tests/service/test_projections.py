@@ -1,25 +1,27 @@
 from __future__ import annotations
 
 from gwent_engine.core.actions import StartGameAction
-from gwent_engine.core.ids import PlayerId
 from gwent_engine.serialize import game_state_to_dict
-from gwent_service.application.projections import project_match_for_player
-from gwent_service.application.snapshot import snapshot_from_stored_match
-from gwent_service.domain.models import (
+from gwent_service.domain import (
     StagedMulliganSubmission,
     StoredMatch,
     StoredPlayerSlot,
 )
-from gwent_service.engine.adapter import GwentEngineAdapter
-from gwent_service.engine.contracts import CreateMatchStateSpec, EnginePlayerDeckSpec
+from gwent_service.engine_adapter import (
+    CreateMatchStateSpec,
+    EnginePlayerDeckSpec,
+    GwentEngineAdapter,
+)
+from gwent_service.match_service import snapshot_from_stored_match
+from gwent_service.projections import project_match_for_player
 
 from tests.service.support import pending_decoy_state
-from tests.support import IdentityShuffle
+from tests.support import PLAYER_ONE_ID, IdentityRandom
 
 
 def test_projection_hides_opponent_hand_contents_and_never_exposes_staged_mulligans() -> None:
     adapter = GwentEngineAdapter()
-    rng = IdentityShuffle()
+    rng = IdentityRandom()
     base_state = adapter.create_match_state(
         CreateMatchStateSpec(
             game_id="projection_match",
@@ -31,7 +33,7 @@ def test_projection_hides_opponent_hand_contents_and_never_exposes_staged_mullig
     )
     transition = adapter.apply_engine_action(
         base_state,
-        StartGameAction(starting_player=PlayerId("p1")),
+        StartGameAction(starting_player=PLAYER_ONE_ID),
         rng=rng,
     )
     stored_match = StoredMatch(

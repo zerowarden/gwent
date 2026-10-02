@@ -9,6 +9,7 @@ from typing import cast
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_evaluation import AgentSpec, EvidencePolicy, SuitePurpose, SuiteSpec, execute_run
 from gwent_evaluation.execution import RunExecution
+from gwent_evaluation.holdout import HoldoutAuthorization
 from gwent_evaluation.metrics import CaseStatus, ScoredCase
 from gwent_evaluation.models import (
     AGENT_SPEC_VERSION,
@@ -161,6 +162,7 @@ def execute_suite(
     suite: SuiteSpec | None = None,
     run_id: str = "run",
     evidence_policy: EvidencePolicy = EvidencePolicy.ALL,
+    holdout_authorization: HoldoutAuthorization | None = None,
 ) -> RunExecution:
     return execute_run(
         suite=suite or suite_spec(),
@@ -168,6 +170,7 @@ def execute_suite(
         output_root=output_root,
         repository_root=REPOSITORY_ROOT,
         evidence_policy=evidence_policy,
+        holdout_authorization=holdout_authorization,
     )
 
 

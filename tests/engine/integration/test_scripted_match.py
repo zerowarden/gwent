@@ -10,7 +10,8 @@ from gwent_engine.core.events import (
     StartingPlayerChosenEvent,
 )
 
-from tests.engine.support import PLAYER_ONE_ID, PLAYER_TWO_ID, run_scripted_round
+from tests.engine.support import run_scripted_round
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_deterministic_scripted_match_has_expected_events_and_final_state() -> None:

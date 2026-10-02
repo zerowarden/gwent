@@ -16,10 +16,14 @@ from gwent_shared.json_payloads import dump_pretty_json
 from gwent_evaluation.models import SpecError
 from gwent_evaluation.progress import Progress, TerminalProgress, stage
 from gwent_evaluation.provenance import default_repository_root
+from gwent_evaluation.tuning.assessment import assessment_parser
+from gwent_evaluation.tuning.html import write_plan_html
 from gwent_evaluation.tuning.models import StudySpec
+from gwent_evaluation.tuning.ranges import ranges_parser
 from gwent_evaluation.tuning.selection import finalize_study, select_challenger, verify_selection
 from gwent_evaluation.tuning.specs import load_study_spec, plan_study
 from gwent_evaluation.tuning.study_report import optimization_directory, write_study_report
+from gwent_evaluation.tuning.throughput import throughput_parser
 from gwent_evaluation.tuning.workflow import run_tuning
 
 
@@ -97,9 +101,10 @@ def tuning_parsers() -> Iterator[tuple[str, argparse.ArgumentParser]]:
             _ = parser.add_argument("--recover-lock", action="store_true")
         parser.set_defaults(handler=command)
         yield name, parser
-    from gwent_evaluation.tuning.ranges import ranges_parser
 
     yield "ranges", ranges_parser()
+    yield "assessment", assessment_parser()
+    yield "throughput", throughput_parser()
 
 
 def _print_plan(study: StudySpec, root: Path) -> None:
@@ -157,8 +162,6 @@ def _execute(args: argparse.Namespace) -> int:
     study = _study(args) if name in {"plan", "run"} else None
     root = _root(args, study)
     if name == "plan":
-        from gwent_evaluation.tuning.html import write_plan_html
-
         assert study is not None
         write_plan_html(study, root)
         if as_json:

@@ -3,16 +3,16 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from gwent_engine.cards import CardDefinition, CardRegistry, DeckDefinition
-from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
-from gwent_engine.runtime_assets import (
+from gwent_engine.assets import (
     load_card_registry,
     load_leader_registry,
     load_sample_deck_map,
 )
-from gwent_shared.error_translation import translate_mapping_key
-
-from gwent_evaluation.provenance import canonical_digest
+from gwent_engine.cards import CardDefinition, CardRegistry
+from gwent_engine.decks import DeckDefinition
+from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
+from gwent_shared.extract import translate_mapping_key
+from gwent_shared.json_payloads import canonical_digest
 
 
 @dataclass(frozen=True, slots=True)

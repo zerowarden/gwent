@@ -8,12 +8,12 @@ from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 from gwent_engine.rules.players import replace_player
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
 from ..support import (
     NORTHERN_REALMS_DECK_ID,
     NORTHERN_REALMS_SIEGE_HORN_LEADER_ID,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
     SCOIATAEL_DECK_ID,
     SCOIATAEL_RANGED_HORN_LEADER_ID,
     build_in_round_game_state,
@@ -22,64 +22,64 @@ from ..support import (
 
 def test_northern_realms_draws_one_card_on_round_win() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=NORTHERN_REALMS_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
-    initial_deck_size = len(state.player(PlayerId("p1")).deck)
+    initial_deck_size = len(state.player(PLAYER_ONE_ID).deck)
     state, _ = apply_action(
         state,
         PlayCardAction(
-            player_id=PlayerId("p1"),
-            card_instance_id=state.player(PlayerId("p1")).hand[0],
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=state.player(PLAYER_ONE_ID).hand[0],
             target_row=Row.CLOSE,
         ),
         card_registry=card_registry,
     )
-    state, _ = apply_action(state, PassAction(player_id=PlayerId("p2")))
+    state, _ = apply_action(state, PassAction(player_id=PLAYER_TWO_ID))
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
     )
 
-    assert len(next_state.player(PlayerId("p1")).hand) == 10
-    assert len(next_state.player(PlayerId("p1")).deck) == initial_deck_size - 1
+    assert len(next_state.player(PLAYER_ONE_ID).hand) == 10
+    assert len(next_state.player(PLAYER_ONE_ID).deck) == initial_deck_size - 1
     assert isinstance(events[3], FactionPassiveTriggeredEvent)
-    assert events[3].player_id == PlayerId("p1")
+    assert events[3].player_id == PLAYER_ONE_ID
     assert isinstance(events[4], CardsDrawnEvent)
-    assert events[4].card_instance_ids == (state.player(PlayerId("p1")).deck[0],)
+    assert events[4].card_instance_ids == (state.player(PLAYER_ONE_ID).deck[0],)
 
 
 def test_northern_realms_does_nothing_if_deck_is_empty() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=NORTHERN_REALMS_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
-    state = _deplete_player_deck(state, PlayerId("p1"))
+    state = _deplete_player_deck(state, PLAYER_ONE_ID)
     state, _ = apply_action(
         state,
         PlayCardAction(
-            player_id=PlayerId("p1"),
-            card_instance_id=state.player(PlayerId("p1")).hand[0],
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=state.player(PLAYER_ONE_ID).hand[0],
             target_row=Row.CLOSE,
         ),
         card_registry=card_registry,
     )
-    state, _ = apply_action(state, PassAction(player_id=PlayerId("p2")))
+    state, _ = apply_action(state, PassAction(player_id=PLAYER_TWO_ID))
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
     )
 
-    assert len(next_state.player(PlayerId("p1")).hand) == 9
-    assert len(next_state.player(PlayerId("p1")).deck) == 0
+    assert len(next_state.player(PLAYER_ONE_ID).hand) == 9
+    assert len(next_state.player(PLAYER_ONE_ID).deck) == 0
     assert all(
-        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PlayerId("p1"))
+        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PLAYER_ONE_ID)
         for event in events
     )
     assert all(not isinstance(event, CardsDrawnEvent) for event in events)
@@ -87,7 +87,7 @@ def test_northern_realms_does_nothing_if_deck_is_empty() -> None:
 
 def test_northern_realms_does_not_draw_above_max_hand_size() -> None:
     card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=NORTHERN_REALMS_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )[1]
@@ -121,21 +121,21 @@ def test_northern_realms_does_not_draw_above_max_hand_size() -> None:
         )
         .build()
     )
-    state, _ = apply_action(state, PassAction(player_id=PlayerId("p2")))
+    state, _ = apply_action(state, PassAction(player_id=PLAYER_TWO_ID))
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
     )
 
-    assert len(next_state.player(PlayerId("p1")).hand) == 17
+    assert len(next_state.player(PLAYER_ONE_ID).hand) == 17
     assert (
         CardInstanceId("p1_bonus_draw_blocked_by_full_hand")
-        in next_state.player(PlayerId("p1")).deck
+        in next_state.player(PLAYER_ONE_ID).deck
     )
     assert all(
-        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PlayerId("p1"))
+        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PLAYER_ONE_ID)
         for event in events
     )
     assert all(not isinstance(event, CardsDrawnEvent) for event in events)

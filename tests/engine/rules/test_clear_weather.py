@@ -7,12 +7,10 @@ from gwent_engine.core.state import RowState
 from gwent_engine.rules.row_effects import row_has_commanders_horn, row_has_special_mardroeme
 from gwent_engine.rules.scoring import calculate_row_score
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import card, rows, scenario
-from ..support import (
-    CARD_REGISTRY,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
-)
+from ..support import CARD_REGISTRY
 
 
 def test_clear_weather_discards_active_weather_cards_and_restores_scores() -> None:

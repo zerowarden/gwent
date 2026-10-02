@@ -10,7 +10,7 @@ from typing import cast
 
 import pytest
 from gwent_engine.ai.baseline import HeuristicBot
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_evaluation.agents import resolve_agent, snapshot_suite
 from gwent_evaluation.execution import EvidencePolicy
 from gwent_evaluation.models import (

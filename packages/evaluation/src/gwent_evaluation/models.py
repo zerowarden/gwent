@@ -16,7 +16,7 @@ from gwent_engine.ai.arena.models import (
     TerminationReason as TerminationReason,
 )
 from gwent_engine.ai.baseline import get_base_profile_definition
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION, PlayerObservation
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, GameId, PlayerId
 from gwent_engine.core.state import GameState
@@ -42,6 +42,10 @@ class SuitePurpose(Enum):
     @property
     def requires_clean_checkout(self) -> bool:
         return self in (SuitePurpose.OPTIMIZE, SuitePurpose.VALIDATION, SuitePurpose.TEST)
+
+    @property
+    def is_heldout(self) -> bool:
+        return self is SuitePurpose.TEST
 
 
 class SchedulingPolicy(Enum):

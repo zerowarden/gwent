@@ -1,20 +1,21 @@
-"""Bounded study declarations. These records do not run games or optimizers."""
+"""Bounded study declarations and the study-report record; neither runs games or optimizers."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import cast
 
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.baseline.profile_catalog import DEFAULT_BASE_PROFILE
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_shared.extract import expect_int, expect_str
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.execution import EvidencePolicy
 from gwent_evaluation.metrics import BootstrapConfig
 from gwent_evaluation.models import BotFamily, RunManifest, SpecError, SuitePurpose
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict, run_manifest_from_dict
 from gwent_evaluation.tuning.parameters import (
     ParameterSpace,
@@ -341,3 +342,35 @@ class SweepPoint:
     value: float
     coordinates: tuple[float, ...]
     configuration_digest: str
+
+
+LIMITATIONS = (
+    "Fixed decks and opponents; additional seeds do not establish unseen-deck strength.",
+    "Fixed tactical structure, shortlist, overrides, and non-tunable configuration.",
+    "Optimization and validation are selection-affected development evidence.",
+    "Only explicit held-out confirmation can support promotion under the frozen thresholds.",
+    "Decision latency is diagnostic, depends on machine/load, and never enters fitness.",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class StudyReport:
+    study_id: str
+    study_digest: str
+    stage: str
+    engineering: str
+    measurement: str
+    verdict: str
+    reasons: tuple[str, ...]
+    inputs: Mapping[str, object]
+    sensitivity: Mapping[str, object] | None
+    parameters: tuple[Mapping[str, object], ...]
+    methods: tuple[Mapping[str, object], ...]
+    runs: tuple[Mapping[str, object], ...]
+    validation: Mapping[str, object] | None
+    confirmation: Mapping[str, object] | None
+    verification: Mapping[str, object] | None
+    artifacts: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {"schema_version": 1, **record_to_dict(self), "limitations": LIMITATIONS}

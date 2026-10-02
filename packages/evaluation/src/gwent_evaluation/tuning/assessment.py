@@ -8,15 +8,15 @@ from pathlib import Path
 from typing import cast
 
 from gwent_engine.ai.arena.catalog import load_policy_bot
-from gwent_engine.ai.policy_artifacts import PolicyArtifact, PolicyStatus
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact, PolicyStatus
 from gwent_shared.extract import expect_int, expect_sequence, expect_str
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, dump_pretty_json
 
 from gwent_evaluation.agents import candidate_from_artifact
 from gwent_evaluation.execution import EvidencePolicy, execute_run
 from gwent_evaluation.html_report import document, table
 from gwent_evaluation.models import SpecError, SuitePurpose
-from gwent_evaluation.provenance import canonical_digest, default_repository_root
+from gwent_evaluation.provenance import default_repository_root
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.replay import reproduce_case
 from gwent_evaluation.storage import RunConflictError, atomic_write_text, read_record_mapping
@@ -127,7 +127,7 @@ def _artifact_check(study_root: Path, output: Path, repository: Path) -> dict[st
     )
     reproduced = reproduce_case(run.root, run.results[0].case_id, repository_root=repository)
     if not (reproduced.execution_identity_matches and reproduced.semantics_reproduced):
-        raise SpecError("Nondefault artifact did not reproduce exactly through M1.")
+        raise SpecError("Nondefault artifact did not reproduce exactly through evaluation replay.")
     payload: dict[str, object] = {
         "artifact": str(path),
         "configuration_digest": configuration.digest(),
@@ -265,8 +265,8 @@ def run_assessment(protocol: Path, output: Path, *, recover_lock: bool = False) 
                     "## Runtime acceptance",
                     "",
                     "The nondefault diagnostic artifact reloaded "
-                    + "through the engine factory and reproduced through M1 with matching "
-                    + "execution identity and semantics.",
+                    + "through the engine factory and reproduced through evaluation replay "
+                    + "with matching execution identity and semantics.",
                     "",
                     "See [artifact check](artifact-check/report.json).",
                     "",
@@ -309,7 +309,7 @@ def write_assessment_html(output: Path) -> None:
     )
 
 
-def main() -> None:
+def assessment_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     _ = parser.add_argument("--output", type=Path, default=Path(".output/acceptance/assessment"))
     _ = parser.add_argument(
@@ -319,16 +319,17 @@ def main() -> None:
     )
     _ = parser.add_argument("--recover-lock", action="store_true")
     _ = parser.add_argument("--report-only", action="store_true")
-    args = parser.parse_args()
+    parser.set_defaults(handler=assessment_command)
+    return parser
+
+
+def assessment_command(args: argparse.Namespace) -> int:
     if cast(bool, args.report_only):
         write_assessment_html(cast(Path, args.output))
-        return
+        return 0
     run_assessment(
         cast(Path, args.protocol),
         cast(Path, args.output),
         recover_lock=cast(bool, args.recover_lock),
     )
-
-
-if __name__ == "__main__":
-    main()
+    return 0

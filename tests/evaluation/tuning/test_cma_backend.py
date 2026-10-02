@@ -17,7 +17,6 @@ import pytest
 from gwent_evaluation.models import SpecError
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.tuning import cma_backend
-from gwent_evaluation.tuning.backends import create_optimizer
 from gwent_evaluation.tuning.cma_backend import CmaEsSearch
 from gwent_evaluation.tuning.models import (
     CmaSettings,
@@ -32,6 +31,7 @@ from gwent_evaluation.tuning.optimizers import (
     ProposalFitness,
 )
 from gwent_evaluation.tuning.parameters import encode_parameters
+from gwent_evaluation.tuning.study import create_optimizer
 from numpy.typing import NDArray
 
 
@@ -351,13 +351,13 @@ class BlockOptimizer(importlib.abc.MetaPathFinder):
 
 sys.meta_path.insert(0, BlockOptimizer())
 from gwent_engine.ai.arena import create_bot
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_service.main import app
-from gwent_service.dependencies import get_match_service
+from gwent_service.api import get_match_service
 create_bot('heuristic', bot_id='runtime', heuristic_configuration=HeuristicConfiguration())
 get_match_service()
 from gwent_evaluation.tuning.models import OptimizerMethod
-from gwent_evaluation.tuning.backends import create_optimizer
+from gwent_evaluation.tuning.study import create_optimizer
 from gwent_evaluation.tuning.specs import study_from_dict
 from gwent_evaluation.models import SpecError
 study = study_from_dict(json.loads(sys.stdin.read()))

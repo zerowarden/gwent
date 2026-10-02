@@ -12,14 +12,13 @@ from gwent_engine.rules.effect_applicability import (
 )
 from gwent_engine.rules.scoring import calculate_effective_strength, calculate_row_score
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import (
     CARD_REGISTRY,
     SCOIATAEL_CLOSE_SCORCH_LEADER_ID,
     SCOIATAEL_RANGED_HORN_LEADER_ID,
-    IndexedRandom,
 )
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IndexedRandom
 
 
 def test_hero_strength_ignores_weather_horn_morale_and_bond_effects() -> None:

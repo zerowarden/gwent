@@ -10,9 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import cast, final
 
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, canonical_json, dump_pretty_json
 
-from gwent_evaluation.provenance import canonical_digest, canonical_json
 from gwent_evaluation.records import CorruptRecordError, parse_record_mapping
 from gwent_evaluation.storage import RunConflictError, atomic_write_text, read_record_mapping
 

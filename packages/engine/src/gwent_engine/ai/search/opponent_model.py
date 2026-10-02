@@ -3,9 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from gwent_engine.ai.action_ids import action_to_id
-from gwent_engine.ai.action_legality import is_legal_action
-from gwent_engine.ai.actions import enumerate_legal_actions
+from gwent_engine.ai.actions import enumerate_legal_actions, is_legal_action
 from gwent_engine.ai.baseline import (
     BaseProfileDefinition,
     build_assessment,
@@ -34,6 +32,7 @@ from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.players import opponent_player_id_from_state
+from gwent_engine.serialize.actions import action_to_id
 
 PUBLIC_EXACT_LEADER_REPLY_KINDS = frozenset(
     {

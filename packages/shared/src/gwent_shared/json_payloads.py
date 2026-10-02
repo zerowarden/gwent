@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import math
 from collections.abc import Callable, Mapping, Sequence
@@ -38,6 +39,47 @@ def canonical_json(payload: object) -> str:
     """Canonical JSON text for typed payloads, rejecting non-finite numbers."""
 
     return dump_canonical_json(to_canonical(payload))
+
+
+DIGEST_PREFIX = "sha256:"
+
+
+def sha256_bytes(data: bytes) -> bytes:
+    return hashlib.sha256(data).digest()
+
+
+def sha256_bytes_hexdigest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def sha256_hexdigest(text: str) -> str:
+    return sha256_bytes_hexdigest(text.encode("utf-8"))
+
+
+def canonical_hexdigest(payload: object) -> str:
+    """Bare SHA-256 hex digest of the canonical JSON form of `payload`."""
+
+    return sha256_hexdigest(canonical_json(payload))
+
+
+def canonical_digest(payload: object) -> str:
+    """`sha256:`-prefixed digest used for record, artifact, and identity digests."""
+
+    return DIGEST_PREFIX + canonical_hexdigest(payload)
+
+
+def is_digest(value: object) -> bool:
+    return isinstance(value, str) and value.startswith(DIGEST_PREFIX)
+
+
+def digest_hex(digest: str) -> str:
+    return digest.removeprefix(DIGEST_PREFIX)
+
+
+def seed_from_text(text: str) -> int:
+    """Deterministic seed from text: first 8 SHA-256 bytes, big-endian."""
+
+    return int.from_bytes(sha256_bytes(text.encode("utf-8"))[:8], "big")
 
 
 def to_canonical(value: object) -> object:

@@ -12,34 +12,11 @@ from gwent_engine.cli.models import CliRun
 @final
 class HTMLFormatter:
     def __init__(self, run: CliRun) -> None:
-        self._kind_by_name = {
-            escape(run.card_names_by_instance_id[card_id]): run.card_kinds_by_instance_id.get(
-                card_id,
-                "unit",
-            )
-            for card_id in run.card_names_by_instance_id
-        }
-        self._spy_by_name = {
-            escape(run.card_names_by_instance_id[card_id]): run.card_spy_by_instance_id.get(
-                card_id,
-                False,
-            )
-            for card_id in run.card_names_by_instance_id
-        }
-        self._medic_by_name = {
-            escape(run.card_names_by_instance_id[card_id]): run.card_medic_by_instance_id.get(
-                card_id,
-                False,
-            )
-            for card_id in run.card_names_by_instance_id
-        }
-        self._scorch_by_name = {
-            escape(run.card_names_by_instance_id[card_id]): run.card_scorch_by_instance_id.get(
-                card_id,
-                False,
-            )
-            for card_id in run.card_names_by_instance_id
-        }
+        cards_by_name = {escape(card.name): card for card in run.cards.values()}
+        self._kind_by_name = {name: card.kind for name, card in cards_by_name.items()}
+        self._spy_by_name = {name: card.is_spy for name, card in cards_by_name.items()}
+        self._medic_by_name = {name: card.is_medic for name, card in cards_by_name.items()}
+        self._scorch_by_name = {name: card.is_scorch for name, card in cards_by_name.items()}
 
     @staticmethod
     def timestamp(moment: datetime | None = None) -> str:

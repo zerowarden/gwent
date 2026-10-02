@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.provenance import (
     RepositoryProvenance,
     RuntimeProvenance,
-    canonical_digest,
-    canonical_json,
     read_repository_provenance,
     read_runtime_provenance,
 )
+from gwent_shared.json_payloads import canonical_digest, canonical_json
 
 from tests.evaluation.support import REPOSITORY_ROOT
 
@@ -77,3 +78,27 @@ def test_implementation_digest_identifies_local_source_changes(
     before = provenance.implementation_digest()
     _ = (tmp_path / "gwent_engine" / "__init__.py").write_text("VALUE = 2\n")
     assert provenance.implementation_digest() != before
+
+
+def test_resolve_assets_rejects_unknown_deck() -> None:
+    assets = resolve_assets()
+
+    with pytest.raises(ValueError, match="Unknown sample deck id"):
+        _ = assets.deck("missing_deck")
+
+
+def test_deck_digest_is_deck_specific() -> None:
+    assets = resolve_assets()
+
+    monsters = assets.deck_digest("monsters_muster_swarm_strict")
+    nilfgaard = assets.deck_digest("nilfgaard_spy_medic_control_strict")
+
+    assert monsters != nilfgaard
+
+
+def test_deck_digest_changes_with_deck_contents() -> None:
+    assets = resolve_assets()
+    deck = assets.deck("monsters_muster_swarm_strict")
+    mutated = replace(deck, card_definition_ids=deck.card_definition_ids[:-1])
+
+    assert canonical_digest(deck) != canonical_digest(mutated)

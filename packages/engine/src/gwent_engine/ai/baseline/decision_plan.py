@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
-from gwent_engine.ai.actions import action_to_id
+from gwent_engine.ai.actions import filter_non_leave_actions
 from gwent_engine.ai.baseline.assessment import DecisionAssessment, build_assessment
 from gwent_engine.ai.baseline.candidates import (
     CandidateAction,
@@ -10,20 +11,26 @@ from gwent_engine.ai.baseline.candidates import (
     shortlist_actions,
 )
 from gwent_engine.ai.baseline.context import DecisionContext, classify_context
-from gwent_engine.ai.baseline.evaluation import ActionScoreBreakdown, explain_ranked_actions
-from gwent_engine.ai.baseline.overrides import TacticalOverride, explain_tactical_override
+from gwent_engine.ai.baseline.evaluation import explain_ranked_actions
+from gwent_engine.ai.baseline.pass_logic import (
+    minimum_commitment_finish,
+    should_cut_losses_after_pass,
+    should_pass_now,
+)
 from gwent_engine.ai.baseline.profile_catalog import (
     DEFAULT_BASE_PROFILE,
     BaseProfileDefinition,
 )
 from gwent_engine.ai.baseline.profiles import HeuristicProfile, compose_profile
+from gwent_engine.ai.baseline.score_terms import ActionScoreBreakdown
+from gwent_engine.ai.observation_queries import build_viewer_hand_definition_index
 from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig
-from gwent_engine.ai.utils import build_viewer_hand_definition_index, filter_non_leave_actions
+from gwent_engine.ai.policy import DEFAULT_BASELINE_CONFIG, BaselineConfig, PassConfig
 from gwent_engine.cards import CardDefinition, CardRegistry
-from gwent_engine.core.actions import GameAction
+from gwent_engine.core.actions import GameAction, PassAction
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.leaders import LeaderRegistry
+from gwent_engine.serialize.actions import action_to_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,3 +126,61 @@ def build_decision_plan(
         override=override,
         chosen_action=chosen_action,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class TacticalOverride:
+    action: GameAction
+    reason: str
+
+
+def explain_tactical_override(
+    legal_actions: tuple[GameAction, ...],
+    *,
+    observation: PlayerObservation,
+    assessment: DecisionAssessment,
+    context: DecisionContext,
+    card_registry: CardRegistry,
+    pass_config: PassConfig,
+    viewer_hand_definitions: Mapping[CardInstanceId, CardDefinition] | None = None,
+) -> TacticalOverride | None:
+    exact_finish = minimum_commitment_finish(
+        legal_actions,
+        observation=observation,
+        assessment=assessment,
+        card_registry=card_registry,
+        config=pass_config,
+        viewer_hand_definitions=viewer_hand_definitions,
+    )
+    if exact_finish is not None:
+        return TacticalOverride(
+            action=exact_finish,
+            reason="minimum_commitment_finish",
+        )
+    if should_cut_losses_after_pass(
+        legal_actions,
+        observation=observation,
+        assessment=assessment,
+        card_registry=card_registry,
+        config=pass_config,
+        viewer_hand_definitions=viewer_hand_definitions,
+    ):
+        for action in legal_actions:
+            if isinstance(action, PassAction):
+                return TacticalOverride(
+                    action=action,
+                    reason="hopeless_catch_up_pass",
+                )
+    if should_pass_now(assessment, context, config=pass_config):
+        for action in legal_actions:
+            if isinstance(action, PassAction):
+                return TacticalOverride(
+                    action=action,
+                    reason="safe_pass",
+                )
+    if len(legal_actions) == 1:
+        return TacticalOverride(
+            action=legal_actions[0],
+            reason="single_legal_action",
+        )
+    return None

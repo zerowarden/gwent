@@ -2,7 +2,7 @@ from dataclasses import fields, replace
 from typing import cast
 
 import pytest
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.policy import EvaluationWeights
 from gwent_evaluation.models import SpecError
 from gwent_evaluation.tuning.models import StudySpec

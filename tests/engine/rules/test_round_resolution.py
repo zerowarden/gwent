@@ -1,12 +1,16 @@
 from gwent_engine.core import Phase, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction
-from gwent_engine.core.events import CardsMovedToDiscardEvent, RoundEndedEvent
-from gwent_engine.core.ids import CardInstanceId, PlayerId
+from gwent_engine.core.events import (
+    CardsMovedToDiscardEvent,
+    GameEvent,
+    MatchEndedEvent,
+    RoundEndedEvent,
+)
+from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action, apply_action_with_intermediate_state
 from gwent_engine.rules.round_resolution import determine_round_outcome
 from gwent_engine.rules.scoring import calculate_player_score, calculate_row_score
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, scenario
 from tests.engine.support import (
     CARD_REGISTRY,
@@ -15,6 +19,7 @@ from tests.engine.support import (
     build_in_round_game_state,
     first_hand_unit_for_row,
 )
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_row_and_total_scoring_are_correct() -> None:
@@ -113,15 +118,15 @@ def test_round_winner_is_computed_correctly() -> None:
 
 def test_board_moves_to_discard_and_next_round_starts_cleanly() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=NILFGAARD_DECK_ID,
         player_two_deck_id=NILFGAARD_DECK_ID,
     )
-    played_card = first_hand_unit_for_row(state, card_registry, PlayerId("p1"), Row.CLOSE)
+    played_card = first_hand_unit_for_row(state, card_registry, PLAYER_ONE_ID, Row.CLOSE)
     state, _ = apply_action(
         state,
         PlayCardAction(
-            player_id=PlayerId("p1"),
+            player_id=PLAYER_ONE_ID,
             card_instance_id=played_card,
             target_row=Row.CLOSE,
         ),
@@ -129,20 +134,20 @@ def test_board_moves_to_discard_and_next_round_starts_cleanly() -> None:
     )
     state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
     )
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
     )
 
-    player_one = next_state.player(PlayerId("p1"))
-    player_two = next_state.player(PlayerId("p2"))
+    player_one = next_state.player(PLAYER_ONE_ID)
+    player_two = next_state.player(PLAYER_TWO_ID)
     assert next_state.phase == Phase.IN_ROUND
     assert next_state.round_number == 2
-    assert next_state.current_player == PlayerId("p1")
+    assert next_state.current_player == PLAYER_ONE_ID
     assert player_one.rows.all_cards() == ()
     assert player_two.rows.all_cards() == ()
     assert played_card in player_one.discard
@@ -156,20 +161,20 @@ def test_board_moves_to_discard_and_next_round_starts_cleanly() -> None:
 
 def test_draw_removes_one_gem_from_both_players() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=SCOIATAEL_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
-    state, _ = apply_action(state, PassAction(player_id=PlayerId("p1")))
+    state, _ = apply_action(state, PassAction(player_id=PLAYER_ONE_ID))
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
     )
 
-    assert next_state.player(PlayerId("p1")).gems_remaining == 1
-    assert next_state.player(PlayerId("p2")).gems_remaining == 1
+    assert next_state.player(PLAYER_ONE_ID).gems_remaining == 1
+    assert next_state.player(PLAYER_TWO_ID).gems_remaining == 1
     assert isinstance(events[1], RoundEndedEvent)
     assert events[1].winner is None
 
@@ -206,3 +211,80 @@ def test_playing_last_card_triggers_round_ended_event_automatically() -> None:
     assert next_state.phase == Phase.MATCH_ENDED
     assert next_state.current_player is None
     assert sum(isinstance(event, RoundEndedEvent) for event in events) == 2
+
+
+def test_no_normal_redraw_occurs_between_rounds() -> None:
+    state, card_registry = build_in_round_game_state(
+        starting_player=PLAYER_ONE_ID,
+        player_one_deck_id=NILFGAARD_DECK_ID,
+        player_two_deck_id=NILFGAARD_DECK_ID,
+    )
+    player_one_initial_hand = len(state.player(PLAYER_ONE_ID).hand)
+    player_two_initial_hand = len(state.player(PLAYER_TWO_ID).hand)
+    state, _ = apply_action(
+        state,
+        PlayCardAction(
+            player_id=PLAYER_ONE_ID,
+            card_instance_id=first_hand_unit_for_row(
+                state,
+                card_registry,
+                PLAYER_ONE_ID,
+                Row.CLOSE,
+            ),
+            target_row=Row.CLOSE,
+        ),
+        card_registry=card_registry,
+    )
+    state, _ = apply_action(state, PassAction(player_id=PLAYER_TWO_ID))
+
+    next_state, _ = apply_action(
+        state,
+        PassAction(player_id=PLAYER_ONE_ID),
+        card_registry=card_registry,
+    )
+
+    assert len(next_state.player(PLAYER_ONE_ID).hand) == player_one_initial_hand - 1
+    assert len(next_state.player(PLAYER_TWO_ID).hand) == player_two_initial_hand
+    assert len(next_state.player(PLAYER_ONE_ID).deck) == len(state.player(PLAYER_ONE_ID).deck)
+    assert len(next_state.player(PLAYER_TWO_ID).deck) == len(state.player(PLAYER_TWO_ID).deck)
+
+
+def test_match_ends_when_a_player_loses_the_second_gem() -> None:
+    state, card_registry = build_in_round_game_state(
+        starting_player=PLAYER_ONE_ID,
+        player_one_deck_id=NILFGAARD_DECK_ID,
+        player_two_deck_id=NILFGAARD_DECK_ID,
+    )
+
+    events: tuple[GameEvent, ...] = ()
+    for _ in range(2):
+        state, _ = apply_action(
+            state,
+            PlayCardAction(
+                player_id=PLAYER_ONE_ID,
+                card_instance_id=first_hand_unit_for_row(
+                    state,
+                    card_registry,
+                    PLAYER_ONE_ID,
+                    Row.CLOSE,
+                ),
+                target_row=Row.CLOSE,
+            ),
+            card_registry=card_registry,
+        )
+        state, _ = apply_action(
+            state,
+            PassAction(player_id=PLAYER_TWO_ID),
+        )
+        state, events = apply_action(
+            state,
+            PassAction(player_id=PLAYER_ONE_ID),
+            card_registry=card_registry,
+        )
+
+    assert state.phase == Phase.MATCH_ENDED
+    assert state.match_winner == PLAYER_ONE_ID
+    assert state.current_player is None
+    assert state.player(PLAYER_TWO_ID).gems_remaining == 0
+    match_end = next(event for event in events if isinstance(event, MatchEndedEvent))
+    assert match_end.winner == PLAYER_ONE_ID

@@ -1,10 +1,11 @@
 import pytest
 from gwent_engine.ai.arena import create_bot, execute_match
 from gwent_engine.core import GameStatus, Phase
-from gwent_engine.core.ids import GameId, PlayerId
+from gwent_engine.core.ids import GameId
 from gwent_engine.core.randomness import SeededRandom
 
 from tests.engine.support import CARD_REGISTRY, LEADER_REGISTRY, sample_deck_map
+from tests.support import PLAYER_ONE_ID
 
 
 def test_execute_match_completes_seeded_game() -> None:
@@ -16,7 +17,7 @@ def test_execute_match_completes_seeded_game() -> None:
         player_two_bot=create_bot("random", bot_id="p2_bot", seed=8),
         player_one_deck=deck_by_id["monsters_muster_swarm_strict"],
         player_two_deck=deck_by_id["nilfgaard_spy_medic_control_strict"],
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         card_registry=CARD_REGISTRY,
         leader_registry=LEADER_REGISTRY,
         rng=SeededRandom(17),
@@ -88,7 +89,7 @@ def test_heuristic_bot_completes_seeded_series_against_greedy() -> None:
             player_two_bot=create_bot("greedy", bot_id=f"greedy_{seed}"),
             player_one_deck=deck_by_id["nilfgaard_spy_medic_control_strict"],
             player_two_deck=deck_by_id["monsters_muster_swarm_strict"],
-            starting_player=PlayerId("p1"),
+            starting_player=PLAYER_ONE_ID,
             card_registry=CARD_REGISTRY,
             leader_registry=LEADER_REGISTRY,
             rng=SeededRandom(seed),
@@ -110,7 +111,7 @@ def test_search_bot_completes_seeded_game() -> None:
         player_two_bot=create_bot("random", bot_id="random_bot", seed=13),
         player_one_deck=deck_by_id["nilfgaard_spy_medic_control_strict"],
         player_two_deck=deck_by_id["monsters_muster_swarm_strict"],
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         card_registry=CARD_REGISTRY,
         leader_registry=LEADER_REGISTRY,
         rng=SeededRandom(13),

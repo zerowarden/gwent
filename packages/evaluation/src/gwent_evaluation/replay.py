@@ -20,7 +20,7 @@ from gwent_engine.core.randomness import SeededRandom
 from gwent_engine.core.reducer import apply_action_with_intermediate_state
 from gwent_engine.core.state import GameState
 from gwent_engine.serialize import action_from_id
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, dump_pretty_json
 
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
@@ -32,7 +32,7 @@ from gwent_evaluation.execution import (
     semantic_digest,
 )
 from gwent_evaluation.models import MatchResult, ScheduledMatch, TrajectoryStep
-from gwent_evaluation.provenance import canonical_digest, default_repository_root
+from gwent_evaluation.provenance import default_repository_root
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.reporting import persist_run_report
 from gwent_evaluation.schedule import other_seat

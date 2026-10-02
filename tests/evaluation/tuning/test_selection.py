@@ -7,8 +7,9 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import pytest
-from gwent_engine.ai.policy_artifacts import PolicyArtifact, PolicyStatus
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact, PolicyStatus
 from gwent_evaluation.execution import EvidencePolicy, RunExecution
+from gwent_evaluation.holdout import HoldoutAuthorization, HoldoutOrigin
 from gwent_evaluation.models import (
     MatchResult,
     RunManifest,
@@ -19,8 +20,8 @@ from gwent_evaluation.models import (
 )
 from gwent_evaluation.reporting import build_run_report
 from gwent_evaluation.schedule import schedule_suite
-from gwent_evaluation.storage import RunConflictError, RunStore
-from gwent_evaluation.tuning import objective, selection, verification
+from gwent_evaluation.storage import RunConflictError, RunStore, read_record_mapping
+from gwent_evaluation.tuning import objective, selection
 from gwent_evaluation.tuning import study as controller
 from gwent_evaluation.tuning.models import OptimizerMethod, StudySpec
 from gwent_evaluation.tuning.optimizers import (
@@ -128,6 +129,7 @@ def experiment(
         evidence_policy: EvidencePolicy,
         expected_manifest: RunManifest,
         workers: int = 1,
+        holdout_authorization: HoldoutAuthorization | None = None,
     ) -> RunExecution:
         fixture.worker_requests.append((suite.purpose, workers))
         assert repository_root == REPOSITORY_ROOT
@@ -136,8 +138,14 @@ def experiment(
         configuration = suite.candidate.heuristic_configuration
         assert configuration is not None
         digest = configuration.digest()
-        if suite.purpose is SuitePurpose.TEST:
-            assert (fixture.root / "selection/selection.json").is_file()
+        if suite.purpose.is_heldout:
+            selection = read_record_mapping(fixture.root / "selection/selection.json")
+            assert holdout_authorization is not None
+            assert holdout_authorization.origin is HoldoutOrigin.FINALIZATION
+            assert holdout_authorization.covers(suite)
+            assert holdout_authorization.selection_digest == selection["record_digest"]
+        else:
+            assert holdout_authorization is None
         store = RunStore(output_root, run_id)
         loaded = store.prepare(expected_manifest, matches=schedule_suite(suite))
         fresh: list[str] = []
@@ -167,7 +175,7 @@ def experiment(
     def checks(_root: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(["make", "check"], 0, "passed\n", "")
 
-    monkeypatch.setattr(verification, "run_correctness_checks", checks)
+    monkeypatch.setattr(selection, "run_correctness_checks", checks)
     return fixture
 
 
@@ -369,7 +377,7 @@ def test_failed_verification_preserves_holdout(
     def checks(_root: Path) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(["make", "check"], 1, "failure\n", "")
 
-    monkeypatch.setattr(verification, "run_correctness_checks", checks)
+    monkeypatch.setattr(selection, "run_correctness_checks", checks)
     evidence = verify_selection(experiment.root, repository_root=REPOSITORY_ROOT)
     assert evidence["passed"] is False
     with pytest.raises(RunConflictError, match="verification"):

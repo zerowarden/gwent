@@ -1,8 +1,8 @@
 """Atomic on-disk storage for experiment runs.
 
 Record ⇄ dict conversion lives in `gwent_evaluation.records`; this module owns
-the run directory layout, atomic writes, digest verification, and conflict
-detection.
+the run directory layout, atomic writes, digest verification, conflict
+detection, and the reading guides written beside disposable results.
 """
 
 from __future__ import annotations
@@ -12,10 +12,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import quote
 
 from gwent_engine.cards import CardRegistry
 from gwent_shared.extract import require_sequence_field, require_str_field
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, canonical_json, dump_pretty_json
 
 from gwent_evaluation.assets import resolve_assets
 from gwent_evaluation.models import (
@@ -27,7 +28,7 @@ from gwent_evaluation.models import (
     ScheduledMatch,
     TrajectoryStep,
 )
-from gwent_evaluation.provenance import canonical_digest, canonical_json, file_digest
+from gwent_evaluation.provenance import file_digest
 from gwent_evaluation.records import (
     CorruptRecordError,
     StorageError,
@@ -78,6 +79,10 @@ class RunStore:
     @property
     def evidence_dir(self) -> Path:
         return self.root / "evidence"
+
+    @property
+    def heldout_path(self) -> Path:
+        return self.root / "heldout.json"
 
     @property
     def report_path(self) -> Path:
@@ -353,3 +358,59 @@ def atomic_write_text(path: Path, content: str) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     _ = temporary.write_text(content, encoding="utf-8")
     os.replace(temporary, path)
+
+
+RUN_FILES = """| File family | Meaning |
+| --- | --- |
+| `manifest.json` | Frozen suite, agents, source commit, runtime, assets, and identity. |
+| `schedule.jsonl` | One scheduled case per line, including seeds and seats. |
+| `matches/*.json` | Checksummed outcomes; these are authoritative match evidence. |
+| `evidence/*.samples.jsonl` | Player-safe decision samples, when collected. |
+| `evidence/*.trajectory.json` | Replay trajectories when the evidence policy retains them. |
+| `heldout.json` | Recorded held-out consumption, when a held-out suite was executed. |
+| `report.json`, `report.md` | Derived summaries of the verified match records. |
+
+Digest-based case names bind evidence to its scheduled case. Do not rename or
+edit committed evidence. Summary-only runs have no decision samples or trajectories.
+"""
+
+
+def write_run_guide(root: Path) -> None:
+    atomic_write_text(
+        root / "README.md",
+        "# Evaluation run\n\nOpen [report.md](report.md) for results. "
+        + "[manifest.json](manifest.json) records the inputs.\n\n"
+        + RUN_FILES,
+    )
+
+
+def write_sensitivity_guide(root: Path) -> None:
+    atomic_write_text(
+        root / "README.md",
+        "# Sensitivity evidence\n\n"
+        + "[report.json](report.json) explains whether the weight surface changes "
+        + "relative action scores, selected actions, and match outcomes. Passing does "
+        + "not prove improved strength or optimal bounds.\n\n"
+        + "[snapshot.json](snapshot.json) freezes the study. `runs/` contains the "
+        + "incumbent and bound-control evaluations. Decision samples are required "
+        + "for rescoring; full trajectories are retained for failures.\n\n"
+        + RUN_FILES,
+    )
+
+
+def write_output_index(root: Path) -> None:
+    """Index existing guides only; never advertise missing or half-written reports."""
+    links = [
+        f"- [{path.name}]({quote(path.name)}/README.md)"
+        for path in sorted(root.iterdir())
+        if path.is_dir() and (path / "README.md").is_file()
+    ]
+    atomic_write_text(
+        root / "README.md",
+        "# Experiment results\n\n"
+        + "These are disposable generated results. Source, commands, and authored "
+        + "inputs live in the repository. `make pilot` creates or resumes the complete "
+        + "pilot; separately requested experiments live under `manual/`.\n\n"
+        + "\n".join(links)
+        + "\n",
+    )

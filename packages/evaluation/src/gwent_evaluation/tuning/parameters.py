@@ -6,12 +6,12 @@ import math
 from dataclasses import dataclass, fields, replace
 from typing import cast
 
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.policy import EvaluationWeights
 from gwent_shared.extract import expect_finite_float, expect_int, expect_sequence, expect_str
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.models import SpecError
-from gwent_evaluation.provenance import canonical_digest
 
 
 def finite_float(value: object, *, context: str) -> float:

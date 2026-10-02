@@ -27,21 +27,23 @@ from gwent_engine.rules.abilities import (
     strongest_battlefield_unit_card_ids,
 )
 from gwent_engine.rules.avenger import resolve_leave_battlefield_triggers
-from gwent_engine.rules.battlefield_effects import (
-    clear_weather_cards,
-    is_weather_ability,
-    weather_row_for,
-)
-from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
 from gwent_engine.rules.players import replace_player
 from gwent_engine.rules.round_continuation import advance_turn_after_action
-from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.rules.row_effects import (
+    apply_berserker_transformations_for_row,
+    special_ability_kind,
+)
 from gwent_engine.rules.state_ops import (
     append_to_row,
     card_in_zone,
     replace_card_instance,
     replace_card_instances,
     replace_row_card,
+)
+from gwent_engine.rules.weather import (
+    clear_weather_cards,
+    is_weather_ability,
+    weather_row_for,
 )
 
 type SpecialCardHandler = Callable[

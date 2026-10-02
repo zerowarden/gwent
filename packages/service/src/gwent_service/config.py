@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from os import getenv
 from pathlib import Path
 
-from gwent_engine.resources import bundled_data_path
+from gwent_engine.assets import bundled_data_path
 
 
 @dataclass(frozen=True, slots=True)

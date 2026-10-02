@@ -6,11 +6,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import cached_property
 
-from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.arena.models import MatchFailureStage, MatchStepKind, TerminationReason
 from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import StartGameAction
+from gwent_engine.serialize.actions import action_to_id
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.models import (
     DecisionSample,
@@ -19,7 +20,7 @@ from gwent_evaluation.models import (
     ScheduledMatch,
     TrajectoryStep,
 )
-from gwent_evaluation.provenance import SEED_DERIVATION_VERSION, canonical_digest
+from gwent_evaluation.provenance import SEED_DERIVATION_VERSION
 from gwent_evaluation.records import CorruptRecordError, record_to_dict
 from gwent_evaluation.schedule import CASE_ID_VERSION, schedule_suite
 

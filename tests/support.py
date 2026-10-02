@@ -1,8 +1,11 @@
 from pathlib import Path
 from typing import final, override
 
-from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.randomness import SupportsRandom
+
+PLAYER_ONE_ID = PlayerId("p1")
+PLAYER_TWO_ID = PlayerId("p2")
 
 
 def write_yaml_fixture(tmp_path: Path, filename: str, content: str) -> Path:
@@ -28,12 +31,8 @@ class IdentityRandom(SupportsRandom):
         return cards[0]
 
 
-class IdentityShuffle(IdentityRandom):
-    pass
-
-
 @final
-class IndexedRandom(IdentityShuffle):
+class IndexedRandom(IdentityRandom):
     def __init__(self, *, choice_index: int) -> None:
         self.choice_index: int = choice_index
 

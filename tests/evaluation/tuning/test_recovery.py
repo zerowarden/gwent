@@ -15,12 +15,12 @@ from gwent_evaluation import execution
 from gwent_evaluation import storage as run_storage
 from gwent_evaluation.execution import execute_case
 from gwent_evaluation.models import MatchResult
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.storage import RunConflictError, RunStore
 from gwent_evaluation.tuning.models import StudySpec
 from gwent_evaluation.tuning.sensitivity import SensitivityReport
 from gwent_evaluation.tuning.storage import StudyLockedError, StudyStore
+from gwent_shared.json_payloads import canonical_digest
 
 from tests.evaluation.tuning.test_study import evidence as evidence
 from tests.evaluation.tuning.test_study import execute

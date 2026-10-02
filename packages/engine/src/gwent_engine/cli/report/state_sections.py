@@ -5,15 +5,16 @@ from dataclasses import dataclass
 
 from gwent_engine.ai.arena import MatchStepKind
 from gwent_engine.cli.models import CliRun, CliStep
-from gwent_engine.cli.presenters import round_ended_event, winner_text
-from gwent_engine.cli.report.common import formatted_summary
-from gwent_engine.cli.report.format import HTMLFormatter
-from gwent_engine.cli.view_formatters import (
+from gwent_engine.cli.presenters import (
     board_card_list_text,
     board_row_label,
     board_total,
     card_list_text,
+    round_ended_event,
+    winner_text,
 )
+from gwent_engine.cli.report.common import formatted_summary
+from gwent_engine.cli.report.format import HTMLFormatter
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, CardInstanceId, PlayerId
 from gwent_engine.core.state import GameState
 
@@ -103,26 +104,19 @@ class StateSectionsPresenter:
         }
 
     def card_list_text(self, card_ids: tuple[CardInstanceId, ...]) -> str:
-        return card_list_text(
-            card_ids,
-            card_names_by_instance_id=self.run.card_names_by_instance_id,
-            card_values_by_instance_id=self.run.card_values_by_instance_id,
-        )
+        return card_list_text(card_ids, self.run.cards)
 
     def sorted_card_ids(
         self,
         card_ids: tuple[CardInstanceId, ...],
     ) -> tuple[CardInstanceId, ...]:
-        return tuple(
-            sorted(
-                card_ids,
-                key=lambda card_id: (
-                    -self.run.card_values_by_instance_id.get(card_id, 0),
-                    self.run.card_names_by_instance_id.get(card_id, str(card_id)),
-                    str(card_id),
-                ),
-            )
-        )
+        def sort_key(card_id: CardInstanceId) -> tuple[int, str, str]:
+            card = self.run.cards.get(card_id)
+            if card is None:
+                return (0, str(card_id), str(card_id))
+            return (-card.base_value, card.name, str(card_id))
+
+        return tuple(sorted(card_ids, key=sort_key))
 
     def board_scores(
         self,
@@ -214,7 +208,9 @@ class StateSectionsPresenter:
                 return False
         if player.leader.horn_row is not None and player.leader.horn_row.value == row_name:
             return True
-        return any(self.run.card_horn_by_instance_id.get(card_id, False) for card_id in row)
+        return any(
+            (card := self.run.cards.get(card_id)) is not None and card.is_horn for card_id in row
+        )
 
     def _board_card_list_text(
         self,
@@ -223,6 +219,6 @@ class StateSectionsPresenter:
     ) -> str:
         return board_card_list_text(
             card_ids,
-            card_names_by_instance_id=self.run.card_names_by_instance_id,
+            cards=self.run.cards,
             strengths_by_instance_id=strengths_by_instance_id,
         )

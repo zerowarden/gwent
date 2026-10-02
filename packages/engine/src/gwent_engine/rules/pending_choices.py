@@ -17,20 +17,20 @@ from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PendingChoice, PlayerState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.abilities import resolve_played_medic_choice
-from gwent_engine.rules.choice_classification import (
+from gwent_engine.rules.choice_targets import (
     card_requires_pending_choice,
     leader_requires_pending_choice,
+    pending_medic_choice,
 )
 from gwent_engine.rules.effect_applicability import (
     can_target_for_decoy,
 )
-from gwent_engine.rules.leader_abilities import apply_use_leader_ability
-from gwent_engine.rules.leader_choice_targets import leader_pending_choice_targets
-from gwent_engine.rules.leader_effects import (
+from gwent_engine.rules.leader_common import (
     leader_definition_for_player,
+    leader_pending_choice_targets,
     restore_selection_is_randomized,
 )
-from gwent_engine.rules.medic_choices import pending_medic_choice
+from gwent_engine.rules.leader_resolution import apply_use_leader_ability
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.selection_validation import validate_selection_count
 from gwent_engine.rules.turn_flow import apply_play_card

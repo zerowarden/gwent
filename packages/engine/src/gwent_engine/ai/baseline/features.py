@@ -12,7 +12,7 @@ from typing import Protocol
 
 from gwent_engine.cards import CardDefinition
 from gwent_engine.core import AbilityKind, Row
-from gwent_engine.rules.battlefield_effects import weather_rows_for
+from gwent_engine.rules.weather import weather_rows_for
 
 _WEATHER_ABILITY_KINDS = (
     AbilityKind.BITING_FROST,

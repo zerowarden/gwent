@@ -5,10 +5,8 @@ from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import CardInstance, GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.rules.battlefield_effects import is_weather_ability
-from gwent_engine.rules.card_abilities import definition_has_ability
 from gwent_engine.rules.effect_applicability import can_target_for_decoy
-from gwent_engine.rules.leader_effects import restore_selection_is_randomized
+from gwent_engine.rules.leader_common import restore_selection_is_randomized
 from gwent_engine.rules.round_continuation import can_continue_round
 from gwent_engine.rules.row_effects import (
     row_has_commanders_horn,
@@ -16,6 +14,7 @@ from gwent_engine.rules.row_effects import (
     row_has_special_mardroeme,
     special_ability_kind,
 )
+from gwent_engine.rules.weather import is_weather_ability
 
 
 def validate_in_round_player_can_act(
@@ -104,7 +103,7 @@ def _validate_unit_play_legality(
         definition,
         missing_message="Unit cards must target a combat row.",
     )
-    if definition_has_ability(definition, AbilityKind.MEDIC):
+    if AbilityKind.MEDIC in definition.ability_kinds:
         _validate_medic_play_legality(
             state,
             action,

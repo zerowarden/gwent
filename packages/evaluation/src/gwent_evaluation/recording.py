@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import override
 
-from gwent_engine.ai.action_ids import action_to_id, mulligan_selection_id
+from gwent_engine.ai.actions import mulligan_selection_id
 from gwent_engine.ai.arena import MatchDecision, MatchTransition, MulliganDecision
 from gwent_engine.ai.arena.models import FailedDecisionAttempt
 from gwent_engine.ai.hashing import event_fingerprint
+from gwent_engine.serialize.actions import action_to_id
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.models import DecisionSample, MatchEvidence, TrajectoryStep
-from gwent_evaluation.provenance import canonical_digest
 
 
 @dataclass(slots=True)

@@ -1,12 +1,14 @@
 import pytest
-from gwent_engine.cards.registry import CardRegistry
+from gwent_engine.cards.models import CardRegistry
 from gwent_engine.core import FactionId, Row, Zone
 from gwent_engine.core.actions import PassAction, PlayCardAction
 from gwent_engine.core.events import FactionPassiveTriggeredEvent, NextRoundStartedEvent
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
-from gwent_engine.factions.passives import resolve_before_round_cleanup
+from gwent_engine.rules.faction_passives import resolve_before_round_cleanup
+
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IndexedRandom
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
@@ -16,23 +18,22 @@ from ..support import (
     NORTHERN_REALMS_DECK_ID,
     NORTHERN_REALMS_SIEGE_SCORCH_LEADER_ID,
     SCOIATAEL_DECK_ID,
-    IndexedRandom,
     build_in_round_game_state,
 )
 
 
 def test_monsters_retains_exactly_one_deterministic_unit() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=MONSTERS_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
-    monsters_card = _hand_card_for_row(state, card_registry, PlayerId("p1"), Row.CLOSE)
-    scoiatael_card = _hand_card_for_row(state, card_registry, PlayerId("p2"), Row.CLOSE)
+    monsters_card = _hand_card_for_row(state, card_registry, PLAYER_ONE_ID, Row.CLOSE)
+    scoiatael_card = _hand_card_for_row(state, card_registry, PLAYER_TWO_ID, Row.CLOSE)
     state, _ = apply_action(
         state,
         PlayCardAction(
-            player_id=PlayerId("p1"),
+            player_id=PLAYER_ONE_ID,
             card_instance_id=monsters_card,
             target_row=Row.CLOSE,
         ),
@@ -41,7 +42,7 @@ def test_monsters_retains_exactly_one_deterministic_unit() -> None:
     state, _ = apply_action(
         state,
         PlayCardAction(
-            player_id=PlayerId("p2"),
+            player_id=PLAYER_TWO_ID,
             card_instance_id=scoiatael_card,
             target_row=Row.CLOSE,
         ),
@@ -49,20 +50,20 @@ def test_monsters_retains_exactly_one_deterministic_unit() -> None:
     )
     state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=0),
     )
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=1),
     )
 
-    assert next_state.player(PlayerId("p1")).rows.close == (monsters_card,)
-    assert next_state.player(PlayerId("p2")).rows.all_cards() == ()
+    assert next_state.player(PLAYER_ONE_ID).rows.close == (monsters_card,)
+    assert next_state.player(PLAYER_TWO_ID).rows.all_cards() == ()
     assert next_state.card(monsters_card).zone == Zone.BATTLEFIELD
     assert next_state.card(scoiatael_card).zone == Zone.DISCARD
     assert isinstance(events[2], FactionPassiveTriggeredEvent)
@@ -71,35 +72,35 @@ def test_monsters_retains_exactly_one_deterministic_unit() -> None:
 
 def test_monsters_does_nothing_when_no_eligible_units_exist() -> None:
     state, card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=MONSTERS_DECK_ID,
         player_two_deck_id=SCOIATAEL_DECK_ID,
     )
     state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=0),
     )
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=0),
     )
 
-    assert next_state.player(PlayerId("p1")).rows.all_cards() == ()
-    assert next_state.player(PlayerId("p2")).rows.all_cards() == ()
+    assert next_state.player(PLAYER_ONE_ID).rows.all_cards() == ()
+    assert next_state.player(PLAYER_TWO_ID).rows.all_cards() == ()
     assert all(
-        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PlayerId("p1"))
+        not (isinstance(event, FactionPassiveTriggeredEvent) and event.player_id == PLAYER_ONE_ID)
         for event in events
     )
 
 
 def test_passive_event_order_is_deterministic_when_multiple_passives_trigger() -> None:
     card_registry = build_in_round_game_state(
-        starting_player=PlayerId("p1"),
+        starting_player=PLAYER_ONE_ID,
         player_one_deck_id=MONSTERS_DECK_ID,
         player_two_deck_id=NORTHERN_REALMS_DECK_ID,
     )[1]
@@ -124,14 +125,14 @@ def test_passive_event_order_is_deterministic_when_multiple_passives_trigger() -
     )
     state, _ = apply_action(
         state,
-        PassAction(player_id=PlayerId("p1")),
+        PassAction(player_id=PLAYER_ONE_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=0),
     )
 
     next_state, events = apply_action(
         state,
-        PassAction(player_id=PlayerId("p2")),
+        PassAction(player_id=PLAYER_TWO_ID),
         card_registry=card_registry,
         rng=IndexedRandom(choice_index=0),
     )
@@ -146,7 +147,7 @@ def test_passive_event_order_is_deterministic_when_multiple_passives_trigger() -
         "NextRoundStartedEvent",
     ]
     assert isinstance(events[6], NextRoundStartedEvent)
-    assert next_state.current_player == PlayerId("p2")
+    assert next_state.current_player == PLAYER_TWO_ID
 
 
 def _hand_card_for_row(
@@ -206,8 +207,8 @@ def test_monsters_retention_uses_controlled_non_hero_units_in_mirror_match(
     )
     assert len(retained) == len(events) == 2
     for player, eligible in (
-        (PlayerId("p1"), {"incoming_spy", "p1_unit"}),
-        (PlayerId("p2"), {"outgoing_spy", "p2_unit"}),
+        (PLAYER_ONE_ID, {"incoming_spy", "p1_unit"}),
+        (PLAYER_TWO_ID, {"outgoing_spy", "p2_unit"}),
     ):
         event = next(
             event

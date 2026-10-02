@@ -15,19 +15,16 @@ from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import CardInstance, GameState, PlayerState, RowState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 from gwent_engine.rules.abilities import resolve_row_scorch
-from gwent_engine.rules.battlefield_effects import clear_weather_cards, weather_row_for
 from gwent_engine.rules.leader_common import (
     ActiveLeaderHandler,
     discard_and_choose_selection_required,
+    enabled_leader_definition_for_player,
     is_agile_battlefield_unit,
+    leader_definition_for_player,
     move_battlefield_card_to_row,
     pick_random_card_ids,
     resolve_discard_and_choose_from_deck_selection,
     selected_weather_card_in_deck,
-)
-from gwent_engine.rules.leader_effects import (
-    enabled_leader_definition_for_player,
-    leader_definition_for_player,
 )
 from gwent_engine.rules.players import other_player_from_pair, replace_player
 from gwent_engine.rules.round_continuation import advance_turn_after_action
@@ -40,6 +37,7 @@ from gwent_engine.rules.state_ops import (
     replace_card_instance,
     replace_card_instances,
 )
+from gwent_engine.rules.weather import clear_weather_cards, weather_row_for
 
 
 def resolve_setup_passive_leader_effects(

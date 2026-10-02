@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import singledispatch
 
-from gwent_engine.cli.view_formatters import card_ref_text
+from gwent_engine.cli.models import CardMetadata
 from gwent_engine.core import AbilityKind
 from gwent_engine.core.actions import (
     GameAction,
@@ -39,17 +39,61 @@ from gwent_engine.core.events import (
 from gwent_engine.core.ids import CardInstanceId, PlayerId
 
 
+def card_ref_text(
+    card_instance_id: CardInstanceId,
+    cards: Mapping[CardInstanceId, CardMetadata],
+) -> str:
+    card = cards.get(card_instance_id)
+    if card is None:
+        return str(card_instance_id)
+    return f"[{card.name}] ({card.base_value})"
+
+
+def card_list_text(
+    card_ids: tuple[CardInstanceId, ...],
+    cards: Mapping[CardInstanceId, CardMetadata],
+) -> str:
+    if not card_ids:
+        return "-"
+    return ", ".join(card_ref_text(card_id, cards) for card_id in card_ids)
+
+
+def board_total(
+    strengths_by_instance_id: Mapping[CardInstanceId, int],
+    card_ids: tuple[CardInstanceId, ...],
+) -> int:
+    return sum(strengths_by_instance_id.get(card_id, 0) for card_id in card_ids)
+
+
+def board_row_label(label: str, *, active: bool) -> str:
+    return f"{label} (weather)" if active else label
+
+
+def board_card_list_text(
+    card_ids: tuple[CardInstanceId, ...],
+    *,
+    cards: Mapping[CardInstanceId, CardMetadata],
+    strengths_by_instance_id: Mapping[CardInstanceId, int],
+) -> str:
+    if not card_ids:
+        return "-"
+    return ", ".join(
+        f"[{_card_name(card_id, cards)}] ({strengths_by_instance_id.get(card_id, 0)})"
+        for card_id in card_ids
+    )
+
+
+def _card_name(card_id: CardInstanceId, cards: Mapping[CardInstanceId, CardMetadata]) -> str:
+    card = cards.get(card_id)
+    return str(card_id) if card is None else card.name
+
+
 @dataclass(frozen=True, slots=True)
 class _SummaryCardContext:
-    names_by_instance_id: Mapping[CardInstanceId, str]
-    values_by_instance_id: Mapping[CardInstanceId, int]
+    cards: Mapping[CardInstanceId, CardMetadata]
 
     def card_ref(self, card_instance_id: CardInstanceId) -> str:
-        return card_ref_text(
-            card_instance_id,
-            self.names_by_instance_id,
-            self.values_by_instance_id,
-        )
+        return card_ref_text(card_instance_id, self.cards)
 
 
 def event_type_name(event: GameEvent) -> str:
@@ -70,13 +114,9 @@ def winner_text(winner: PlayerId | None) -> str:
 def summarize_action(
     action: GameAction,
     *,
-    card_names_by_instance_id: Mapping[CardInstanceId, str],
-    card_values_by_instance_id: Mapping[CardInstanceId, int],
+    cards: Mapping[CardInstanceId, CardMetadata],
 ) -> str:
-    return _summarize_action(
-        action,
-        _SummaryCardContext(card_names_by_instance_id, card_values_by_instance_id),
-    )
+    return _summarize_action(action, _SummaryCardContext(cards))
 
 
 @singledispatch
@@ -166,13 +206,9 @@ def _(
 def summarize_event(
     event: GameEvent,
     *,
-    card_names_by_instance_id: Mapping[CardInstanceId, str],
-    card_values_by_instance_id: Mapping[CardInstanceId, int],
+    cards: Mapping[CardInstanceId, CardMetadata],
 ) -> str:
-    return _summarize_event(
-        event,
-        _SummaryCardContext(card_names_by_instance_id, card_values_by_instance_id),
-    )
+    return _summarize_event(event, _SummaryCardContext(cards))
 
 
 @singledispatch

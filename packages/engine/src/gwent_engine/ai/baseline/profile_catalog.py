@@ -5,24 +5,24 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
-from gwent_shared.error_translation import translate_mapping_key
 from gwent_shared.extract import (
     expect_finite_float,
     expect_mapping,
     optional_int_field,
     require_mapping_field,
     require_str_field,
+    translate_mapping_key,
 )
 
-from gwent_engine.ai.baseline.policies.registry import POLICY_CATALOG
+from gwent_engine.ai.baseline.policies import validate_policy_selection
 from gwent_engine.ai.policy import (
     AGGRESSIVE_LEADER_POLICY_ID,
     OPPORTUNISTIC_SCORCH_POLICY_ID,
     PolicySelection,
 )
+from gwent_engine.assets import bundled_data_path
 from gwent_engine.core.errors import DefinitionLoadError
 from gwent_engine.core.yaml_parsing import load_yaml_document
-from gwent_engine.resources import bundled_data_path
 
 DEFAULT_BASE_PROFILES_PATH = bundled_data_path("heuristic_profiles.yaml")
 
@@ -182,7 +182,7 @@ def _policy_selection_from_mapping(
             error_factory=DefinitionLoadError,
         ),
     )
-    POLICY_CATALOG.validate(selection, context=context)
+    validate_policy_selection(selection, context=context)
     return selection
 
 

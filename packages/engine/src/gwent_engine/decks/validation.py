@@ -1,9 +1,10 @@
 from collections import Counter
 from dataclasses import dataclass
 
-from gwent_engine.cards import CardDefinition, CardRegistry, DeckDefinition
+from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import CardType, FactionId
 from gwent_engine.core.ids import CardDefinitionId
+from gwent_engine.decks.definitions import DeckDefinition
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
 
 

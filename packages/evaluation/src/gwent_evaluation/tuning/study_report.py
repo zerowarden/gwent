@@ -5,13 +5,12 @@ from pathlib import Path
 from statistics import median
 from typing import cast
 
-from gwent_engine.ai.policy_artifacts import PolicyArtifact
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact
 from gwent_shared.extract import expect_mapping
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, dump_pretty_json
 
 from gwent_evaluation.execution import candidate_manifest
 from gwent_evaluation.models import SpecError
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.reporting import build_run_report
 from gwent_evaluation.storage import (
@@ -20,13 +19,13 @@ from gwent_evaluation.storage import (
     atomic_write_text,
     read_record_mapping,
 )
+from gwent_evaluation.tuning.html import render_study_html
 from gwent_evaluation.tuning.latency import load_latency
-from gwent_evaluation.tuning.models import StudyMode, StudySpec
-from gwent_evaluation.tuning.report_models import LIMITATIONS, StudyReport
+from gwent_evaluation.tuning.models import LIMITATIONS, StudyMode, StudyReport, StudySpec
+from gwent_evaluation.tuning.selection import require_verification
 from gwent_evaluation.tuning.sensitivity import SensitivityReport
 from gwent_evaluation.tuning.specs import study_from_dict
 from gwent_evaluation.tuning.storage import JournalEntry, StudyStore, read_checked_document
-from gwent_evaluation.tuning.verification import require_verification
 
 
 def _mapping(value: object) -> Mapping[str, object]:
@@ -584,8 +583,6 @@ def render_study_markdown(report: StudyReport) -> str:
 
 
 def write_study_report(root: Path, *, destination: Path | None = None) -> StudyReport:
-    from gwent_evaluation.tuning.html import render_study_html
-
     report = build_study_report(root)
     # Keep the optimization controller's own report intact for historical roots.
     destination = destination or (

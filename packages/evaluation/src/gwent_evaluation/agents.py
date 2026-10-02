@@ -7,13 +7,13 @@ from typing import cast
 from gwent_engine.ai.agents import BotAgent
 from gwent_engine.ai.arena import BotFamilyDefinition, bot_family
 from gwent_engine.ai.baseline import BaseProfileDefinition, get_base_profile_definition
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifact
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_engine.ai.policy import BaselineConfig
-from gwent_engine.ai.policy_artifacts import PolicyArtifact
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.models import AgentSpec, BotFamily, SuiteSpec
-from gwent_evaluation.provenance import canonical_digest
 
 
 class AgentResolutionError(ValueError):

@@ -26,14 +26,14 @@ from gwent_engine.core.validators import (
     validate_use_leader_ability_action,
 )
 from gwent_engine.leaders import LeaderRegistry
-from gwent_engine.rules.forfeit import apply_leave
 from gwent_engine.rules.game_setup import apply_mulligan, apply_start_game
-from gwent_engine.rules.leader_abilities import apply_use_leader_ability
+from gwent_engine.rules.leader_resolution import apply_use_leader_ability
 from gwent_engine.rules.pending_choices import (
     maybe_create_pending_choice_for_leader,
     maybe_create_pending_choice_for_play,
     resolve_pending_choice,
 )
+from gwent_engine.rules.round_cleanup import apply_leave
 from gwent_engine.rules.trigger_resolution import resolve_post_action_transitions
 from gwent_engine.rules.turn_flow import apply_pass, apply_play_card
 

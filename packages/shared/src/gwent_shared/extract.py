@@ -43,6 +43,7 @@ __all__ = [
     "stringify",
     "stringify_list",
     "stringify_optional",
+    "translate_mapping_key",
 ]
 
 
@@ -526,3 +527,16 @@ def _message(context: str, label: str | None, suffix: str) -> str:
     if label is None:
         return f"{context} {suffix}."
     return f"{context} field {label!r} {suffix}."
+
+
+def translate_mapping_key[KeyT, ValueT](
+    mapping: Mapping[KeyT, ValueT],
+    key: KeyT,
+    error_factory: Callable[[KeyT], Exception],
+) -> ValueT:
+    """Look up `key`, converting `KeyError` into the caller's domain error."""
+
+    try:
+        return mapping[key]
+    except KeyError as exc:
+        raise error_factory(key) from exc

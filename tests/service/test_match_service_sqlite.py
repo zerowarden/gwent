@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from gwent_service.application.commands import PassTurnCommand, SubmitMulliganCommand
-from gwent_service.application.match_service import MatchService
-from gwent_service.engine.adapter import GwentEngineAdapter
-from gwent_service.infrastructure.sqlite import SQLiteMatchRepository
+from gwent_service.dto import PassTurnCommand, SubmitMulliganCommand
+from gwent_service.engine_adapter import GwentEngineAdapter
+from gwent_service.match_service import MatchService
+from gwent_service.persistence import SQLiteMatchRepository
 
 from tests.service.support import build_create_match_command, identity_rng_factory
 

@@ -5,27 +5,25 @@ from dataclasses import dataclass, replace
 from math import fsum
 from random import Random
 
-from gwent_shared.digests import seed_from_text
+from gwent_shared.json_payloads import seed_from_text
 
 from gwent_engine.ai.baseline import BaseProfileDefinition, HeuristicBot, build_assessment
 from gwent_engine.ai.hashing import state_fingerprint
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import SearchConfig
 from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
-from gwent_engine.ai.search.explain import (
-    SearchDecisionComparison,
-    SearchDecisionExplanation,
-)
+from gwent_engine.ai.search.simulation import PlayerSimulation, materialize_player_simulation
 from gwent_engine.ai.search.turn_resolution import TurnSearchResolver
 from gwent_engine.ai.search.types import (
     SearchCandidate,
     SearchCandidateEvaluation,
+    SearchDecisionComparison,
+    SearchDecisionExplanation,
     SearchLine,
     SearchResult,
     SearchTraceFact,
     SearchValueTerm,
 )
-from gwent_engine.ai.simulation import PlayerSimulation, materialize_player_simulation
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core.actions import (
     GameAction,

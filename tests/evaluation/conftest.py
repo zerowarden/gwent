@@ -1,7 +1,6 @@
 """Ordinary evaluation tests may inspect holdout definitions, never their outcomes."""
 
 from collections.abc import Mapping
-from pathlib import Path
 from typing import cast
 
 import pytest
@@ -10,10 +9,12 @@ from gwent_evaluation.specs import load_agent_catalog, load_suite_catalog
 from gwent_evaluation.storage import RunStore, read_record_mapping
 from gwent_evaluation.validation import LoadedRun
 
+from tests.evaluation.support import REPOSITORY_ROOT
+
 
 @pytest.fixture(scope="session")
 def registered_holdouts() -> frozenset[str]:
-    root = Path(__file__).resolve().parents[2]
+    root = REPOSITORY_ROOT
     agents = load_agent_catalog(root / "experiments/agents.json")
     suites = load_suite_catalog(root / "experiments/suites.json", agents=agents)
     inline: set[str] = set()

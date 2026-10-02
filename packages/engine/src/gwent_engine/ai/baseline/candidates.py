@@ -3,12 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 
-from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.pending_choice import pending_choice_score
 from gwent_engine.ai.baseline.projection import LeaderActionProjection, project_leader_action
+from gwent_engine.ai.observation_queries import viewer_hand_definition
 from gwent_engine.ai.observations import PlayerObservation
 from gwent_engine.ai.policy import BaselineConfig, CandidateScoringConfig
-from gwent_engine.ai.utils import viewer_hand_definition
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType
 from gwent_engine.core.actions import (
@@ -21,6 +20,7 @@ from gwent_engine.core.actions import (
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.serialize.actions import action_to_id
 
 
 @dataclass(frozen=True, slots=True)

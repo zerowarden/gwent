@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from gwent_shared.digests import seed_from_text
+from gwent_shared.json_payloads import seed_from_text
 
-from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.actions import enumerate_legal_actions
-from gwent_engine.ai.baseline import BaseProfileDefinition
+from gwent_engine.ai.baseline import BaseProfileDefinition, DecisionAssessment, build_assessment
 from gwent_engine.ai.observations import build_player_observation
 from gwent_engine.ai.policy import SearchConfig
 from gwent_engine.ai.search.candidates import generate_search_candidates, order_search_candidates
-from gwent_engine.ai.search.depth_policy import should_search_opponent_reply
 from gwent_engine.ai.search.evaluator import evaluate_search_state
 from gwent_engine.ai.search.opponent_model import (
     OpponentReplyCandidate,
@@ -24,6 +22,7 @@ from gwent_engine.ai.search.types import (
     SearchTraceFact,
 )
 from gwent_engine.cards import CardRegistry
+from gwent_engine.core import GameStatus
 from gwent_engine.core.actions import GameAction
 from gwent_engine.core.ids import PlayerId
 from gwent_engine.core.randomness import SeededRandom
@@ -31,6 +30,7 @@ from gwent_engine.core.reducer import apply_action_with_intermediate_state
 from gwent_engine.core.state import GameState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.players import opponent_player_id_from_state
+from gwent_engine.serialize.actions import action_to_id
 
 
 @dataclass(slots=True)
@@ -369,3 +369,63 @@ class TurnSearchResolver:
 
 def _branch_seed(parent_seed: int, action: GameAction) -> int:
     return seed_from_text(f"{parent_seed}:{action_to_id(action)}")
+
+
+@dataclass(frozen=True, slots=True)
+class ReplySearchDecision:
+    enabled: bool
+    reason: str
+
+
+def should_search_opponent_reply(
+    state: GameState,
+    *,
+    viewer_player_id: PlayerId,
+    config: SearchConfig,
+    card_registry: CardRegistry,
+    leader_registry: LeaderRegistry | None = None,
+) -> ReplySearchDecision:
+    observation = build_player_observation(state, viewer_player_id, leader_registry)
+    assessment = build_assessment(observation, card_registry)
+    opponent_id = opponent_player_id_from_state(state, viewer_player_id)
+
+    if state.status == GameStatus.MATCH_ENDED:
+        decision = ReplySearchDecision(enabled=False, reason="match_ended")
+    elif state.current_player != opponent_id:
+        decision = ReplySearchDecision(enabled=False, reason="control_not_with_opponent")
+    elif assessment.opponent_passed:
+        decision = ReplySearchDecision(enabled=False, reason="opponent_already_passed")
+    else:
+        decision = _active_opponent_reply_decision(
+            state,
+            opponent_id=opponent_id,
+            assessment=assessment,
+            config=config,
+        )
+    return decision
+
+
+def _active_opponent_reply_decision(
+    state: GameState,
+    *,
+    opponent_id: PlayerId,
+    assessment: DecisionAssessment,
+    config: SearchConfig,
+) -> ReplySearchDecision:
+    opponent = assessment.opponent
+    opponent_resources = opponent.hand_count + (0 if opponent.leader_used else 1)
+    if opponent_resources <= 0:
+        decision = ReplySearchDecision(enabled=False, reason="opponent_has_no_resources")
+    elif state.pending_choice is not None and state.pending_choice.player_id == opponent_id:
+        decision = ReplySearchDecision(enabled=True, reason="opponent_pending_choice")
+    elif assessment.round_number >= 3:
+        decision = ReplySearchDecision(enabled=True, reason="final_round")
+    elif abs(assessment.score_gap) <= config.reply_search_score_gap_threshold:
+        decision = ReplySearchDecision(enabled=True, reason="close_score_gap")
+    elif opponent.hand_count >= config.reply_search_min_hand_count and (
+        opponent.hand_count >= assessment.viewer.hand_count
+    ):
+        decision = ReplySearchDecision(enabled=True, reason="opponent_hidden_pressure")
+    else:
+        decision = ReplySearchDecision(enabled=False, reason="stable_position")
+    return decision

@@ -1,19 +1,16 @@
-from gwent_engine.ai.actions import (
-    action_to_id,
-    enumerate_legal_actions,
-    enumerate_mulligan_selections,
-    legal_action_mask,
-)
-from gwent_engine.ai.turn_actions import enumerate_candidate_actions
+from gwent_engine.ai.actions import enumerate_legal_actions, legal_action_mask
+from gwent_engine.ai.turn_actions import enumerate_candidate_actions, enumerate_mulligan_selections
 from gwent_engine.core import ChoiceKind, ChoiceSourceKind, Row
 from gwent_engine.core.actions import PlayCardAction, ResolveChoiceAction
 from gwent_engine.core.ids import CardInstanceId, ChoiceId, PlayerId
+from gwent_engine.serialize.actions import action_to_id
+
+from tests.support import PLAYER_ONE_ID
 
 from ..scenario_builder import card, rows, scenario
 from ..support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
-    PLAYER_ONE_ID,
     build_sample_game_state,
     build_started_game_state,
 )

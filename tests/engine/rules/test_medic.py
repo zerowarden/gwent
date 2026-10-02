@@ -4,9 +4,9 @@ from gwent_engine.core.events import MedicResolvedEvent, MusterResolvedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, scenario
 from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def test_playing_medic_creates_pending_choice_with_only_valid_discard_units() -> None:

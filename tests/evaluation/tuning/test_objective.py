@@ -20,7 +20,7 @@ from gwent_evaluation.models import (
     SuitePurpose,
     TerminationReason,
 )
-from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance, canonical_digest
+from gwent_evaluation.provenance import RepositoryProvenance, RuntimeProvenance
 from gwent_evaluation.records import CorruptRecordError
 from gwent_evaluation.replay import ReplayError, replay_case, reproduce_case
 from gwent_evaluation.schedule import other_seat, schedule_blocks, schedule_suite
@@ -41,7 +41,9 @@ from gwent_evaluation.tuning.sensitivity import (
     sensitivity_controls,
     sensitivity_suite,
 )
+from gwent_evaluation.tuning.storage import StudyStore
 from gwent_evaluation.validation import execution_identity
+from gwent_shared.json_payloads import canonical_digest
 
 from tests.evaluation.support import (
     DECK_A,
@@ -379,6 +381,19 @@ def test_environment_is_rechecked_after_match_execution(
     monkeypatch.setattr(objective, "execute_run", run_then_drift)
     with pytest.raises(RunConflictError, match="pinned manifest"):
         _ = evaluate_candidate(study, study.incumbent, run_id="post-drift", output_root=tmp_path)
+
+
+def test_recorded_evaluation_requires_capability_for_heldout_templates(
+    scientific: StudySpec, tmp_path: Path
+) -> None:
+    with pytest.raises(SpecError, match="tune finalize"):
+        _ = objective.evaluate_recorded_candidate(
+            StudyStore(tmp_path),
+            scientific,
+            scientific.test,
+            scientific.incumbent,
+            repository_root=REPOSITORY_ROOT,
+        )
 
 
 @pytest.mark.parametrize("change", ["bounds", "frozen"])

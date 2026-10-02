@@ -25,6 +25,8 @@ class CliMatchRecorder:
     pending_choice_state: GameState | None = None
 
     def record_decision(self, decision: MatchDecision) -> None:
+        """Satisfy `MatchRecorder`; review explanations are rebuilt per step instead."""
+
         del decision
 
     def record_transition(self, transition: MatchTransition) -> None:

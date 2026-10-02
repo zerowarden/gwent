@@ -10,16 +10,15 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import NoReturn, final
 
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_shared.extract import expect_mapping
+from gwent_shared.json_payloads import canonical_digest, digest_hex
 
 from gwent_evaluation.execution import EvidencePolicy, validate_run_environment
 from gwent_evaluation.models import SpecError
 from gwent_evaluation.progress import advance
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.storage import RunConflictError
-from gwent_evaluation.tuning.backends import create_optimizer
 from gwent_evaluation.tuning.models import OptimizerMethod, StudySpec
 from gwent_evaluation.tuning.objective import (
     TrialEvaluation,
@@ -36,6 +35,8 @@ from gwent_evaluation.tuning.optimizers import (
     OptimizerStopReason,
     Proposal,
     ProposalFitness,
+    ProposalOptimizer,
+    RandomSearch,
     ScoredCandidate,
     SearchOutcome,
     summarize_search,
@@ -109,7 +110,7 @@ class _Candidate:
 
     @property
     def run_id(self) -> str:
-        return "trial-" + canonical_digest(self.identity).removeprefix("sha256:")
+        return "trial-" + digest_hex(canonical_digest(self.identity))
 
     @property
     def relative_root(self) -> Path:
@@ -397,3 +398,24 @@ class _StudyRunner:
             tuple(methods),
             summarize_search(reference, tuple(all_trials)),
         )
+
+
+def create_optimizer(study: StudySpec, method: OptimizerMethod) -> ProposalOptimizer:
+    """Construct only declared settings; optional dependencies load only for CMA."""
+    settings = next((item for item in study.optimizers if item.method is method), None)
+    if settings is None:
+        raise SpecError("Optimizer method is not declared in the study.")
+    if method is OptimizerMethod.RANDOM:
+        return RandomSearch(settings, dimensions=len(study.parameter_space.parameters))
+    try:
+        from gwent_evaluation.tuning.cma_backend import CmaEsSearch
+    except ImportError as error:
+        raise SpecError(
+            "CMA requires the optional gwent-evaluation[tuning] dependencies."
+        ) from error
+    return CmaEsSearch(
+        settings,
+        initial_mean=encode_parameters(
+            study.parameter_space, study.incumbent, frozen_configuration=study.incumbent
+        ),
+    )

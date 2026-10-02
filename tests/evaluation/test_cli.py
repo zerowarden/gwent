@@ -8,7 +8,15 @@ from typing import cast
 import pytest
 from gwent_evaluation import execution as execution_module
 from gwent_evaluation.cli import EXIT_DIVERGENCE, EXIT_ERROR, EXIT_OK, main
-from gwent_evaluation.provenance import read_runtime_provenance
+from gwent_evaluation.holdout import ACKNOWLEDGEMENT_PHRASE
+from gwent_evaluation.provenance import (
+    RepositoryProvenance,
+    read_repository_provenance,
+    read_runtime_provenance,
+)
+from gwent_evaluation.tuning import assessment, throughput
+
+from tests.evaluation.support import REPOSITORY_ROOT
 
 DECK_A = "monsters_muster_swarm_strict"
 DECK_B = "nilfgaard_spy_medic_control_strict"
@@ -19,6 +27,7 @@ def _write_tiny_catalogs(
     *,
     suite_id: str,
     deck_pairs: list[list[str]],
+    purpose: str = "smoke",
 ) -> tuple[Path, Path]:
     tmp_path.mkdir(parents=True, exist_ok=True)
     agents_path = tmp_path / "agents.json"
@@ -48,7 +57,7 @@ def _write_tiny_catalogs(
                     {
                         "schema_version": 1,
                         "suite_id": suite_id,
-                        "purpose": "smoke",
+                        "purpose": purpose,
                         "candidate": "heuristic-neutral",
                         "opponents": ["random"],
                         "deck_pairs": deck_pairs,
@@ -165,3 +174,74 @@ def test_invalid_inputs_exit_with_error(tmp_path: Path) -> None:
     _ = main(_run_arguments(suites_path, agents_path, suite_id="cli-tiny", output_root=output_root))
 
     assert main(["replay", str(output_root / "run"), "--case", "missing-case"]) == EXIT_ERROR
+
+
+def test_heldout_suite_requires_finalize_or_explicit_acknowledgement(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    suites_path, agents_path = _write_tiny_catalogs(
+        tmp_path, suite_id="cli-heldout", deck_pairs=[[DECK_A, DECK_B]], purpose="test"
+    )
+    output_root = tmp_path / "out"
+    arguments = _run_arguments(
+        suites_path, agents_path, suite_id="cli-heldout", output_root=output_root
+    )
+
+    assert main(arguments) == EXIT_ERROR
+    assert "tune finalize" in capsys.readouterr().err
+    assert not (output_root / "run").exists()
+
+    with pytest.raises(SystemExit):
+        _ = main([*arguments, "--consume-heldout", "WRONG"])
+    assert not (output_root / "run").exists()
+
+    provenance = replace(read_repository_provenance(REPOSITORY_ROOT), dirty=False)
+
+    def clean_repository(_root: Path) -> RepositoryProvenance:
+        return provenance
+
+    monkeypatch.setattr(execution_module, "read_repository_provenance", clean_repository)
+    assert main([*arguments, "--consume-heldout", ACKNOWLEDGEMENT_PHRASE]) == EXIT_OK
+    record = cast(
+        dict[str, object],
+        json.loads((output_root / "run" / "heldout.json").read_text(encoding="utf-8")),
+    )
+    assert record["suite_id"] == "cli-heldout"
+    assert record["origin"] == "manual"
+    assert record["acknowledgement"] == ACKNOWLEDGEMENT_PHRASE
+
+
+def test_consume_heldout_only_applies_to_heldout_suites(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    suites_path, agents_path = _write_tiny_catalogs(
+        tmp_path, suite_id="cli-tiny", deck_pairs=[[DECK_A, DECK_B]]
+    )
+    arguments = _run_arguments(
+        suites_path, agents_path, suite_id="cli-tiny", output_root=tmp_path / "out"
+    )
+
+    assert main([*arguments, "--consume-heldout", ACKNOWLEDGEMENT_PHRASE]) == EXIT_ERROR
+    assert "only applies to held-out" in capsys.readouterr().err
+    assert not (tmp_path / "out").exists()
+
+
+@pytest.mark.parametrize(
+    ("command", "module", "report_function"),
+    [
+        ("assessment", assessment, "write_assessment_html"),
+        ("throughput", throughput, "rebuild_throughput_report"),
+    ],
+)
+def test_tune_routes_report_only_subcommands_to_their_rebuilders(
+    command: str,
+    module: object,
+    report_function: str,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rebuilt: list[Path] = []
+    monkeypatch.setattr(module, report_function, rebuilt.append)
+
+    assert main(["tune", command, "--report-only", "--output", str(tmp_path)]) == EXIT_OK
+    assert rebuilt == [tmp_path]

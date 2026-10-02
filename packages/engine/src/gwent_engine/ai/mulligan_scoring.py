@@ -1,13 +1,37 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from gwent_engine.ai.policy import DEFAULT_MULLIGAN_POLICY, MulliganScoreWeights
 from gwent_engine.cards import CardDefinition
 from gwent_engine.core import AbilityKind, CardType
 from gwent_engine.core.actions import MulliganSelection
 from gwent_engine.core.ids import CardDefinitionId, CardInstanceId
+
+
+def best_mulligan_selection(
+    legal_selections: Sequence[MulliganSelection],
+    hand_by_id: Mapping[CardInstanceId, CardDefinition],
+    definition_counts: Counter[CardDefinitionId],
+    *,
+    weights: MulliganScoreWeights,
+    prefer_highest_card_ids: bool,
+) -> MulliganSelection:
+    """Highest-scoring selection, then fewest replacements, then the card-id tie-break.
+
+    Bots differ only in the final tie-break between equally scored selections of
+    equal size: the lowest or the highest card-id tuple.
+    """
+
+    def rank(selection: MulliganSelection) -> tuple[int, int]:
+        score = mulligan_selection_score(selection, hand_by_id, definition_counts, weights=weights)
+        return score, -len(selection.cards_to_replace)
+
+    best_rank = max(rank(selection) for selection in legal_selections)
+    tied = [selection for selection in legal_selections if rank(selection) == best_rank]
+    pick = max if prefer_highest_card_ids else min
+    return pick(tied, key=lambda selection: tuple(map(str, selection.cards_to_replace)))
 
 
 def mulligan_selection_score(

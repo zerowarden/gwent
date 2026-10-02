@@ -13,15 +13,21 @@ from threading import current_thread, main_thread
 from time import perf_counter
 
 from gwent_engine.ai.arena import MatchExecution, execute_match
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.hashing import state_fingerprint
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
 from gwent_engine.ai.observations import OBSERVATION_CONTRACT_VERSION
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO
 from gwent_engine.core.randomness import SeededRandom
 from gwent_shared.extract import stringify_optional
+from gwent_shared.json_payloads import canonical_digest
 
 from gwent_evaluation.agents import ResolvedAgent, resolve_agent, snapshot_suite
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
+from gwent_evaluation.holdout import (
+    HoldoutAuthorization,
+    record_holdout_consumption,
+    require_holdout_authorization,
+)
 from gwent_evaluation.models import (
     RECORD_SCHEMA_VERSION,
     AgentIdentity,
@@ -39,7 +45,6 @@ from gwent_evaluation.models import (
 from gwent_evaluation.progress import advance
 from gwent_evaluation.provenance import (
     SEED_DERIVATION_VERSION,
-    canonical_digest,
     read_repository_provenance,
     read_runtime_provenance,
 )
@@ -204,17 +209,21 @@ def execute_run(
     evidence_policy: EvidencePolicy = EvidencePolicy.FAILURES,
     expected_manifest: RunManifest | None = None,
     workers: int = 1,
+    holdout_authorization: HoldoutAuthorization | None = None,
 ) -> RunExecution:
     """Execute or resume one run, persisting results and evidence atomically.
 
     Cases already persisted are verified and reused, so a resumed run never
-    re-executes or silently replaces completed work.
+    re-executes or silently replaces completed work. Held-out suites require a
+    `HoldoutAuthorization` issued by the finalization workflow or by the
+    explicit manual-consumption escape hatch.
     """
 
     validate_worker_count(workers)
     if workers > 1 and evidence_policy is not EvidencePolicy.NONE:
         raise SpecError("Parallel execution requires evidence policy 'none'.")
     suite = snapshot_suite(suite)
+    require_holdout_authorization(suite, holdout_authorization)
     assets = resolve_assets()
     candidate = resolve_agent(suite.candidate)
     opponents = {opponent: resolve_agent(opponent) for opponent in suite.opponents}
@@ -236,6 +245,8 @@ def execute_run(
         )
     store = RunStore(output_root=output_root, run_id=run_id)
     prepared = store.prepare(manifest, matches=matches)
+    if holdout_authorization is not None:
+        record_holdout_consumption(store, authorization=holdout_authorization)
     persisted = prepared.results
     execution_id = prepared.execution_identity
     results = dict(persisted)

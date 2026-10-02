@@ -507,11 +507,3 @@ def range_command(args: argparse.Namespace) -> int:
             run_ranges(protocol, root, recover_lock=cast(bool, args.recover_lock), workers=workers)
     print(f"Read: {root / ('plan/report.html' if action == 'plan' else 'report.html')}")
     return 0
-
-
-def main() -> None:
-    _ = range_command(ranges_parser().parse_args())
-
-
-if __name__ == "__main__":
-    main()

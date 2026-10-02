@@ -8,11 +8,10 @@ from gwent_engine.ai.baseline.features import dead_card_penalty
 from gwent_engine.ai.baseline.projection.battlefield import resolve_projected_battlefield
 from gwent_engine.ai.baseline.projection.board import (
     ProjectedBattlefieldCard,
+    ProjectionResolverContext,
     board_projection,
 )
-from gwent_engine.ai.baseline.projection.context import (
-    viewer_public,
-)
+from gwent_engine.ai.baseline.projection.context import viewer_public
 from gwent_engine.ai.baseline.projection.future_value import (
     projected_avenger_value,
     projected_future_hand_value,
@@ -25,23 +24,20 @@ from gwent_engine.ai.baseline.projection.models import (
     PlayActionProjection,
     ScorchImpact,
 )
-from gwent_engine.ai.baseline.projection.resolver_context import (
-    ProjectionResolverContext,
-)
-from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
-from gwent_engine.ai.utils import (
+from gwent_engine.ai.observation_queries import (
     is_non_hero_unit,
     viewer_deck_count,
     viewer_deck_definitions,
     viewer_hand_definition,
 )
+from gwent_engine.ai.observations import PlayerObservation
+from gwent_engine.ai.policy import DEFAULT_FEATURE_POLICY, DEFAULT_PROJECTION_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, CardType, Row
 from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.ids import CardInstanceId, PlayerId
-from gwent_engine.rules.battlefield_effects import is_weather_ability, weather_rows_for
 from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.rules.weather import is_weather_ability, weather_rows_for
 
 
 @dataclass(frozen=True)

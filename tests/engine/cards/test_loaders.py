@@ -2,28 +2,25 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from gwent_engine.assets import bundled_data_dir
 from gwent_engine.cards.loaders import load_card_definitions
-from gwent_engine.cards.registry import CardRegistry
+from gwent_engine.cards.models import CardRegistry
 from gwent_engine.core import (
     AbilityKind,
     FactionId,
     LeaderAbilityKind,
     LeaderSelectionMode,
-    PassiveKind,
     Row,
 )
 from gwent_engine.core.errors import (
     DefinitionLoadError,
     UnknownAbilityKindError,
     UnknownLeaderAbilityKindError,
-    UnknownPassiveKindError,
 )
 from gwent_engine.core.ids import CardDefinitionId, LeaderId
 from gwent_engine.decks import load_sample_decks
-from gwent_engine.factions.loaders import load_faction_definitions
 from gwent_engine.leaders.loaders import load_leader_definitions
-from gwent_engine.leaders.registry import LeaderRegistry
-from gwent_engine.resources import bundled_data_dir
+from gwent_engine.leaders.models import LeaderRegistry
 
 from tests.support import write_yaml_fixture
 
@@ -44,7 +41,6 @@ def _assert_loader_rejects(
 
 
 def test_sample_yaml_loads_successfully() -> None:
-    faction_definitions = load_faction_definitions(DATA_DIR / "factions.yaml")
     card_definitions = load_card_definitions(DATA_DIR / "cards.yaml")
     card_registry = CardRegistry.from_definitions(card_definitions)
     leader_definitions = load_leader_definitions(DATA_DIR / "leaders.yaml")
@@ -55,14 +51,9 @@ def test_sample_yaml_loads_successfully() -> None:
         leader_registry,
     )
 
-    assert len(faction_definitions) == 5
     assert len(card_definitions) == 165
     assert len(leader_definitions) == 22
     assert len(deck_definitions) == 16
-    assert faction_definitions[0].passive_kind == PassiveKind.MONSTERS_KEEP_ONE_UNIT
-    assert faction_definitions[-1].passive_kind == (
-        PassiveKind.SKELLIGE_SUMMON_TWO_FROM_DISCARD_ON_ROUND_THREE
-    )
     assert deck_definitions[0].faction == FactionId.MONSTERS
     assert len(deck_definitions[0].card_definition_ids) == 25
     assert (
@@ -185,32 +176,6 @@ def test_reconciled_hero_flags(definition_id: str) -> None:
 @pytest.mark.parametrize(
     ("filename", "content", "loader", "error_type", "message"),
     (
-        (
-            "factions.yaml",
-            """
-factions:
-  - faction_id: monsters
-    name: Monsters
-    passive_kind: not_a_real_passive
-    passive_description: Broken
-""",
-            load_faction_definitions,
-            UnknownPassiveKindError,
-            "Unknown passive_kind",
-        ),
-        (
-            "factions.yaml",
-            """
-factions:
-  - faction_id: not_a_real_faction
-    name: Broken Faction
-    passive_kind: monsters_keep_one_unit
-    passive_description: Broken
-""",
-            load_faction_definitions,
-            DefinitionLoadError,
-            "Unknown faction id",
-        ),
         (
             "cards.yaml",
             """

@@ -6,12 +6,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from gwent_engine.ai.action_ids import action_to_id
 from gwent_engine.ai.arena.models import MatchDecisionKind
 from gwent_engine.ai.baseline.decision_plan import build_decision_plan
 from gwent_engine.ai.baseline.evaluation import explain_ranked_actions
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
-from gwent_engine.serialize.actions import action_from_id
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.serialize.actions import action_from_id, action_to_id
 from gwent_shared.extract import (
     expect_finite_float,
     expect_int,
@@ -19,7 +18,7 @@ from gwent_shared.extract import (
     expect_sequence,
     expect_str,
 )
-from gwent_shared.json_payloads import dump_pretty_json
+from gwent_shared.json_payloads import canonical_digest, dump_pretty_json
 
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.assets import ResolvedAssets, resolve_assets
@@ -27,7 +26,6 @@ from gwent_evaluation.execution import EvidencePolicy, execute_run, validate_run
 from gwent_evaluation.metrics import block_outcomes, compute_run_metrics
 from gwent_evaluation.models import DecisionSample, SpecError, SuitePurpose, SuiteSpec
 from gwent_evaluation.progress import advance
-from gwent_evaluation.provenance import canonical_digest
 from gwent_evaluation.records import decision_sample_to_dict, parse_record_mapping, record_to_dict
 from gwent_evaluation.reporting import scored_cases
 from gwent_evaluation.schedule import schedule_blocks, schedule_suite

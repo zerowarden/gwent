@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import (
@@ -10,7 +12,7 @@ from gwent_engine.core import (
     Zone,
 )
 from gwent_engine.core.actions import PlayCardAction
-from gwent_engine.core.config import SCORCH_THRESHOLD
+from gwent_engine.core.enums import SCORCH_THRESHOLD
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import (
     CardPlayedEvent,
@@ -29,19 +31,20 @@ from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.avenger import resolve_leave_battlefield_triggers
+from gwent_engine.rules.choice_targets import eligible_medic_target_ids, pending_medic_choice
 from gwent_engine.rules.effect_applicability import (
     eligible_destroyable_unit_ids,
 )
-from gwent_engine.rules.event_builder import EventBuilder
-from gwent_engine.rules.leader_effects import restore_selection_is_randomized
-from gwent_engine.rules.mardroeme import apply_berserker_transformations_for_row
-from gwent_engine.rules.medic_choices import eligible_medic_target_ids, pending_medic_choice
+from gwent_engine.rules.leader_common import restore_selection_is_randomized
 from gwent_engine.rules.players import (
     opponent_player_id_from_state,
     other_player_from_state,
 )
 from gwent_engine.rules.round_continuation import advance_turn_after_action
-from gwent_engine.rules.row_effects import horn_source_for_row
+from gwent_engine.rules.row_effects import (
+    apply_berserker_transformations_for_row,
+    horn_source_for_row,
+)
 from gwent_engine.rules.state_ops import (
     append_to_row,
     card_in_zone,
@@ -56,6 +59,26 @@ type AfterUnitPlayedHandler = Callable[
     GameState,
 ]
 type PlayDestinationModifier = Callable[[GameState, PlayerId], PlayerId]
+
+
+@dataclass(slots=True)
+class EventBuilder:
+    """Accumulates events and assigns consecutive ids from the state's counter."""
+
+    base_event_counter: int
+    _events: list[GameEvent] = field(default_factory=list)
+
+    def next_event_id(self) -> int:
+        return self.base_event_counter + len(self._events) + 1
+
+    def append(self, event: GameEvent) -> None:
+        self._events.append(event)
+
+    def extend(self, events: tuple[GameEvent, ...]) -> None:
+        self._events.extend(events)
+
+    def build(self) -> tuple[GameEvent, ...]:
+        return tuple(self._events)
 
 
 @dataclass(slots=True)

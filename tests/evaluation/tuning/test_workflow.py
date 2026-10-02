@@ -194,7 +194,7 @@ def test_cli_passes_output_and_explicit_recovery(
     def inputs(_root: Path) -> tuple[StudySpec, RunManifest]:
         return scientific, smoke
 
-    monkeypatch.setattr(workflow, "load_pilot_inputs", inputs)
+    monkeypatch.setattr(cli, "load_pilot_inputs", inputs)
     monkeypatch.setattr(cli, "_repository_root", lambda: REPOSITORY_ROOT)
     assert cli.main(["tune", "pilot", "--output", str(tmp_path), "--recover-lock"]) == 0
     assert (tmp_path / "README.md").exists()

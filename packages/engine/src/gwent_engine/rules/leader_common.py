@@ -1,23 +1,37 @@
+"""Shared leader helpers: enabled definitions, passive modifiers, and choice targets.
+
+Kept below the pending-choice and round-continuation layers so both can share
+one authoritative set of leader eligibility rules without an import cycle.
+"""
+
+from __future__ import annotations
+
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from gwent_engine.cards import CardRegistry
 from gwent_engine.core import (
     WEATHER_ABILITY_KINDS,
     AbilityKind,
     CardType,
+    LeaderAbilityKind,
+    LeaderAbilityMode,
     LeaderSelectionMode,
     Row,
 )
 from gwent_engine.core.actions import UseLeaderAbilityAction
 from gwent_engine.core.errors import IllegalActionError
 from gwent_engine.core.events import GameEvent
-from gwent_engine.core.ids import CardInstanceId
+from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.state import GameState, PlayerState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
-from gwent_engine.rules.effect_applicability import can_affect_card
-from gwent_engine.rules.players import replace_player
+from gwent_engine.rules.effect_applicability import (
+    can_affect_card,
+    can_target_for_discard_retrieval,
+    is_hero,
+)
+from gwent_engine.rules.players import other_player_from_state, replace_player
 from gwent_engine.rules.row_effects import special_ability_kind
 from gwent_engine.rules.selection_validation import (
     validate_distinct_selections,
@@ -211,3 +225,141 @@ def resolve_discard_and_choose_from_deck_selection(
     if len(drawn_card_ids) != leader_definition.deck_pick_count:
         raise IllegalActionError("Leader requires the configured number of chosen deck cards.")
     return discarded_card_ids, drawn_card_ids
+
+
+def leader_definition_for_player(
+    player: PlayerState,
+    leader_registry: LeaderRegistry,
+) -> LeaderDefinition:
+    return leader_registry.get(player.leader.leader_id)
+
+
+def enabled_leader_definition_for_player(
+    player: PlayerState,
+    leader_registry: LeaderRegistry | None,
+) -> LeaderDefinition | None:
+    if leader_registry is None or player.leader.disabled:
+        return None
+    return leader_definition_for_player(player, leader_registry)
+
+
+def enabled_passive_leader_definitions(
+    state: GameState,
+    leader_registry: LeaderRegistry | None,
+) -> tuple[LeaderDefinition, ...]:
+    if leader_registry is None:
+        return ()
+    return tuple(
+        leader_definition
+        for player in state.players
+        if (leader_definition := enabled_leader_definition_for_player(player, leader_registry))
+        is not None
+        and leader_definition.ability_mode == LeaderAbilityMode.PASSIVE
+    )
+
+
+def any_enabled_passive_leader_has_ability(
+    state: GameState,
+    leader_registry: LeaderRegistry | None,
+    ability_kind: LeaderAbilityKind,
+) -> bool:
+    return any(
+        leader_definition.ability_kind == ability_kind
+        for leader_definition in enabled_passive_leader_definitions(state, leader_registry)
+    )
+
+
+def restore_selection_is_randomized(
+    state: GameState,
+    leader_registry: LeaderRegistry | None,
+    *,
+    card_registry: CardRegistry,
+    medic_card_id: CardInstanceId,
+) -> bool:
+    return not is_hero(state, card_registry, medic_card_id) and (
+        any_enabled_passive_leader_has_ability(
+            state,
+            leader_registry,
+            LeaderAbilityKind.RANDOMIZE_RESTORE_TO_BATTLEFIELD_SELECTION,
+        )
+    )
+
+
+def player_has_enabled_passive_leader_ability(
+    state: GameState,
+    leader_registry: LeaderRegistry | None,
+    player_id: PlayerId,
+    ability_kind: LeaderAbilityKind,
+) -> bool:
+    player = state.player(player_id)
+    leader_definition = enabled_leader_definition_for_player(player, leader_registry)
+    return leader_definition is not None and leader_definition.ability_kind == ability_kind
+
+
+@dataclass(frozen=True, slots=True)
+class LeaderChoiceTargets:
+    legal_target_ids: tuple[CardInstanceId, ...]
+    min_selections: int = 1
+    max_selections: int = 1
+
+
+def leader_pending_choice_targets(
+    state: GameState,
+    player: PlayerState,
+    *,
+    card_registry: CardRegistry,
+    ability_kind: LeaderAbilityKind,
+    hand_discard_count: int,
+    deck_pick_count: int,
+) -> LeaderChoiceTargets | None:
+    match ability_kind:
+        case LeaderAbilityKind.DISCARD_AND_CHOOSE_FROM_DECK:
+            return _discard_and_choose_targets(
+                player,
+                hand_discard_count=hand_discard_count,
+                deck_pick_count=deck_pick_count,
+            )
+        case LeaderAbilityKind.RETURN_CARD_FROM_OWN_DISCARD_TO_HAND:
+            return _discard_retrieval_targets(state, card_registry, player.discard)
+        case LeaderAbilityKind.TAKE_CARD_FROM_OPPONENT_DISCARD_TO_HAND:
+            opponent = other_player_from_state(state, player.player_id)
+            return _discard_retrieval_targets(state, card_registry, opponent.discard)
+        case _:
+            raise IllegalActionError(f"Unsupported pending-choice leader ability: {ability_kind!r}")
+
+
+def _discard_and_choose_targets(
+    player: PlayerState,
+    *,
+    hand_discard_count: int,
+    deck_pick_count: int,
+) -> LeaderChoiceTargets | None:
+    if not discard_and_choose_selection_required(
+        player,
+        hand_discard_count=hand_discard_count,
+        deck_pick_count=deck_pick_count,
+    ):
+        return None
+    selection_count = hand_discard_count + deck_pick_count
+    return LeaderChoiceTargets(
+        legal_target_ids=player.hand + player.deck,
+        min_selections=selection_count,
+        max_selections=selection_count,
+    )
+
+
+def _discard_retrieval_targets(
+    state: GameState,
+    card_registry: CardRegistry,
+    discard: tuple[CardInstanceId, ...],
+) -> LeaderChoiceTargets | None:
+    legal_target_ids = tuple(
+        card_id
+        for card_id in discard
+        if can_target_for_discard_retrieval(
+            state,
+            card_registry,
+            target_card_id=card_id,
+        )
+    )
+    return LeaderChoiceTargets(legal_target_ids) if legal_target_ids else None

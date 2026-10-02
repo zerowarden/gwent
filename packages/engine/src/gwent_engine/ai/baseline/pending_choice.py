@@ -2,22 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from gwent_engine.ai.actions import action_to_id
 from gwent_engine.ai.baseline.projection import projected_future_card_value
 from gwent_engine.ai.baseline.projection.context import opponent_public, viewer_public
-from gwent_engine.ai.observations import PlayerObservation
-from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
-from gwent_engine.ai.utils import (
+from gwent_engine.ai.observation_queries import (
     is_non_hero_unit,
     viewer_deck_count,
     viewer_deck_instance_ids,
     visible_definitions,
 )
+from gwent_engine.ai.observations import PlayerObservation
+from gwent_engine.ai.policy import DEFAULT_PENDING_CHOICE_POLICY
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import AbilityKind, ChoiceSourceKind, LeaderAbilityKind
 from gwent_engine.core.actions import GameAction, ResolveChoiceAction
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
+from gwent_engine.serialize.actions import action_to_id
 
 
 class UnsupportedPendingChoiceError(Exception):

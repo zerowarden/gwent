@@ -9,13 +9,13 @@ from gwent_engine.core.ids import CardInstanceId, PlayerId
 from gwent_engine.core.reducer import apply_action
 from gwent_engine.core.state import GameState
 
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
+
 from ..scenario_builder import ScenarioCard, ScenarioRows, card, rows, scenario
 from ..support import (
     CARD_REGISTRY,
     LEADER_REGISTRY,
     NILFGAARD_RAIN_FROM_DECK_LEADER_ID,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
     SKELLIGE_KING_BRAN_LEADER_ID,
 )
 

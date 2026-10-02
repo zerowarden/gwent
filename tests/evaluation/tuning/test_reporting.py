@@ -131,7 +131,6 @@ def test_insensitive_preflight_and_no_evidence_are_explicit(
 def test_workflow_stops_after_selection_and_resumes_without_test_feedback(
     experiment: Experiment, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from gwent_evaluation.tuning import latency
 
     root = tmp_path / "workflow"
 
@@ -148,7 +147,7 @@ def test_workflow_stops_after_selection_and_resumes_without_test_feedback(
         return None
 
     monkeypatch.setattr(workflow, "run_sensitivity", sensitivity)
-    monkeypatch.setattr(latency, "measure_selected_latency", timing)
+    monkeypatch.setattr(workflow, "measure_selected_latency", timing)
     for _ in range(2):
         workflow.run_tuning(experiment.study, output_root=root, repository_root=REPOSITORY_ROOT)
     report = build_study_report(root)

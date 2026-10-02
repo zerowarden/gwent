@@ -22,15 +22,12 @@ from tests.engine.support import (
     NILFGAARD_DECK_ID,
     NILFGAARD_RANDOMIZE_RESTORE_LEADER_ID,
     NILFGAARD_WHITE_FLAME_LEADER_ID,
-    PLAYER_ONE_ID,
-    PLAYER_TWO_ID,
     SCOIATAEL_LEADER_PASSIVES_DECK_ID,
     SCOIATAEL_RANGED_HORN_LEADER_ID,
     SKELLIGE_KING_BRAN_LEADER_ID,
-    IdentityShuffle,
-    IndexedRandom,
     build_sample_game_state,
 )
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom, IndexedRandom
 
 
 def test_white_flame_disables_opponent_passive_leader_before_setup() -> None:
@@ -56,7 +53,7 @@ def test_white_flame_disables_opponent_passive_leader_before_setup() -> None:
     next_state, events = apply_action(
         white_flame_state,
         StartGameAction(starting_player=PLAYER_ONE_ID),
-        rng=IdentityShuffle(),
+        rng=IdentityRandom(),
         leader_registry=leader_registry,
     )
 

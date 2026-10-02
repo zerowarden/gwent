@@ -14,13 +14,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from gwent_engine.ai.policy_artifacts import PolicyArtifactError
+from gwent_engine.ai.baseline.policy_artifacts import PolicyArtifactError
 from gwent_shared.json_payloads import dump_pretty_json
 
-from gwent_evaluation.agents import AgentResolutionError, candidate_from_artifact
+from gwent_evaluation.agents import AgentResolutionError, candidate_from_artifact, snapshot_suite
 from gwent_evaluation.execution import EvidencePolicy, execute_run
+from gwent_evaluation.holdout import (
+    ACKNOWLEDGEMENT_PHRASE,
+    HELDOUT_EXECUTION_ERROR,
+    HoldoutAuthorization,
+    authorize_manual_consumption,
+)
 from gwent_evaluation.models import SuiteSpec
-from gwent_evaluation.output import write_output_index, write_run_guide, write_sensitivity_guide
 from gwent_evaluation.provenance import default_repository_root as _repository_root
 from gwent_evaluation.records import StorageError
 from gwent_evaluation.replay import (
@@ -43,8 +48,11 @@ from gwent_evaluation.specs import (
     load_agent_catalog,
     load_suite_catalog,
 )
+from gwent_evaluation.storage import write_output_index, write_run_guide, write_sensitivity_guide
+from gwent_evaluation.tuning.cli import tuning_parsers
 from gwent_evaluation.tuning.sensitivity import run_sensitivity
 from gwent_evaluation.tuning.specs import load_study_spec
+from gwent_evaluation.tuning.workflow import load_pilot_inputs, run_pilot
 
 EXIT_OK = 0
 EXIT_DIVERGENCE = 1
@@ -86,7 +94,6 @@ def _build_parser() -> argparse.ArgumentParser:
     _ = pilot_parser.add_argument("--output", type=Path, default=Path(".output/pilot"))
     _ = pilot_parser.add_argument("--recover-lock", action="store_true")
     pilot_parser.set_defaults(handler=_cmd_tune_pilot)
-    from gwent_evaluation.tuning.cli import tuning_parsers
 
     for name, command_parser in tuning_parsers():
         _ = tune_commands.add_parser(
@@ -138,6 +145,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     run_parser.set_defaults(handler=_cmd_run)
     _ = run_parser.add_argument("--candidate-artifact", type=Path, default=None)
+    _ = run_parser.add_argument(
+        "--consume-heldout",
+        choices=(ACKNOWLEDGEMENT_PHRASE,),
+        default=None,
+        help=(
+            "Emergency escape hatch for executing a held-out suite outside `tune finalize`; "
+            + "the consumption is recorded in the run directory."
+        ),
+    )
 
     report_parser = subparsers.add_parser(
         "report", help="Rebuild and print the report of a run directory."
@@ -165,8 +181,6 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_tune_pilot(args: argparse.Namespace) -> int:
-    from gwent_evaluation.tuning.workflow import load_pilot_inputs, run_pilot
-
     repository = _repository_root()
     study, smoke = load_pilot_inputs(repository)
     output = cast(Path, args.output)
@@ -222,6 +236,9 @@ def _cmd_run(args: argparse.Namespace) -> int:
     artifact = cast(Path | None, args.candidate_artifact)
     if artifact is not None:
         suite = replace(suite, candidate=candidate_from_artifact(suite.candidate, artifact))
+    authorization = _holdout_authorization(
+        suite, acknowledgement=cast(str | None, args.consume_heldout)
+    )
     run_id = cast(str | None, args.run_id)
     execution = execute_run(
         suite=suite,
@@ -229,11 +246,14 @@ def _cmd_run(args: argparse.Namespace) -> int:
         output_root=cast(Path, args.output_root),
         repository_root=_repository_root(),
         evidence_policy=EvidencePolicy(cast(str, args.evidence_policy)),
+        holdout_authorization=authorization,
     )
     write_run_guide(execution.root)
     _index_output(execution.root.parent)
     report = execution.report
     print(f"run: {execution.root}")
+    if authorization is not None:
+        print(f"held-out consumption: {execution.root / 'heldout.json'}")
     print(
         f"executed={len(execution.executed_case_ids)} "
         + f"resumed={len(execution.resumed_case_ids)}"
@@ -276,6 +296,23 @@ def _cmd_compare(args: argparse.Namespace) -> int:
     comparison = compare_runs(cast(Path, args.reference), cast(Path, args.candidate))
     print(render_comparison_markdown(comparison), end="")
     return EXIT_OK if comparison.compatible else EXIT_DIVERGENCE
+
+
+def _holdout_authorization(
+    suite: SuiteSpec, *, acknowledgement: str | None
+) -> HoldoutAuthorization | None:
+    if not suite.purpose.is_heldout:
+        if acknowledgement is not None:
+            raise SpecError("--consume-heldout only applies to held-out test suites.")
+        return None
+    if acknowledgement is None:
+        raise SpecError(f"Suite {suite.suite_id!r} is held out. {HELDOUT_EXECUTION_ERROR}")
+    print(
+        f"warning: manually consuming held-out suite {suite.suite_id!r}; "
+        + "the consumption is recorded in the run directory.",
+        file=sys.stderr,
+    )
+    return authorize_manual_consumption(snapshot_suite(suite), acknowledgement=acknowledgement)
 
 
 def _select_suite(

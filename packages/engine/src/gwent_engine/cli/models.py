@@ -6,7 +6,7 @@ from gwent_engine.ai.arena import (
     MatchStepKind,
     MatchTransition,
 )
-from gwent_engine.ai.debug import HeuristicDecisionExplanation
+from gwent_engine.ai.baseline.explain import HeuristicDecisionExplanation
 from gwent_engine.ai.search import SearchDecisionExplanation
 from gwent_engine.core.actions import GameAction
 from gwent_engine.core.events import GameEvent
@@ -14,6 +14,19 @@ from gwent_engine.core.ids import CardInstanceId, DeckId, GameId, LeaderId, Play
 from gwent_engine.core.state import GameState
 
 type BotDecisionExplanation = HeuristicDecisionExplanation | SearchDecisionExplanation
+
+
+@dataclass(frozen=True, slots=True)
+class CardMetadata:
+    """Static per-instance card facts used by review rendering."""
+
+    name: str
+    base_value: int
+    kind: str
+    is_spy: bool
+    is_medic: bool
+    is_horn: bool
+    is_scorch: bool
 
 
 class CliMatchExecutionError(RuntimeError):
@@ -86,11 +99,5 @@ class CliRun:
     steps: tuple[CliStep, ...]
     pending_choice_state: GameState | None
     final_state: GameState
-    card_names_by_instance_id: Mapping[CardInstanceId, str]
-    card_values_by_instance_id: Mapping[CardInstanceId, int]
-    card_kinds_by_instance_id: Mapping[CardInstanceId, str]
-    card_spy_by_instance_id: Mapping[CardInstanceId, bool]
-    card_medic_by_instance_id: Mapping[CardInstanceId, bool]
-    card_horn_by_instance_id: Mapping[CardInstanceId, bool]
-    card_scorch_by_instance_id: Mapping[CardInstanceId, bool]
+    cards: Mapping[CardInstanceId, CardMetadata]
     final_strengths_by_instance_id: Mapping[CardInstanceId, int]

@@ -4,12 +4,12 @@ from gwent_engine.core.actions import PlayCardAction
 from gwent_engine.core.events import CardPlayedEvent
 from gwent_engine.core.ids import CardInstanceId
 from gwent_engine.core.reducer import apply_action
-from gwent_engine.rules.battlefield_effects import active_weather_cards, weather_card_affects_row
 from gwent_engine.rules.scoring import calculate_row_score
+from gwent_engine.rules.weather import active_weather_cards, weather_card_affects_row
 
-from tests.engine.primitives import PLAYER_ONE_ID, PLAYER_TWO_ID
 from tests.engine.scenario_builder import card, rows, scenario
 from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 @pytest.mark.parametrize(

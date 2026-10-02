@@ -4,8 +4,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from time import perf_counter
 
-from gwent_engine.ai.action_ids import action_to_id, mulligan_selection_id
-from gwent_engine.ai.actions import enumerate_legal_actions, enumerate_mulligan_selections
+from gwent_engine.ai.actions import enumerate_legal_actions, mulligan_selection_id
 from gwent_engine.ai.agents import BotAgent
 from gwent_engine.ai.arena.models import (
     FailedDecisionAttempt,
@@ -21,7 +20,8 @@ from gwent_engine.ai.arena.models import (
     TurnDecision,
 )
 from gwent_engine.ai.observations import build_player_observation
-from gwent_engine.cards import CardRegistry, DeckDefinition
+from gwent_engine.ai.turn_actions import enumerate_mulligan_selections
+from gwent_engine.cards import CardRegistry
 from gwent_engine.core import GameStatus, Phase
 from gwent_engine.core.actions import (
     GameAction,
@@ -34,9 +34,11 @@ from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, GameId, PlayerId
 from gwent_engine.core.randomness import SupportsRandom
 from gwent_engine.core.reducer import apply_action_with_intermediate_state
 from gwent_engine.core.state import GameState
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.leaders import LeaderRegistry
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 from gwent_engine.serialize import action_from_id
+from gwent_engine.serialize.actions import action_to_id
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,13 +1,22 @@
+from gwent_engine.assets import load_card_registry
 from gwent_engine.core import AbilityKind
 from gwent_engine.core.ids import PLAYER_ONE, PLAYER_TWO, CardInstanceId
 from gwent_engine.core.state import GameState
-from gwent_engine.runtime_assets import load_card_registry
-from gwent_service.application.commands import PassTurnCommand, PlayCardCommand
-from gwent_service.application.snapshot import snapshot_from_stored_match
-from gwent_service.engine.adapter import GwentEngineAdapter
+from gwent_service.dto import (
+    PassTurnCommand,
+    PlayCardCommand,
+    ResolveChoiceCommand,
+    SubmitMulliganCommand,
+)
+from gwent_service.engine_adapter import GwentEngineAdapter
+from gwent_service.match_service import snapshot_from_stored_match
 
 from tests.service.support import (
+    build_create_match_command,
+    build_service,
     build_started_match,
+    pending_decoy_state,
+    replace_match_state,
 )
 
 
@@ -86,3 +95,59 @@ def _first_spy_in_hand(state: GameState) -> CardInstanceId:
         if AbilityKind.SPY in definition.ability_kinds:
             return card_id
     raise AssertionError("Expected a spy in the opponent's opening hand.")
+
+
+def test_match_service_pending_choice_can_be_retrieved_and_resolved() -> None:
+    service, repository = build_service()
+    _ = service.create_match(
+        build_create_match_command(
+            match_id="pending_choice_match",
+            alice_deck_id="scoiatael_high_stakes",
+            bob_deck_id="scoiatael_high_stakes",
+        ),
+        viewer_service_player_id="alice",
+    )
+    _ = service.submit_mulligan(
+        SubmitMulliganCommand(
+            match_id="pending_choice_match",
+            service_player_id="alice",
+            card_instance_ids=("p1_card_9",),
+        )
+    )
+    _ = service.submit_mulligan(
+        SubmitMulliganCommand(
+            match_id="pending_choice_match",
+            service_player_id="bob",
+            card_instance_ids=(),
+        )
+    )
+    stored_match = repository.get("pending_choice_match")
+    assert stored_match is not None
+    pending_state = pending_decoy_state("pending_choice_match")
+    _ = replace_match_state(repository, match_id="pending_choice_match", state=pending_state)
+
+    pending_choice_view = service.get_match(
+        "pending_choice_match", viewer_service_player_id="alice"
+    )
+    hidden_from_bob = service.get_match("pending_choice_match", viewer_service_player_id="bob")
+    before_resolution = repository.get("pending_choice_match")
+
+    assert before_resolution is not None
+    assert pending_choice_view.pending_choice is not None
+    assert hidden_from_bob.pending_choice is None
+    assert len(before_resolution.event_log_payloads) == len(stored_match.event_log_payloads)
+
+    resolved_view = service.resolve_choice(
+        ResolveChoiceCommand(
+            match_id="pending_choice_match",
+            service_player_id="alice",
+            choice_id=pending_choice_view.pending_choice.choice_id,
+            selected_card_instance_ids=("p1_spy_target",),
+        )
+    )
+    after_resolution = repository.get("pending_choice_match")
+
+    assert after_resolution is not None
+    assert resolved_view.pending_choice is None
+    assert "p1_spy_target" in {card.instance_id for card in resolved_view.viewer_hand}
+    assert len(after_resolution.event_log_payloads) > len(before_resolution.event_log_payloads)

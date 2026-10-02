@@ -12,7 +12,14 @@ from gwent_engine.core import (
     Row,
     Zone,
 )
-from gwent_engine.core.ids import CardInstanceId, ChoiceId, GameId, LeaderId, PlayerId
+from gwent_engine.core.ids import (
+    CardDefinitionId,
+    CardInstanceId,
+    ChoiceId,
+    GameId,
+    LeaderId,
+    PlayerId,
+)
 from gwent_engine.core.state import (
     CardInstance,
     GameState,
@@ -22,10 +29,63 @@ from gwent_engine.core.state import (
     RowState,
 )
 
-from .primitives import PLAYER_ONE_ID, PLAYER_TWO_ID, make_card_instance
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 DEFAULT_SCENARIO_FACTION = FactionId("scoiatael")
 DEFAULT_SCENARIO_LEADER = LeaderId("scoiatael_francesca_the_beautiful")
+
+
+def make_card_instance(
+    *,
+    instance_id: str,
+    definition_id: str,
+    owner: PlayerId,
+    zone: Zone,
+    row: Row | None = None,
+    battlefield_side: PlayerId | None = None,
+) -> CardInstance:
+    return CardInstance(
+        instance_id=CardInstanceId(instance_id),
+        definition_id=CardDefinitionId(definition_id),
+        owner=owner,
+        zone=zone,
+        row=row,
+        battlefield_side=battlefield_side,
+    )
+
+
+def battlefield_card(
+    *,
+    instance_id: str,
+    definition_id: str,
+    owner: PlayerId,
+    row: Row,
+    battlefield_side: PlayerId | None = None,
+) -> CardInstance:
+    return make_card_instance(
+        instance_id=instance_id,
+        definition_id=definition_id,
+        owner=owner,
+        zone=Zone.BATTLEFIELD,
+        row=row,
+        battlefield_side=battlefield_side or owner,
+    )
+
+
+def weather_card(
+    *,
+    instance_id: str,
+    definition_id: str,
+    owner: PlayerId,
+    row: Row,
+) -> CardInstance:
+    return make_card_instance(
+        instance_id=instance_id,
+        definition_id=definition_id,
+        owner=owner,
+        zone=Zone.WEATHER,
+        row=row,
+    )
 
 
 DEFAULT_LEADER_BY_FACTION = {

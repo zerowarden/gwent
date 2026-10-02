@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import NoReturn, final
 
 import pytest
-from gwent_engine.ai.heuristic_configuration import HeuristicConfiguration
+from gwent_engine.ai.baseline.heuristic_configuration import HeuristicConfiguration
 from gwent_evaluation.agents import resolve_agent
 from gwent_evaluation.execution import agent_identity
 from gwent_evaluation.models import MatchResult, SpecError, TerminationReason

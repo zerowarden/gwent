@@ -8,9 +8,9 @@ from gwent_engine.rules.scoring import (
     calculate_effective_strength,
 )
 
-from tests.engine.primitives import PLAYER_ONE_ID, make_card_instance
-from tests.engine.scenario_builder import card, rows, scenario
+from tests.engine.scenario_builder import card, make_card_instance, rows, scenario
 from tests.engine.support import CARD_REGISTRY
+from tests.support import PLAYER_ONE_ID
 
 
 def test_non_battlefield_unit_uses_base_strength() -> None:

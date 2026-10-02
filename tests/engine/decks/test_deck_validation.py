@@ -1,5 +1,4 @@
-from gwent_engine.cards.models import CardDefinition, DeckDefinition
-from gwent_engine.cards.registry import CardRegistry
+from gwent_engine.cards.models import CardDefinition, CardRegistry
 from gwent_engine.core import (
     AbilityKind,
     CardType,
@@ -10,20 +9,18 @@ from gwent_engine.core import (
     Row,
 )
 from gwent_engine.core.actions import StartGameAction
-from gwent_engine.core.ids import CardDefinitionId, DeckId, GameId, LeaderId, PlayerId
+from gwent_engine.core.ids import CardDefinitionId, DeckId, GameId, LeaderId
 from gwent_engine.core.reducer import apply_action
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.decks.validation import (
     DEFAULT_DECK_RULESET,
     DeckRuleset,
     validate_deck,
 )
-from gwent_engine.leaders.models import LeaderDefinition
-from gwent_engine.leaders.registry import LeaderRegistry
+from gwent_engine.leaders.models import LeaderDefinition, LeaderRegistry
 from gwent_engine.rules.game_setup import PlayerDeck, build_game_state
 
-from tests.engine.support import (
-    IdentityShuffle,
-)
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID, IdentityRandom
 
 
 def _unit_definition(
@@ -408,15 +405,15 @@ def test_deck_validation_is_not_wired_into_apply_action() -> None:
     initial_state = build_game_state(
         game_id=GameId("deck_validation_is_explicit"),
         player_decks=(
-            PlayerDeck(player_id=PlayerId("p1"), deck=invalid_but_playable_deck),
-            PlayerDeck(player_id=PlayerId("p2"), deck=invalid_but_playable_deck),
+            PlayerDeck(player_id=PLAYER_ONE_ID, deck=invalid_but_playable_deck),
+            PlayerDeck(player_id=PLAYER_TWO_ID, deck=invalid_but_playable_deck),
         ),
     )
 
     started_state, _ = apply_action(
         initial_state,
-        StartGameAction(starting_player=PlayerId("p1")),
-        rng=IdentityShuffle(),
+        StartGameAction(starting_player=PLAYER_ONE_ID),
+        rng=IdentityRandom(),
     )
 
     assert validation_result.errors != ()

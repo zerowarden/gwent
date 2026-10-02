@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from itertools import combinations, product
 
-from gwent_engine.ai.action_ids import action_sort_key
-from gwent_engine.ai.mulligan_actions import enumerate_joint_mulligan_actions
-from gwent_engine.ai.pending_choice_actions import enumerate_pending_choice_actions
 from gwent_engine.cards import CardDefinition, CardRegistry
 from gwent_engine.core import (
     AbilityKind,
@@ -16,17 +14,32 @@ from gwent_engine.core import (
 from gwent_engine.core.actions import (
     GameAction,
     LeaveAction,
+    MulliganSelection,
     PassAction,
     PlayCardAction,
+    ResolveChoiceAction,
+    ResolveMulligansAction,
     StartGameAction,
     UseLeaderAbilityAction,
 )
+from gwent_engine.core.enums import MAX_MULLIGAN_REPLACEMENTS
 from gwent_engine.core.ids import CardInstanceId, PlayerId
-from gwent_engine.core.state import GameState, PlayerState
+from gwent_engine.core.state import GameState, PendingChoice, PlayerState
 from gwent_engine.leaders import LeaderDefinition, LeaderRegistry
-from gwent_engine.rules.battlefield_effects import is_weather_ability
-from gwent_engine.rules.leader_effects import leader_definition_for_player
+from gwent_engine.rules.leader_common import leader_definition_for_player
 from gwent_engine.rules.row_effects import special_ability_kind
+from gwent_engine.rules.weather import is_weather_ability
+from gwent_engine.serialize.actions import action_payload
+
+ACTION_TYPE_ORDER = {
+    "StartGameAction": 0,
+    "ResolveMulligansAction": 1,
+    "ResolveChoiceAction": 2,
+    "PlayCardAction": 3,
+    "UseLeaderAbilityAction": 4,
+    "PassAction": 5,
+    "LeaveAction": 6,
+}
 
 ROW_TARGETED_SPECIAL_ABILITIES = frozenset(
     {
@@ -323,3 +336,88 @@ def _card_is_untargeted_playable_special(definition: CardDefinition) -> bool:
 
 def _finalize_actions(actions: Iterable[GameAction]) -> tuple[GameAction, ...]:
     return tuple(sorted(actions, key=action_sort_key))
+
+
+def action_sort_key(action: GameAction) -> tuple[object, ...]:
+    payload = action_payload(action)
+    type_name = str(payload["type"])
+    return (
+        ACTION_TYPE_ORDER[type_name],
+        *(payload[key] for key in sorted(payload) if key != "type"),
+    )
+
+
+def enumerate_pending_choice_actions(
+    pending_choice: PendingChoice,
+) -> tuple[GameAction, ...]:
+    actions: list[GameAction] = []
+    for selection_size in range(
+        pending_choice.min_selections,
+        pending_choice.max_selections + 1,
+    ):
+        for selected_ids in combinations(
+            pending_choice.legal_target_card_instance_ids,
+            selection_size,
+        ):
+            actions.append(
+                ResolveChoiceAction(
+                    player_id=pending_choice.player_id,
+                    choice_id=pending_choice.choice_id,
+                    selected_card_instance_ids=selected_ids,
+                )
+            )
+    return tuple(sorted(actions, key=action_sort_key))
+
+
+def enumerate_mulligan_selections(
+    state: GameState,
+    player_id: PlayerId,
+) -> tuple[MulliganSelection, ...]:
+    if state.phase != Phase.MULLIGAN:
+        return ()
+    player = state.player(player_id)
+    selections = tuple(
+        MulliganSelection(player_id=player_id, cards_to_replace=card_ids)
+        for card_ids in card_id_combinations(
+            player.hand,
+            max_count=min(MAX_MULLIGAN_REPLACEMENTS, len(player.hand)),
+        )
+    )
+    return tuple(sorted(selections, key=mulligan_selection_sort_key))
+
+
+def enumerate_joint_mulligan_actions(state: GameState) -> tuple[GameAction, ...]:
+    player_selections = tuple(
+        enumerate_mulligan_selections(state, player.player_id) for player in state.players
+    )
+    actions = tuple(
+        ResolveMulligansAction(selections=selection_pair)
+        for selection_pair in product(*player_selections)
+    )
+    return tuple(sorted(actions, key=action_sort_key))
+
+
+def card_id_combinations(
+    card_ids: tuple[CardInstanceId, ...],
+    *,
+    max_count: int,
+) -> tuple[tuple[CardInstanceId, ...], ...]:
+    selections = [
+        selected_ids
+        for selection_size in range(max_count + 1)
+        for selected_ids in combinations(card_ids, selection_size)
+    ]
+    return tuple(
+        sorted(
+            selections,
+            key=lambda ids: (len(ids), tuple(str(card_id) for card_id in ids)),
+        )
+    )
+
+
+def mulligan_selection_sort_key(selection: MulliganSelection) -> tuple[object, ...]:
+    return (
+        str(selection.player_id),
+        len(selection.cards_to_replace),
+        tuple(str(card_id) for card_id in selection.cards_to_replace),
+    )

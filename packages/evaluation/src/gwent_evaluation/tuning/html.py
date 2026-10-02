@@ -10,8 +10,7 @@ from gwent_shared.json_payloads import dump_pretty_json
 from gwent_evaluation.html_report import chart, document, percent, table
 from gwent_evaluation.records import record_to_dict
 from gwent_evaluation.storage import atomic_write_text
-from gwent_evaluation.tuning.models import StudySpec
-from gwent_evaluation.tuning.report_models import StudyReport
+from gwent_evaluation.tuning.models import StudyReport, StudySpec
 from gwent_evaluation.tuning.specs import plan_study
 
 

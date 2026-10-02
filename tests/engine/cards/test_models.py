@@ -1,7 +1,9 @@
 from typing import cast
 
 import pytest
-from gwent_engine.cards.models import CardDefinition, DeckDefinition
+from gwent_engine.assets import bundled_data_dir
+from gwent_engine.cards.loaders import load_card_definitions
+from gwent_engine.cards.models import CardDefinition, CardRegistry
 from gwent_engine.core import (
     AbilityKind,
     CardType,
@@ -10,22 +12,23 @@ from gwent_engine.core import (
     LeaderAbilityKind,
     LeaderAbilityMode,
     LeaderSelectionMode,
-    PassiveKind,
     Phase,
     Row,
     Zone,
 )
+from gwent_engine.core.errors import UnknownCardDefinitionError
 from gwent_engine.core.ids import (
     CardDefinitionId,
     CardInstanceId,
     DeckId,
     GameId,
     LeaderId,
-    PlayerId,
 )
 from gwent_engine.core.state import CardInstance, GameState, LeaderState, PlayerState, RowState
-from gwent_engine.factions.models import FactionDefinition
+from gwent_engine.decks import DeckDefinition
 from gwent_engine.leaders.models import LeaderDefinition
+
+from tests.support import PLAYER_ONE_ID, PLAYER_TWO_ID
 
 
 def _build_card_definition(**overrides: object) -> CardDefinition:
@@ -85,13 +88,6 @@ def _assert_card_definition_rejected(
 
 
 def test_typed_models_construct_cleanly() -> None:
-    faction = FactionDefinition(
-        faction_id=FactionId.MONSTERS,
-        name="Monsters",
-        passive_kind=PassiveKind.MONSTERS_KEEP_ONE_UNIT,
-        passive_description="One unit remains after cleanup.",
-    )
-
     card_definition = CardDefinition(
         definition_id=CardDefinitionId("scoiatael_bond_vanguard"),
         name="Bond Vanguard",
@@ -110,7 +106,7 @@ def test_typed_models_construct_cleanly() -> None:
     )
 
     player_one = PlayerState(
-        player_id=PlayerId("p1"),
+        player_id=PLAYER_ONE_ID,
         faction=FactionId.MONSTERS,
         leader=LeaderState(leader_id=LeaderId("monsters_eredin_commander_of_the_red_riders")),
         deck=(CardInstanceId("card_1"),),
@@ -119,7 +115,7 @@ def test_typed_models_construct_cleanly() -> None:
         rows=RowState(),
     )
     player_two = PlayerState(
-        player_id=PlayerId("p2"),
+        player_id=PLAYER_TWO_ID,
         faction=FactionId.NILFGAARD,
         leader=LeaderState(leader_id=LeaderId("nilfgaard_emhyr_his_imperial_majesty")),
         deck=(),
@@ -134,7 +130,7 @@ def test_typed_models_construct_cleanly() -> None:
             CardInstance(
                 instance_id=CardInstanceId("card_1"),
                 definition_id=CardDefinitionId("monsters_griffin"),
-                owner=PlayerId("p1"),
+                owner=PLAYER_ONE_ID,
                 zone=Zone.DECK,
             ),
         ),
@@ -142,11 +138,10 @@ def test_typed_models_construct_cleanly() -> None:
         status=GameStatus.NOT_STARTED,
     )
 
-    assert faction.name == "Monsters"
     assert card_definition.allowed_rows == (Row.CLOSE,)
     assert card_definition.bond_group == "vanguard_line"
     assert deck_definition.card_definition_ids == (CardDefinitionId("monsters_griffin"),)
-    assert game_state.player(PlayerId("p1")).faction == FactionId.MONSTERS
+    assert game_state.player(PLAYER_ONE_ID).faction == FactionId.MONSTERS
 
 
 def test_leader_definition_rejects_specific_weather_mode_without_a_weather_kind() -> None:
@@ -410,3 +405,21 @@ def test_deck_definition_rejects_empty_card_list() -> None:
             leader_id=LeaderId("monsters_eredin_commander_of_the_red_riders"),
             card_definition_ids=(),
         )
+
+
+DATA_DIR = bundled_data_dir()
+
+
+def test_card_registry_lookup_succeeds_for_known_ids() -> None:
+    registry = CardRegistry.from_definitions(load_card_definitions(DATA_DIR / "cards.yaml"))
+
+    card = registry.get(CardDefinitionId("monsters_griffin"))
+
+    assert card.name == "Griffin"
+
+
+def test_card_registry_lookup_fails_for_unknown_ids() -> None:
+    registry = CardRegistry.from_definitions(load_card_definitions(DATA_DIR / "cards.yaml"))
+
+    with pytest.raises(UnknownCardDefinitionError, match="Unknown card definition id"):
+        _ = registry.get(CardDefinitionId("missing_card"))

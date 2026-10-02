@@ -100,6 +100,17 @@ resumes an interrupted run after verifying existing records; conflicting
 manifests are rejected. Exit codes: `0` success, `1` reproduced divergence or
 incompatible comparison, `2` invalid input.
 
+`run` refuses `test`-purpose suites: held-out suites may only be executed
+through `tune finalize`. The emergency escape hatch is deliberately explicit:
+
+```bash
+uv run python -m gwent_evaluation run --suite core-test-v1 \
+  --consume-heldout CONSUME-HELDOUT-PARTITION
+```
+
+The acknowledgement is written to `heldout.json` beside the run and cannot be
+undone. Once a partition has been consumed, treat it as observed evidence.
+
 `replay --reproduce` re-executes the declared agents and reports two independent
 flags: `execution_identity_matches` compares the current implementation, runtime,
 resolved configurations, and assets against the recorded execution identity;
@@ -325,7 +336,7 @@ random backend's `ask()` / `tell()` interface, parameter binding, and objective.
 Construct either method from its frozen study settings:
 
 ```python
-from gwent_evaluation.tuning.backends import create_optimizer
+from gwent_evaluation.tuning.study import create_optimizer
 from gwent_evaluation.tuning.models import OptimizerMethod
 
 optimizer = create_optimizer(study, OptimizerMethod.CMA_ES)
@@ -499,9 +510,12 @@ returns exit code 1 and leaves test cases untouched. A code or dependency fix
 requires a new study; verification cannot carry across implementations.
 
 `finalize` evaluates only the frozen challenger and incumbent on the study's
-test suite. Promotion requires complete valid evidence, the declared minimum
-paired improvement, a bootstrap lower endpoint above zero, and all predeclared
-opponent/deck regression guards. These subgroup guards are descriptive, not a
+test suite; it issues the held-out execution capability only after selection is
+frozen and verification has passed, and records the consumption as
+`heldout.json` in each confirmation run. Promotion requires complete valid
+evidence, the declared minimum paired improvement, a bootstrap lower endpoint
+above zero, and all predeclared opponent/deck regression guards. These subgroup
+guards are descriptive, not a
 simultaneous statistical guarantee. A rejected challenger never causes a runner-up
 to be tested. `selection/confirmation/report.json` records the decision and
 reasons. `selection/confirmation/policy.json` contains the confirmed configuration
@@ -702,7 +716,7 @@ After committing implementation and protocol changes, run:
 
 ```bash
 make check
-uv run --locked python -m gwent_evaluation.tuning.assessment
+uv run --locked tune assessment
 ```
 
 `experiments/tuning/assessment.json` predeclares three independent random/CMA
@@ -717,14 +731,14 @@ assessment, not proof of general optimizer superiority.
 
 The assessment also exports a nondefault **unpromoted diagnostic** policy,
 loads it through the ordinary factory, and checks exact execution identity and
-semantic reproduction through M1. This runtime check is separate from any
+semantic reproduction through evaluation replay. This runtime check is separate from any
 scientific promotion. Rerun the command to verify/reuse results; after process
 death pass `--recover-lock`. The full `weights.json` budget is a separate
 experiment and is not implicitly enabled by this acceptance recipe.
 
 The integrated acceptance tests exercise both real proposal backends and actual
 games across interruption/recovery, synthetic validation/confirmation gates,
-portable artifact reload, and exact M1 reproduction. Synthetic test provenance
+portable artifact reload, and exact evaluation-replay reproduction. Synthetic test provenance
 and synthetic outcomes do not constitute playing-strength evidence. Ordinary
 evaluation tests reject storage execution/reading of registered genuine holdouts.
 
@@ -842,7 +856,7 @@ dependency, external script or CDN. A high optimization curve is not promotion.
 Rebuild the earlier repeated assessment with charts using:
 
 ```bash
-uv run --locked python -m gwent_evaluation.tuning.assessment --report-only
+uv run --locked tune assessment --report-only
 ```
 
 Open `.output/acceptance/assessment/report.html` and follow its replicate links.

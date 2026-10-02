@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import ClassVar
 
-from gwent_shared.error_translation import translate_mapping_key
+from gwent_shared.extract import translate_mapping_key
 
 from gwent_engine.core.errors import DuplicateDefinitionError
 
